@@ -1,0 +1,25 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ]
+    },
+    "types": [
+      "react",
+      "react-native",
+      "vitest/globals"
+    ]
+  },
+  "include": [
+    "app",
+    "src",
+    "scripts",
+    "tests",
+    "*.ts",
+    "*.tsx"
+  ]
+}
