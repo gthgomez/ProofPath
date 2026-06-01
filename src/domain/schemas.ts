@@ -163,6 +163,17 @@ export const lessonWorkshopSchema = z.object({
   coreConcept: nonEmptyString,
   workedExample: nonEmptyString,
   commonMistakes: z.array(nonEmptyString).min(1),
+  misconceptionChecks: z.array(z.object({
+    mistake: nonEmptyString,
+    repair: nonEmptyString,
+    checkPrompt: nonEmptyString
+  })).min(1),
+  recallCards: z.array(z.object({
+    id: nonEmptyString,
+    type: z.enum(["explain", "debug", "transfer"]),
+    prompt: nonEmptyString,
+    answerHint: nonEmptyString
+  })).min(3),
   guidedExercise: nonEmptyString,
   missionConnection: nonEmptyString,
   reflectionPrompt: nonEmptyString

@@ -305,7 +305,7 @@ describe("progress actions", () => {
       title: "Tests",
       body: "Proof",
       testStatus: "passing"
-    })).toContain("verifier output");
+    })).toContain("check output");
   });
 
   it("records recall review events and advances due dates", () => {

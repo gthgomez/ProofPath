@@ -145,9 +145,26 @@ export interface LessonWorkshop {
   coreConcept: string;
   workedExample: string;
   commonMistakes: string[];
+  misconceptionChecks: LessonMisconceptionCheck[];
+  recallCards: LessonRecallCard[];
   guidedExercise: string;
   missionConnection: string;
   reflectionPrompt: string;
+}
+
+export type LessonRecallCardType = "explain" | "debug" | "transfer";
+
+export interface LessonRecallCard {
+  id: string;
+  type: LessonRecallCardType;
+  prompt: string;
+  answerHint: string;
+}
+
+export interface LessonMisconceptionCheck {
+  mistake: string;
+  repair: string;
+  checkPrompt: string;
 }
 
 export interface LessonPracticeBlock {

@@ -17,7 +17,7 @@ function formatVisibleTestExpectation(expectedOutputIncludes?: string[]): string
   }
 
   const learnerOutput = expectedOutputIncludes.filter((value) => value !== "passed");
-  const verifierOutput = expectedOutputIncludes.includes("passed") ? "verifier prints passed" : null;
+  const verifierOutput = expectedOutputIncludes.includes("passed") ? "check prints passed" : null;
   const parts = [
     learnerOutput.length ? `checks output for ${learnerOutput.join(", ")}` : null,
     verifierOutput
@@ -91,7 +91,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
     }
 
     const copied = await copyTextToClipboard(formatProofSummary(latestRun));
-    setCopyStatus(copied ? "Learner-safe proof summary copied." : "Proof summary is visible below.");
+    setCopyStatus(copied ? "Learner-safe check summary copied." : "Check summary is visible below.");
   };
 
   const learnerLatestRun = latestRun ? redactLearnerAttempt(latestRun) : undefined;
@@ -108,7 +108,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
       ? "Running file"
       : "Running checks"
     : proofCaptured
-      ? "Proof captured"
+      ? "Check passed"
       : fileRan
         ? "File ran"
       : learnerLatestRun
@@ -132,16 +132,16 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
         </Row>
         <MutedText>
           {proofCaptured
-            ? "Proof captured. Keep the verifier output for evidence."
+            ? "Check passed. Save the output when you are ready to add portfolio evidence."
             : fileRan
-              ? "The file ran. Run checks when you are ready to validate proof."
+              ? "The file ran. Run checks when you are ready to validate the answer."
             : learnerLatestRun
               ? "Read the failing test, change the smallest thing, then run again."
-              : "Run file to inspect output. Run checks when you are ready to capture proof."}
+              : "Run file to inspect output. Run checks when you are ready to validate the answer."}
         </MutedText>
       </View>
       <SectionTitle>Code editor</SectionTitle>
-      <MutedText>Syntax highlighting helps you read the code structure. Run file shows program output; Run checks validates the proof gate.</MutedText>
+      <MutedText>Syntax highlighting helps you read the code structure. Run file shows program output; Run checks validates the lesson goal.</MutedText>
       {runtimeCapabilities.beginnerNote ? <MutedText>{runtimeCapabilities.beginnerNote}</MutedText> : null}
       <SyntaxHighlightedEditor
         accessibilityLabel={`${runnerSpec.language} code editor`}
@@ -153,7 +153,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
       />
       <Row>
         <ButtonShell
-          accessibilityHint="Runs the current file and shows terminal output without awarding proof."
+          accessibilityHint="Runs the current file and shows terminal output without completing the Code Lab check."
           disabled={isSaving || isRunning}
           onPress={() => {
             void runCode("run_file");
@@ -164,7 +164,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
           {isRunning && activeRunMode === "run_file" ? "Running file" : "Run file"}
         </ButtonShell>
         <ButtonShell
-          accessibilityHint="Runs verifier checks. Passing checks can capture proof and complete the Code Lab gate."
+          accessibilityHint="Runs lesson checks. Passing checks complete the Code Lab task."
           disabled={isSaving || isRunning}
           onPress={() => {
             void runCode("run_checks");
@@ -184,11 +184,11 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
           Reset starter
         </ButtonShell>
       </Row>
-      <MutedText>Proof requires Run checks. Run file is for inspecting behavior before verification.</MutedText>
+      <MutedText>Completion requires Run checks. Run file is for inspecting behavior before verification.</MutedText>
       <CodeTerminal events={terminalEvents} />
       <CodeProblems diagnostics={diagnostics} onSelectLine={setFocusedLine} />
       <SectionTitle>Visible checks</SectionTitle>
-      <MutedText>Only learner-facing verifier feedback appears here; private verifier details stay redacted.</MutedText>
+      <MutedText>Only learner-facing check feedback appears here; private check details stay redacted.</MutedText>
       {runnerSpec.visibleTests.map((test) => (
         <MutedText key={test.id}>{test.name}{formatVisibleTestExpectation(test.expectedOutputIncludes)}</MutedText>
       ))}
@@ -287,13 +287,13 @@ export function CodeRunResult({
             Copy stderr
           </ButtonShell>
           <ButtonShell
-            accessibilityHint="Copies a short proof summary for evidence review."
+            accessibilityHint="Copies a short check summary for evidence review."
             onPress={onCopyProofSummary}
             size="compact"
             tone="green"
             variant="secondary"
           >
-            Copy proof summary
+            Copy check summary
           </ButtonShell>
         </Row>
       ) : null}
@@ -352,14 +352,14 @@ function latestRunBadgeLabel(latestRun: NonNullable<CodeLabProps["latestRun"]>):
 
 function formatProofSummary(latestRun: NonNullable<CodeLabProps["latestRun"]>): string {
   return [
-    "Code Lab proof summary",
+    "Code Lab check summary",
     `command: ${latestRun.command}`,
     `mode: ${latestRun.runMode === "run_checks" ? "checks" : "file run"}`,
     `language: ${latestRun.language}`,
     `result: ${resultStatusLabel(latestRun)}`,
     `runtime: ${latestRun.runtimeMs}ms`,
     latestRun.runMode === "run_checks" ? `visible checks: ${latestRun.testResults.filter((testResult) => testResult.passed).length}/${latestRun.testResults.length} passed` : undefined,
-    latestRun.runMode === "run_checks" ? "private verifier details: redacted" : undefined
+    latestRun.runMode === "run_checks" ? "private check details: redacted" : undefined
   ].filter(Boolean).join("\n\n");
 }
 

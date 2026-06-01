@@ -1,4 +1,4 @@
-import type { ContentPack, LessonMiniProject, LessonMiniProjectTester, LessonPracticeBlock, LessonRunnerSpec, LessonWorkshop, MissionEvidenceRequirements, ProjectMissionPhase, RunnerLanguage } from "@/domain/types";
+import type { ContentPack, Difficulty, Lesson, LessonMiniProject, LessonMiniProjectTester, LessonMisconceptionCheck, LessonPracticeBlock, LessonRecallCard, LessonRunnerSpec, LessonWorkshop, MissionEvidenceRequirements, ProjectMissionPhase, Quiz, RunnerLanguage } from "@/domain/types";
 
 const foundationEvidence: MissionEvidenceRequirements = {
   repoUrl: true,
@@ -36,8 +36,8 @@ function defaultRunnerSpec(
     starterCode,
     visibleTests: [
       {
-        id: "visible-proof",
-        name: "Visible proof check",
+        id: "visible-check",
+        name: "Visible lesson check",
         code: visibleTestCode,
         expectedOutputIncludes: expectedOutput
       }
@@ -53,12 +53,12 @@ function defaultRunnerSpec(
 function miniProjectWithTester(miniProject: LessonMiniProjectInput): LessonMiniProject {
   const defaultTester: LessonMiniProjectTester = {
     codeLabel: "Code or artifact",
-    outputLabel: "Terminal output or verifier result",
+    outputLabel: "Terminal output or check result",
     requiredCodeIncludes: [],
     requiredOutputIncludes: ["passed"],
     forbiddenOutputIncludes: ["traceback", "exception", "syntaxerror", "error:", "failed"],
-    successMessage: "Mini-project proof passed. The lesson can count this hands-on work.",
-    failureMessage: "The tester needs code/artifact proof plus clean verifier output before this can be marked done."
+    successMessage: "Mini-project check passed. The lesson can count this hands-on work.",
+    failureMessage: "The tester needs code or notes plus clean check output before this can be marked done."
   };
 
   return {
@@ -89,9 +89,9 @@ function missionPhases(slug: string, buildTarget: string, verifier: string, poli
   return [
     {
       id: `${slug}-plan`,
-      title: "Plan the proof",
+      title: "Plan the check",
       goal: `Define the smallest useful version of ${buildTarget}.`,
-      tasks: ["Write the user story", "List the data contract", "Name the verifier before building"]
+      tasks: ["Write the user story", "List the data contract", "Name the check before building"]
     },
     {
       id: `${slug}-build`,
@@ -102,8 +102,8 @@ function missionPhases(slug: string, buildTarget: string, verifier: string, poli
     {
       id: `${slug}-verify`,
       title: "Verify and explain",
-      goal: `Prove ${buildTarget} works with ${verifier}.`,
-      tasks: ["Run the verifier", "Capture exact output", `Write the ${polishTarget}`]
+      goal: `Confirm ${buildTarget} works with ${verifier}.`,
+      tasks: ["Run the check", "Capture exact output", `Write the ${polishTarget}`]
     }
   ];
 }
@@ -113,15 +113,15 @@ function lowerFirst(value: string): string {
 }
 
 function professorSynopsis(synopsis: string, objective: string, projectGoal: string): string {
-  return `Start here: ${synopsis} By the end, you will be able to ${lowerFirst(objective)} You will prove it by creating this proof: ${lowerFirst(projectGoal)}`;
+  return `Start here: ${synopsis} By the end, you will be able to ${lowerFirst(objective)} You will practice it by making this small result: ${lowerFirst(projectGoal)}`;
 }
 
 function professorTestingFocus(testingFocus: string): string {
-  return `What the verifier checks: ${testingFocus} If the sandbox prints passed, that means the verifier confirmed the result; it is usually not a word you type yourself.`;
+  return `What the check confirms: ${testingFocus} If the sandbox prints passed, that means the app confirmed the result; it is usually not a word you type yourself.`;
 }
 
 function professorCoreConcept(coreConcept: string): string {
-  return `Plain-English concept: ${coreConcept}`;
+  return `Mental model: ${coreConcept}`;
 }
 
 function professorGuidedExercise(guidedExercise: string): string {
@@ -132,6 +132,47 @@ function professorReflectionPrompt(reflectionPrompt: string): string {
   return `${reflectionPrompt} A strong answer names the decision you made, the evidence you used, and one remaining uncertainty.`;
 }
 
+function retentionSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48) || "lesson";
+}
+
+function lessonRecallCards(objective: string, coreConcept: string, guidedExercise: string, missionConnection: string): LessonRecallCard[] {
+  const slug = retentionSlug(objective);
+
+  return [
+    {
+      id: `${slug}-explain`,
+      type: "explain",
+      prompt: `Explain the lesson idea without opening the notes: ${lowerFirst(objective)}`,
+      answerHint: coreConcept
+    },
+    {
+      id: `${slug}-debug`,
+      type: "debug",
+      prompt: `Name one mistake that would make this practice fail, then say how you would notice it: ${lowerFirst(guidedExercise)}`,
+      answerHint: "Look for the wrong output, missing value, skipped branch, or unchecked failure case before changing more code."
+    },
+    {
+      id: `${slug}-transfer`,
+      type: "transfer",
+      prompt: "Where does this idea show up in the larger project or portfolio mission?",
+      answerHint: missionConnection
+    }
+  ];
+}
+
+function lessonMisconceptionChecks(commonMistakes: string[]): LessonMisconceptionCheck[] {
+  return commonMistakes.slice(0, 2).map((mistake) => ({
+    mistake,
+    repair: "Slow down to one observable behavior, run the smallest check, and explain what changed before moving on.",
+    checkPrompt: `How would you catch this mistake before claiming the lesson is done: ${lowerFirst(mistake)}?`
+  }));
+}
+
 function workshop(
   objective: string,
   whyItMatters: string,
@@ -140,7 +181,7 @@ function workshop(
   guidedExercise: string,
   missionConnection: string,
   reflectionPrompt: string,
-  commonMistakes = ["Skipping the failure case", "Recording completion without verifier output"],
+  commonMistakes = ["Skipping the failure case", "Recording completion without check output"],
   beginnerContext: Pick<LessonWorkshop, "language" | "tools" | "synopsis" | "prerequisites" | "testingFocus"> & { codeShape?: string } = {
     language: "Career skill",
     tools: ["CareerForge"],
@@ -154,12 +195,12 @@ function workshop(
     checkYourAnswer: "Compare your result with the expected output, then explain one thing you would test next."
   },
   miniProject: LessonMiniProjectInput = {
-    title: "Lesson proof slice",
+    title: "Lesson practice slice",
     goal: "Turn the lesson idea into one small artifact you can inspect.",
-    steps: ["Build the smallest working version", "Run one verifier or manual check", "Write what the result proves"],
-    deliverables: ["Working artifact", "Verifier result", "Short reflection"],
-    verifierCommand: "Run the smallest command or check that proves the artifact works.",
-    expectedEvidence: "A note with the artifact path, result, and one limitation.",
+    steps: ["Build the smallest working version", "Run one lesson check or manual check", "Write what the result confirms"],
+    deliverables: ["Working result", "Check result", "Short reflection"],
+    verifierCommand: "Run the smallest command or check that confirms the result works.",
+    expectedEvidence: "A note with the result path, check output, and one limitation.",
     projectConnection: "This mini project is a small rehearsal for the larger portfolio mission."
   },
   practiceReps: LessonPracticeBlock[] = []
@@ -179,9 +220,166 @@ function workshop(
     coreConcept: professorCoreConcept(coreConcept),
     workedExample,
     commonMistakes,
+    misconceptionChecks: lessonMisconceptionChecks(commonMistakes),
+    recallCards: lessonRecallCards(objective, coreConcept, guidedExercise, missionConnection),
     guidedExercise: professorGuidedExercise(guidedExercise),
     missionConnection,
     reflectionPrompt: professorReflectionPrompt(reflectionPrompt)
+  };
+}
+
+interface ProofLessonInput {
+  id: string;
+  moduleId: string;
+  slug: string;
+  title: string;
+  summary: string;
+  bodyMarkdown: string;
+  estimatedMinutes: number;
+  difficulty: Difficulty;
+  skillIds: string[];
+  quizId: string;
+  desktopTask: string;
+  evidencePrompt: string;
+  language: string;
+  tools: string[];
+  synopsis: string;
+  prerequisites: string[];
+  testingFocus: string;
+  objective: string;
+  whyItMatters: string;
+  coreConcept: string;
+  workedExample: string;
+  guidedExercise: string;
+  missionConnection: string;
+  reflectionPrompt: string;
+  practiceStarter: string;
+  practiceExpected: string;
+  practiceCheck: string;
+  practiceReps?: LessonPracticeBlock[];
+  miniTitle: string;
+  miniGoal: string;
+  miniSteps: string[];
+  miniDeliverables: string[];
+  verifierCommand: string;
+  expectedEvidence: string;
+  projectConnection: string;
+  requiredCodeIncludes: string[];
+  requiredOutputIncludes: string[];
+  runnerLanguage?: RunnerLanguage;
+  runnerStarterCode: string;
+  runnerTestCode: string;
+}
+
+function proofLesson(input: ProofLessonInput): Lesson {
+  return {
+    id: input.id,
+    moduleId: input.moduleId,
+    slug: input.slug,
+    title: input.title,
+    summary: input.summary,
+    bodyMarkdown: input.bodyMarkdown,
+    estimatedMinutes: input.estimatedMinutes,
+    difficulty: input.difficulty,
+    skillIds: input.skillIds,
+    quizId: input.quizId,
+    desktopTask: input.desktopTask,
+    evidencePrompt: input.evidencePrompt,
+    workshop: workshop(
+      input.objective,
+      input.whyItMatters,
+      input.coreConcept,
+      input.workedExample,
+      input.guidedExercise,
+      input.missionConnection,
+      input.reflectionPrompt,
+      ["Skipping the negative case", "Claiming completion without check output"],
+      {
+        language: input.language,
+        tools: input.tools,
+        synopsis: input.synopsis,
+        prerequisites: input.prerequisites,
+        testingFocus: `${input.testingFocus} This test keeps the result tied to observable behavior.`
+      },
+      {
+        starterCode: input.practiceStarter,
+        expectedOutput: input.practiceExpected,
+        checkYourAnswer: input.practiceCheck
+      },
+      {
+        title: input.miniTitle,
+        goal: input.miniGoal,
+        steps: input.miniSteps,
+        deliverables: input.miniDeliverables,
+        verifierCommand: input.verifierCommand,
+        expectedEvidence: input.expectedEvidence,
+        projectConnection: input.projectConnection,
+        tester: {
+          codeLabel: "Paste your project note or code",
+          outputLabel: "Paste check output",
+          requiredCodeIncludes: input.requiredCodeIncludes,
+          requiredOutputIncludes: input.requiredOutputIncludes,
+          successMessage: `${input.title} check passed.`,
+          failureMessage: "The tester needs the required fields plus clean check output."
+        },
+        runnerSpec: {
+          language: input.runnerLanguage ?? "javascript",
+          starterCode: input.runnerStarterCode,
+          visibleTests: [
+            {
+              id: `${input.slug}-visible-check`,
+              name: `${input.title} visible check`,
+              code: input.runnerTestCode,
+              expectedOutputIncludes: input.requiredOutputIncludes
+            }
+          ],
+          hiddenTests: [],
+          expectedOutput: input.requiredOutputIncludes
+        }
+      },
+      input.practiceReps
+    )
+  };
+}
+
+function checkpointQuiz(
+  id: string,
+  lessonId: string,
+  title: string,
+  concept: string,
+  rightAnswer: string,
+  wrongAnswerA: string,
+  wrongAnswerB: string,
+  explanation: string
+): Quiz {
+  return {
+    id,
+    lessonId,
+    title,
+    passingScore: 80,
+    questions: [
+      {
+        id: `${id}-1`,
+        prompt: `What is the main purpose of ${concept}?`,
+        choices: [rightAnswer, wrongAnswerA, wrongAnswerB],
+        correctChoiceIndex: 0,
+        explanation
+      },
+      {
+        id: `${id}-2`,
+        prompt: `Which check makes ${concept} reviewable?`,
+        choices: ["A small result plus check output", "A private note with no example", "A claim that the idea is obvious"],
+        correctChoiceIndex: 0,
+        explanation: "CareerForge treats finished work as an inspectable result plus a check result or explicit review note."
+      },
+      {
+        id: `${id}-3`,
+        prompt: `What should a beginner avoid when practicing ${concept}?`,
+        choices: ["Skipping the failure case", "Naming the assumption", "Recording the check command"],
+        correctChoiceIndex: 0,
+        explanation: "The failure case shows whether the work handles real-world mess instead of only the happy path."
+      }
+    ]
   };
 }
 
@@ -257,6 +455,636 @@ const pythonLoopPracticeReps: LessonPracticeBlock[] = [
   }
 ];
 
+const pythonFoundationCapstonePracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}]\ntotal_minutes = 0\n# Add each session's minutes with a loop.\nprint(total_minutes)",
+    expectedOutput: "45 total minutes counted",
+    checkYourAnswer: "This rep isolates the total before the full capstone. If the answer is 0, the loop did not update total_minutes. If it is only 15 or 30, only one record was counted."
+  },
+  {
+    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"sql\", \"minutes\": 45}]\nfocus_count = 0\n# Count sessions where minutes is 30 or more.\nprint(focus_count)",
+    expectedOutput: "2 focus sessions counted",
+    checkYourAnswer: "This rep checks the decision inside the loop. A 30-minute session counts because the condition is greater than or equal to 30."
+  },
+  {
+    starterCode: "session_count = 3\ntotal_minutes = 70\nfocus_count = 1\nsummary = \"\"\n# Build the exact readable summary from the calculated values.\nprint(summary)",
+    expectedOutput: "3 sessions, 70 minutes, 1 focus session",
+    checkYourAnswer: "This rep separates presentation from calculation. The summary should use the calculated variables instead of typing unrelated numbers."
+  }
+];
+
+const pythonStringCleanupPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "raw_topic = \"  PYTHON  \"\nclean_topic = \"\"\nprint(clean_topic)",
+    expectedOutput: "python cleaned topic",
+    checkYourAnswer: "Use strip before lower so edge spaces disappear and capitalization becomes consistent. The cleaned value should not keep the original spacing."
+  },
+  {
+    starterCode: "clean_topic = \"python basics\"\nslug = \"\"\nprint(slug)",
+    expectedOutput: "python-basics slug output",
+    checkYourAnswer: "Create the slug after cleaning the topic. If spaces remain in slug, replace spaces with hyphens on the cleaned value."
+  },
+  {
+    starterCode: "raw_topics = [\" Python \", \"python\", \"PYTHON\"]\ncleaned_topics = []\n# Add the cleaned version of each topic.\nprint(cleaned_topics)",
+    expectedOutput: "['python', 'python', 'python']",
+    checkYourAnswer: "This rep shows why cleanup matters. Three visually different inputs should become the same dependable topic before grouping."
+  }
+];
+
+const pythonFunctionPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "def describe_session(topic, minutes):\n    return \"\"\n\nprint(describe_session(\"python\", 30))",
+    expectedOutput: "python: 30 minutes planned",
+    checkYourAnswer: "This rep practices parameters and return. The function should use the topic and minutes it receives, not hardcoded values."
+  },
+  {
+    starterCode: "def group_minutes(sessions):\n    totals = {}\n    # Add each session's minutes by topic.\n    return totals\n\nprint(group_minutes([{\"topic\": \"python\", \"minutes\": 30}]))",
+    expectedOutput: "{'python': 30} grouped by topic",
+    checkYourAnswer: "Start with one record before trying several. The returned dictionary should use the topic as the key and minutes as the value."
+  },
+  {
+    starterCode: "def group_minutes(sessions):\n    totals = {}\n    return totals\n\nprint(group_minutes([]))",
+    expectedOutput: "{} for empty sessions input",
+    checkYourAnswer: "An empty input should return an empty dictionary. This failure case proves the function does not depend on hidden global data."
+  }
+];
+
+const pythonCoreReviewPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "review = {'architecture': 'CLI calls parser, parser returns records, report prints totals', 'commands': ['python study_tracker.py --help'], 'failure_inspection': 'bad minutes row is rejected with a reason', 'improvement': 'add parser tests for missing topic'}\nprint(review)",
+    expectedOutput: "Architecture, command, failure inspection, and one improvement are all present.",
+    checkYourAnswer: "This rep keeps the review specific. If the architecture could describe any script, name the CLI, parser, report, and rejected-row behavior."
+  },
+  {
+    starterCode: "failure = {'input': '2026-05-08,python,soon', 'expected': 'rejected row reason', 'actual': '', 'next_check': ''}\nprint(failure)",
+    expectedOutput: "A rejected-row failure includes input, expected behavior, actual behavior, and next check.",
+    checkYourAnswer: "A useful failure inspection keeps the bad input visible. Without the raw failed row, a reviewer cannot tell what behavior was actually inspected."
+  },
+  {
+    starterCode: "improvement_decision = {'target': 'parser', 'reason': 'malformed rows are hardest to debug', 'first_step': 'add test_missing_minutes'}\nprint(improvement_decision)",
+    expectedOutput: "The improvement names a concrete target, reason, and first step.",
+    checkYourAnswer: "The improvement should be small enough to do next. Avoid vague plans like make it better; name the file, behavior, and check."
+  }
+];
+
+const pythonDataclassPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "row = {'date': '2026-05-08', 'topic': 'git', 'minutes': '15'}\n# Convert this row into StudySession with minutes as int.\nprint(row)",
+    expectedOutput: "StudySession(date='2026-05-08', topic='git', minutes=15)",
+    checkYourAnswer: "This repeats the model contract with new data. The key check is that minutes becomes an integer before the rest of the project uses it."
+  },
+  {
+    starterCode: "row = {'date': '2026-05-08', 'topic': 'python', 'minutes': '-5'}\n# Try to build StudySession and record the failure.\nprint(row)",
+    expectedOutput: "Negative minutes are rejected with a clear ValueError or project input error.",
+    checkYourAnswer: "The failure case is the point of the model. If negative minutes create a session, the model is only decoration."
+  },
+  {
+    starterCode: "rows = [{'date': '2026-05-08', 'topic': 'python', 'minutes': '30'}]\n# Convert rows into model objects before reports use them.\nprint(rows)",
+    expectedOutput: "Report code receives a list of StudySession objects, not loose raw dictionaries.",
+    checkYourAnswer: "This is the project-shaped rep: parsing creates trusted objects, reports consume trusted objects, and raw rows stay at the boundary."
+  }
+];
+
+const pythonJsonPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "import json\nsummary = {'session_count': 3, 'total_minutes': 65, 'rejected_count': 0}\njson_report = ''\nprint(json_report)",
+    expectedOutput: "{\"session_count\": 3, \"total_minutes\": 65, \"rejected_count\": 0}",
+    checkYourAnswer: "Use new numbers without changing field names. Stable keys matter because tests and future API consumers depend on them."
+  },
+  {
+    starterCode: "import json\njson_report = '{\"total_minutes\": \"45\"}'\nparsed = json.loads(json_report)\n# Decide why this is the wrong contract.\nprint(parsed)",
+    expectedOutput: "The failure is that total_minutes is text, not a number, so the contract should reject it.",
+    checkYourAnswer: "Machine-readable does not only mean valid JSON text. The parsed types must match the contract the rest of the app expects."
+  },
+  {
+    starterCode: "import json\nreport = {'sessions': [{'topic': 'python', 'minutes': 30}], 'totals': {'python': 30}, 'rejected_count': 1}\nprint(json.dumps(report))",
+    expectedOutput: "JSON includes sessions, totals, and rejected_count so another tool can inspect the tracker result.",
+    checkYourAnswer: "This is the project-shaped rep. Include enough stable fields for a dashboard or evidence log to consume without scraping terminal prose."
+  }
+];
+
+const pythonConfigPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "DEFAULT_CONFIG = {'format': 'text', 'output': 'summary.txt', 'min_minutes': 0}\nfile_config = {'output': 'weekly.txt'}\n# Merge without losing omitted defaults.\nprint(file_config)",
+    expectedOutput: "{'format': 'text', 'output': 'weekly.txt', 'min_minutes': 0}",
+    checkYourAnswer: "This repeats the merge with new data. File values update known defaults, but omitted defaults should still be present."
+  },
+  {
+    starterCode: "DEFAULT_CONFIG = {'format': 'text', 'output': 'summary.txt', 'min_minutes': 0}\nfile_config = {'format': 'json', 'secret_token': 'do-not-use'}\n# Ignore unknown or secret-looking keys.\nprint(file_config)",
+    expectedOutput: "The config keeps format=json and rejects or ignores secret_token.",
+    checkYourAnswer: "The failure case protects the boundary. Config should not silently accept unknown keys that could change behavior or leak secrets."
+  },
+  {
+    starterCode: "config_sources = ['defaults', 'tracker.config.json', '--format json']\n# Write the precedence order the CLI will use.\nprint(config_sources)",
+    expectedOutput: "CLI flags override config file values, and config file values override defaults.",
+    checkYourAnswer: "Project-shaped config needs a visible precedence rule. Without it, a user cannot predict why a run produced JSON or text."
+  }
+];
+
+const pythonCiPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "ci_commands = ['python -m pytest', 'study-tracker --help']\n# Add a JSON smoke command that proves report output still works.\nprint(ci_commands)",
+    expectedOutput: "python -m pytest, study-tracker --help, and study-tracker --input sessions.csv --format json are present.",
+    checkYourAnswer: "Repeat the gate with one more integration command. Unit tests plus an installed CLI smoke command catch different failures."
+  },
+  {
+    starterCode: "gate = {'lint': True, 'tests': False, 'cli_smoke': True, 'allowed': True}\n# Make allowed depend on every required check passing.\nprint(gate)",
+    expectedOutput: "allowed is False when tests fail.",
+    checkYourAnswer: "This is the failure rep. A quality gate that stays green when tests fail is not a gate; it is just a checklist."
+  },
+  {
+    starterCode: "evidence = {'local': [], 'ci': [], 'limitation': ''}\n# Record local and CI evidence plus one limitation.\nprint(evidence)",
+    expectedOutput: "Evidence names local commands, CI commands, and one limitation or skipped check.",
+    checkYourAnswer: "Project-shaped CI evidence should be honest. If pre-commit is not installed yet, say that and keep pytest plus smoke output visible."
+  }
+];
+
+const pythonProfessionalReviewPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "review_matrix = [{'area': 'structure', 'evidence': 'tree shows cli/parser/reports/tests'}]\n# Add metadata, command, config, logging, and tests rows.\nprint(review_matrix)",
+    expectedOutput: "Rows cover structure, metadata, command, config, logging, and tests.",
+    checkYourAnswer: "A professional review matrix is only useful when every quality area has evidence, not just a label."
+  },
+  {
+    starterCode: "weak_row = {'area': 'command', 'evidence': ''}\n# Explain why this row fails review.\nprint(weak_row)",
+    expectedOutput: "The row fails because command evidence is empty or lacks study-tracker output.",
+    checkYourAnswer: "This failure rep catches vague review notes. If the command row has no exact command output, installability is not proven."
+  },
+  {
+    starterCode: "improvement = {'target': 'typing', 'decision': '', 'first_check': ''}\n# Choose whether to add mypy/pyright now or document runtime-only typing.\nprint(improvement)",
+    expectedOutput: "The improvement records a typing decision and one check or limitation.",
+    checkYourAnswer: "Typed depth needs a conscious decision. Either add a static type check later or document that this project currently relies on dataclasses and runtime tests."
+  }
+];
+
+const pythonRegexPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "import re\nDATE_PATTERN = r''\nSLUG_PATTERN = r''\n# Validate 2026-06-01 and api-client.\nprint('TODO')",
+    expectedOutput: "True for 2026-06-01 and True for api-client.",
+    checkYourAnswer: "Use new data so you practice the pattern, not the memorized example. Both validators should use fullmatch or anchored checks."
+  },
+  {
+    starterCode: "examples = ['2026-06-01-extra', 'Python Basics', 'api_client']\n# Mark each example invalid and say which rule it breaks.\nprint(examples)",
+    expectedOutput: "All examples are invalid: partial date, spaces/case, and underscore slug.",
+    checkYourAnswer: "This is the failure rep. If a partial date or uppercase slug passes, the validator is accepting more input than the parser contract allows."
+  },
+  {
+    starterCode: "raw_row = {'date': '2026-06-01', 'topic_slug': 'api-client', 'minutes': '30'}\n# Run shape validation before parser conversion.\nprint(raw_row)",
+    expectedOutput: "The row passes shape validation before deeper parser checks.",
+    checkYourAnswer: "Project-shaped validation happens at the boundary. Regex checks the text shape before date parsing, minute conversion, or business rules run."
+  }
+];
+
+const pythonServicePracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "tracker = StudyTrackerService()\n# Add python 30 and sql 20, then calculate total minutes.\nprint(tracker)",
+    expectedOutput: "total_minutes returns 50 after adding python and sql sessions.",
+    checkYourAnswer: "Repeat the same service behavior with new data. The total should come from stored sessions, not from a hardcoded return value."
+  },
+  {
+    starterCode: "first = StudyTrackerService()\nsecond = StudyTrackerService()\n# Prove adding to first does not change second.\nprint(first, second)",
+    expectedOutput: "The second service still has 0 minutes after the first service changes.",
+    checkYourAnswer: "This failure rep catches shared mutable state. Sessions should live on self for each instance, not on the class."
+  },
+  {
+    starterCode: "tracker = StudyTrackerService()\n# Add repeated topics and ask for topic_minutes('python').\nprint(tracker)",
+    expectedOutput: "topic_minutes('python') returns only the python total.",
+    checkYourAnswer: "Project-shaped service methods answer product questions. A topic total should skip unrelated sessions without changing caller code."
+  }
+];
+
+const pythonSqlitePracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "CREATE TABLE sessions (id INTEGER PRIMARY KEY, date TEXT NOT NULL, topic TEXT NOT NULL, minutes INTEGER NOT NULL);\n-- Insert api and python rows, then query totals by topic.",
+    expectedOutput: "api | 25\npython | 30",
+    checkYourAnswer: "Repeat persistence with new data. The grouped query should calculate totals from rows, not from handwritten output."
+  },
+  {
+    starterCode: "CREATE TABLE sessions (id INTEGER PRIMARY KEY, date TEXT NOT NULL, topic TEXT NOT NULL, minutes INTEGER NOT NULL CHECK (minutes > 0));\n-- Try inserting a negative minutes row inside a transaction.",
+    expectedOutput: "The invalid insert fails or rolls back, and no negative minutes row appears.",
+    checkYourAnswer: "This failure rep makes persistence safer. A transaction should leave the database in a trustworthy state when one row is invalid."
+  },
+  {
+    starterCode: "class SessionRepository:\n    def add_session(self, session):\n        pass\n    def totals_by_topic(self):\n        return []\nprint(SessionRepository)",
+    expectedOutput: "Repository methods hide SQL details behind add_session and totals_by_topic.",
+    checkYourAnswer: "Project-shaped persistence keeps SQL at the repository boundary. The service should ask for behavior, not build SQL strings everywhere."
+  }
+];
+
+const pythonApiPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "payload = [{'date': '2026-06-01', 'topic': 'api', 'minutes': 25}]\nclient = FakeClient(FakeResponse(200, payload))\n# Fetch sessions through the safe client.\nprint(payload)",
+    expectedOutput: "The safe client returns the new api session and records timeout=5.",
+    checkYourAnswer: "Repeat the success path with new data. The client boundary should not care whether the topic is python, api, or sql."
+  },
+  {
+    starterCode: "bad_status = FakeResponse(503, {'error': 'unavailable'})\nbad_shape = FakeResponse(200, {'sessions': 'not a list'})\n# Decide which ApiError each case should raise.\nprint(bad_status.status_code, bad_shape.json())",
+    expectedOutput: "Both bad status and bad shape raise ApiError instead of returning fake success.",
+    checkYourAnswer: "This failure rep keeps callers honest. Returning an empty list for bad status hides the difference between no sessions and a broken API."
+  },
+  {
+    starterCode: "config = {'base_url': 'https://example.test', 'api_key': 'secret-value'}\n# Keep secret values out of logs and portfolio evidence.\nprint(config['base_url'])",
+    expectedOutput: "The client uses base_url configuration while secret values stay out of logs and evidence.",
+    checkYourAnswer: "Project-shaped API work includes config and secret boundaries. A beginner client can stay offline while still learning not to log secrets."
+  }
+];
+
+const pythonIntegrationCapstonePracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "integration_matrix = [{'layer': 'validation', 'test': 'test_regex_validation', 'evidence': 'pytest passed'}]\n# Add service, sqlite, api, json, and cli layers.\nprint(integration_matrix)",
+    expectedOutput: "The matrix covers validation, service, sqlite, api, json, and cli with evidence.",
+    checkYourAnswer: "Repeat the matrix with every layer. A missing evidence field means the layer is still a plan, not capstone proof."
+  },
+  {
+    starterCode: "failure_path = {'layer': 'api', 'bad_input': '503 response', 'expected': '', 'test': ''}\n# Fill in the expected failure behavior and test name.\nprint(failure_path)",
+    expectedOutput: "The API failure path raises ApiError and is covered by a named test.",
+    checkYourAnswer: "This failure rep prevents happy-path-only integration. Every external boundary needs a named failure behavior."
+  },
+  {
+    starterCode: "flow = ['api fixture', 'regex validation', 'service add_session', 'sqlite repository', 'json cli output']\n# Attach one command or artifact to each step.\nprint(flow)",
+    expectedOutput: "The stitched flow connects API fixture through validation, service, SQLite, and JSON CLI output.",
+    checkYourAnswer: "Project-shaped integration is more than a checklist. It shows one record traveling across layers with evidence at each boundary."
+  }
+];
+
+const pythonIntegrationReviewPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "review = {'layers': [{'name': 'sqlite', 'evidence': 'query output', 'risk': 'transaction rollback untested'}], 'commands': [], 'improvement': ''}\n# Add missing layers, commands, and improvement.\nprint(review)",
+    expectedOutput: "Review covers every layer, commands, risk, and improvement.",
+    checkYourAnswer: "A final review should name risks per layer. If risk is one generic paragraph, it will not guide the next improvement."
+  },
+  {
+    starterCode: "risk = 'api timeout handling is weak'\nlayers = [{'name': 'validation'}, {'name': 'api'}, {'name': 'sqlite'}]\n# Link the risk to one known layer.\nprint(risk, layers)",
+    expectedOutput: "The risk names the api layer and points to a check or improvement.",
+    checkYourAnswer: "This failure-inspection rep ties uncertainty to architecture. Review risk should point at the layer where you would debug first."
+  },
+  {
+    starterCode: "handoff = {'artifact': 'integration-review.md', 'commands': ['python -m pytest'], 'limitation': '', 'next_improvement': ''}\nprint(handoff)",
+    expectedOutput: "Handoff includes artifact, commands, limitation, and next improvement.",
+    checkYourAnswer: "Project-shaped review leaves a useful artifact for future tracks. The limitation is part of evidence, not an apology."
+  }
+];
+
+const typescriptContractPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "type ReadinessCard = {\n  label: string;\n  score: number;\n};\n\nconst card: ReadinessCard = { label: 'Portfolio', score: 42 };\nconsole.log(card.score);",
+    expectedOutput: "The readiness score prints 42 and the object keeps score as a number.",
+    checkYourAnswer: "Add a status field to the type, then watch the example object fail until you provide it. The lesson is the contract catching drift before the UI renders."
+  },
+  {
+    starterCode: "type EvidenceBadge = { title: string; passing: boolean };\nconst badge: EvidenceBadge = { title: 'CLI tests', passing: true };\nconsole.log(badge.passing);",
+    expectedOutput: "The badge prints true because passing is a boolean, not a display string.",
+    checkYourAnswer: "Change passing to the string 'yes'. TypeScript should reject it because later logic needs a real boolean branch."
+  },
+  {
+    starterCode: "type MissionSummary = { title: string; artifactCount: number; nextAction: string };\nconst summary: MissionSummary = { title: 'RAG Notes', artifactCount: 3, nextAction: 'Add citation check' };",
+    expectedOutput: "The object has one text title, one number count, and one next action string.",
+    checkYourAnswer: "This repeats the same contract idea with new field names so you remember the shape, not just MissionCard."
+  }
+];
+
+const sqlJoinPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "SELECT skills.name\nFROM skills\nLEFT JOIN evidence_skills es ON es.skill_id = skills.id\nWHERE es.evidence_id IS NULL;",
+    expectedOutput: "Only skills with no linked evidence rows should appear.",
+    checkYourAnswer: "Start from the table where missing rows matter. If you start from evidence, skills with no evidence cannot appear."
+  },
+  {
+    starterCode: "SELECT m.title, COUNT(e.id) AS evidence_count\nFROM missions m\nLEFT JOIN evidence e ON e.mission_id = m.id\nGROUP BY m.id, m.title;",
+    expectedOutput: "Every mission appears with a count, including missions where evidence_count is 0.",
+    checkYourAnswer: "COUNT(e.id) counts matching evidence rows. A LEFT JOIN keeps the mission row even when that count is zero."
+  },
+  {
+    starterCode: "SELECT m.title\nFROM missions m\nINNER JOIN evidence e ON e.mission_id = m.id;",
+    expectedOutput: "Only missions that already have evidence appear.",
+    checkYourAnswer: "This is the contrast rep. INNER JOIN is correct for existing matches but wrong when the product question is about missing work."
+  }
+];
+
+const aiRetrievalPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "const retrievedIds = ['n1'];\nconst answer = { claims: [{ text: 'Tests passed', citationId: 'n1' }] };\nconsole.log(answer.claims[0].citationId);",
+    expectedOutput: "The answer cites n1, which is inside the retrieved note id list.",
+    checkYourAnswer: "The claim cites a retrieved note. Change the citation to n2 and the grounding check should reject it."
+  },
+  {
+    starterCode: "const retrievedIds = ['n1'];\nconst answer = { claims: [{ text: 'The app is deployed', citationId: null }] };\nconsole.log(answer.claims[0].citationId);",
+    expectedOutput: "null means the claim is unsupported and should not be presented as fact.",
+    checkYourAnswer: "Unsupported is a valid safe result. Do not fill in a citation just to make the answer look complete."
+  },
+  {
+    starterCode: "const notes = [{ id: 'n1', text: 'SQLite stores progress locally.' }, { id: 'n2', text: 'Secrets stay server-side.' }];\nconst retrievedIds = ['n2'];",
+    expectedOutput: "An answer about secrets may cite n2, but an answer about SQLite should not pretend n2 supports it.",
+    checkYourAnswer: "This rep practices topic fit. Grounding is not just citation format; the cited note must support the claim."
+  }
+];
+
+const securitySecretPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "const settings = ['PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];\nconsole.log(settings);",
+    expectedOutput: "PUBLIC_SUPABASE_URL is public config; SUPABASE_SERVICE_ROLE_KEY is secret.",
+    checkYourAnswer: "The word public is not magic, but service role power is. Classify by what the value can do if leaked."
+  },
+  {
+    starterCode: "const boundary = { operation: 'read user profile', enforcedAt: 'client' };\nconsole.log(boundary.enforcedAt);",
+    expectedOutput: "client is the wrong boundary for authorization.",
+    checkYourAnswer: "Client checks can improve UX, but server or database policy must enforce access before data is returned."
+  },
+  {
+    starterCode: "const env = { MAP_TILE_URL: 'https://tiles.example.com', DATABASE_URL: 'postgres://secret' };\nconsole.log(Object.keys(env));",
+    expectedOutput: "MAP_TILE_URL can be public; DATABASE_URL must not be bundled.",
+    checkYourAnswer: "Ask whether the value only points at a public resource or whether it grants private access."
+  }
+];
+
+const cloudReleasePracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "const checks = { build: true, tests: true, rollback: false };\nconsole.log(checks);",
+    expectedOutput: "Release is blocked because rollback is false.",
+    checkYourAnswer: "A rollback note is part of readiness, not paperwork after deploy. Missing rollback should keep the gate closed."
+  },
+  {
+    starterCode: "const checks = { build: true, tests: false, rollback: true };\nconsole.log(checks);",
+    expectedOutput: "Release is blocked because tests are false.",
+    checkYourAnswer: "This rep prevents build-only thinking. Build success and test success answer different questions."
+  },
+  {
+    starterCode: "const checks = { build: true, tests: true, rollback: true };\nconsole.log(checks);",
+    expectedOutput: "Release can proceed because every required gate is true.",
+    checkYourAnswer: "All-green means the release is allowed, not guaranteed perfect. The gate controls minimum release evidence."
+  }
+];
+
+const mlConfusionMatrixPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "const matrix = { tp: 8, fp: 2, fn: 5, tn: 20 };\nconsole.log(matrix.fn);",
+    expectedOutput: "The matrix reports 5 false negatives.",
+    checkYourAnswer: "False negatives are real positives the model missed. Ask what user harm happens when this number is high."
+  },
+  {
+    starterCode: "const matrix = { tp: 12, fp: 6, fn: 1, tn: 30 };\nconsole.log(matrix.fp);",
+    expectedOutput: "The matrix reports 6 false positives.",
+    checkYourAnswer: "False positives are negative examples predicted positive. They matter when incorrect alerts or approvals are costly."
+  },
+  {
+    starterCode: "const matrix = { tp: 9, fp: 1, fn: 9, tn: 40 };\nconsole.log(matrix.tp + matrix.fn);",
+    expectedOutput: "18 actual positive examples",
+    checkYourAnswer: "This rep ties the cells back to the data. Actual positives are true positives plus false negatives."
+  }
+];
+
+const typescriptRuntimeValidationPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "const payload = { title: 'CLI Study Tracker', proofCount: 2 };\nfunction isMissionCard(value) {\n  return false;\n}\nconsole.log(isMissionCard(payload));",
+    expectedOutput: "true for the complete mission-card payload.",
+    checkYourAnswer: "A TypeScript type helps your code, but external payloads are just unknown values until a runtime check confirms their shape."
+  },
+  {
+    starterCode: "const payload = { title: 'CLI Study Tracker', proofCount: 'two' };\nfunction isMissionCard(value) {\n  return false;\n}\nconsole.log(isMissionCard(payload));",
+    expectedOutput: "false because proofCount is text instead of a number.",
+    checkYourAnswer: "This is the important failure case. If the guard accepts proofCount as a string, the UI contract is not actually protected."
+  },
+  {
+    starterCode: "const payload = null;\nfunction isObject(value) {\n  return false;\n}\nconsole.log(isObject(payload));",
+    expectedOutput: "false because null is not a usable object payload.",
+    checkYourAnswer: "JavaScript has a trap: typeof null is object. A good guard checks value !== null before reading fields."
+  }
+];
+
+const securityAccessControlPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "const request = { userId: 'u1', resourceOwnerId: 'u1' };\nfunction canReadProfile(req) {\n  return true;\n}\nconsole.log(canReadProfile(request));",
+    expectedOutput: "true because the requester owns the profile.",
+    checkYourAnswer: "This is the allowed case. Keep it small so the denied case is easier to compare against."
+  },
+  {
+    starterCode: "const request = { userId: 'u1', resourceOwnerId: 'u2' };\nfunction canReadProfile(req) {\n  return true;\n}\nconsole.log(canReadProfile(request));",
+    expectedOutput: "false because the requester does not own the profile.",
+    checkYourAnswer: "Broken access control often looks like this: the app checks that someone is logged in but forgets to check ownership."
+  },
+  {
+    starterCode: "const request = { userId: 'u1', role: 'user', requiredRole: 'admin' };\nfunction hasRequiredRole(req) {\n  return true;\n}\nconsole.log(hasRequiredRole(request));",
+    expectedOutput: "false because a normal user does not satisfy an admin-only operation.",
+    checkYourAnswer: "Ownership and role checks are separate questions. Say which one your code is answering."
+  }
+];
+
+const securityInjectionOutputPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "const comment = '<script>alert(1)</script>';\nfunction escapeHtml(value) {\n  return value;\n}\nconsole.log(escapeHtml(comment));",
+    expectedOutput: "The script tags are escaped, not rendered as HTML.",
+    checkYourAnswer: "Safe output does not trust stored text just because it already reached your database."
+  },
+  {
+    starterCode: "const name = 'Ada & Grace';\nfunction escapeHtml(value) {\n  return value;\n}\nconsole.log(escapeHtml(name));",
+    expectedOutput: "Ada &amp; Grace or an equivalent escaped ampersand.",
+    checkYourAnswer: "A safe encoder must preserve normal text while escaping special characters. Do not only test attack-looking input."
+  },
+  {
+    starterCode: "const query = \"python'; DROP TABLE lessons; --\";\nfunction usesParameterizedQuery(sql) {\n  return false;\n}\nconsole.log(usesParameterizedQuery(query));",
+    expectedOutput: "The unsafe text is treated as a value, not joined into a SQL command.",
+    checkYourAnswer: "This rep is about boundary discipline: values stay values; commands stay commands."
+  }
+];
+
+const cloudRollbackPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "const release = { version: '1.2.0', previousVersion: '1.1.9', healthCheck: 'failing' };\nfunction rollbackAction(release) {\n  return '';\n}\nconsole.log(rollbackAction(release));",
+    expectedOutput: "rollback to 1.1.9 because the health check is failing.",
+    checkYourAnswer: "A rollback note must name the exact previous version or action. 'Undo it' is not specific enough."
+  },
+  {
+    starterCode: "const release = { version: '1.2.0', previousVersion: '', healthCheck: 'failing' };\nfunction canRelease(release) {\n  return true;\n}\nconsole.log(canRelease(release));",
+    expectedOutput: "false because there is no rollback target.",
+    checkYourAnswer: "A release without a rollback target should be blocked before deploy, not discovered after an incident."
+  },
+  {
+    starterCode: "const drill = { trigger: 'error rate > 5%', owner: 'on-call', command: 'deploy previous' };\nconsole.log(drill);",
+    expectedOutput: "A rollback drill names trigger, owner, and command.",
+    checkYourAnswer: "A useful drill says when to rollback, who acts, and what command or platform action they use."
+  }
+];
+
+const dataContractsPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "const row = { userId: 'u1', minutes: 30, topic: 'python' };\nfunction isLearningRow(row) {\n  return false;\n}\nconsole.log(isLearningRow(row));",
+    expectedOutput: "true because the row has userId, numeric minutes, and topic.",
+    checkYourAnswer: "A dataset contract names the fields a report can trust before any aggregation starts."
+  },
+  {
+    starterCode: "const row = { userId: 'u1', minutes: -5, topic: 'python' };\nfunction isLearningRow(row) {\n  return true;\n}\nconsole.log(isLearningRow(row));",
+    expectedOutput: "false because minutes cannot be negative.",
+    checkYourAnswer: "A fixture should include a bad row on purpose. That proves the contract rejects impossible data."
+  },
+  {
+    starterCode: "const fixture = [{ userId: 'u1', minutes: 30, topic: 'python' }];\nconsole.log(fixture.length);",
+    expectedOutput: "1 sample row available for repeatable tests.",
+    checkYourAnswer: "Fixtures make tests repeatable. If the only sample is a live export, a reviewer cannot easily reproduce the result."
+  }
+];
+
+const dataRejectedRowPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "const row = { rowNumber: 2, minutes: '', topic: 'python' };\nfunction rejectionReason(row) {\n  return '';\n}\nconsole.log(rejectionReason(row));",
+    expectedOutput: "missing minutes is reported as the rejection reason.",
+    checkYourAnswer: "A rejected row needs a reason that tells the data owner what to fix."
+  },
+  {
+    starterCode: "const rejected = [{ rowNumber: 3, raw: 'git,-5', reason: 'negative minutes' }];\nconsole.log(rejected[0].reason);",
+    expectedOutput: "negative minutes is reported as the rejection reason.",
+    checkYourAnswer: "Keep row number, raw value, and reason together. Without the raw value, debugging becomes guesswork."
+  },
+  {
+    starterCode: "const report = { accepted: 8, rejected: 2, reasons: ['missing topic', 'negative minutes'] };\nconsole.log(report.accepted + report.rejected);",
+    expectedOutput: "10 total input rows accounted for.",
+    checkYourAnswer: "A quality report should account for accepted plus rejected rows so bad data does not disappear silently."
+  }
+];
+
+const pythonParserTestPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "def test_parse_second_valid_row():\n    assert parse_row('2026-05-08,git,15')['topic'] == 'git'\n    assert parse_row('2026-05-08,git,15')['minutes'] == 15",
+    expectedOutput: "A second clean row passes with topic git and minutes 15.",
+    checkYourAnswer: "This repeats the happy path with new data. If the test only passes for python and 30, the parser is memorizing the example instead of parsing rows."
+  },
+  {
+    starterCode: "def test_rejects_missing_topic():\n    result = parse_row('2026-05-08,,15')\n    assert result['error'] == 'topic is required'",
+    expectedOutput: "The missing-topic row is rejected with topic is required.",
+    checkYourAnswer: "This is a different failure from bad minutes. A useful parser explains which field failed so the user can fix the row."
+  },
+  {
+    starterCode: "def test_parse_file_rows_mixed():\n    accepted, rejected = parse_rows(['2026-05-08,git,15', 'bad-row'])\n    assert len(accepted) == 1\n    assert rejected[0]['error'] == 'expected 3 columns'",
+    expectedOutput: "One accepted row and one rejected row are both accounted for.",
+    checkYourAnswer: "This is the project-shaped rep: the parser must handle a mixed file, not just one isolated string."
+  }
+];
+
+const pythonCliArgumentPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "parsed = parse_cli(['--topic', 'git', '--minutes', '15'])\nsummary = f\"{parsed['topic']}: {parsed['minutes']} minutes\"\nprint(summary)",
+    expectedOutput: "git: 15 minutes from parsed CLI arguments.",
+    checkYourAnswer: "Same idea, new data. If git still prints python, the summary is hardcoded instead of built from parsed arguments."
+  },
+  {
+    starterCode: "try:\n    parse_cli(['--topic', 'git', '--minutes', 'soon'])\nexcept SystemExit:\n    print('bad minutes rejected')",
+    expectedOutput: "bad minutes rejected",
+    checkYourAnswer: "The failure rep proves type=int is doing real boundary work. Invalid terminal text should not become tracker data."
+  },
+  {
+    starterCode: "command = 'study_tracker --topic sql --minutes 20'\nparsed = parse_cli(['--topic', 'sql', '--minutes', '20'])\nprint(command)\nprint(parsed)",
+    expectedOutput: "study_tracker --topic sql --minutes 20\n{'topic': 'sql', 'minutes': 20}",
+    checkYourAnswer: "This connects the parser to the real command shape a reviewer would run in the CLI project."
+  }
+];
+
+const pythonRejectedRowPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "ROWS = ['2026-05-10,python,25', '2026-05-11,git,15']\naccepted, rejected = parse_rows(ROWS)\nprint(len(accepted), len(rejected))",
+    expectedOutput: "2 accepted rows and 0 rejected rows.",
+    checkYourAnswer: "A good rejected-row reporter also handles the no-error case. Clean files should not invent warnings."
+  },
+  {
+    starterCode: "ROWS = ['2026-05-10,,25']\naccepted, rejected = parse_rows(ROWS)\nprint(rejected[0]['reason'])",
+    expectedOutput: "missing topic is recorded as the rejected-row reason.",
+    checkYourAnswer: "This failure is different from bad minutes and bad columns. Name the exact field that made the row unusable."
+  },
+  {
+    starterCode: "ROWS = ['2026-05-10,python,25', 'bad-row', '2026-05-11,git,15']\naccepted, rejected = parse_rows(ROWS)\nreport = build_rejected_report(rejected)\nprint(len(accepted))\nprint(report)",
+    expectedOutput: "2 accepted rows plus a row-numbered rejected report for bad-row.",
+    checkYourAnswer: "This is the project-shaped run: clean data continues while rejected data remains visible and fixable."
+  }
+];
+
+const professionalProjectStructurePracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "project_files = ['study_tracker/cli.py', 'study_tracker/parser.py', 'study_tracker/reports.py']\nmodule_roles = {'cli': 'parse command arguments'}\nprint(project_files)\nprint(module_roles)",
+    expectedOutput: "The package lists cli.py, parser.py, reports.py, and role notes.",
+    checkYourAnswer: "Same idea, new data: add models.py and decide whether parsing rows or defining StudySession belongs there."
+  },
+  {
+    starterCode: "module_roles = {'parser': 'parse arguments', 'cli': 'parse rows'}\nprint(module_roles)",
+    expectedOutput: "This role map should be rejected because parser and cli responsibilities are swapped.",
+    checkYourAnswer: "Failure rep: if parser.py knows argparse, the boundary is leaking. CLI owns command flags; parser owns rows."
+  },
+  {
+    starterCode: "project_files = ['study_tracker/cli.py', 'study_tracker/parser.py', 'study_tracker/models.py', 'study_tracker/reports.py', 'tests/test_parser.py']\nprint('\\n'.join(project_files))",
+    expectedOutput: "A project-shaped file tree includes package modules and tests outside package code.",
+    checkYourAnswer: "This is the structure a reviewer can navigate before reading implementation details."
+  }
+];
+
+const professionalLoggingPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "value = '45'\nminutes = parse_minutes(value)\nprint(minutes)",
+    expectedOutput: "45 minutes parsed successfully without warning logs.",
+    checkYourAnswer: "The success path should stay boring. Logging should not turn normal input into noisy warnings."
+  },
+  {
+    starterCode: "try:\n    parse_minutes('')\nexcept TrackerInputError as error:\n    print(error)",
+    expectedOutput: "minutes is required for empty input.",
+    checkYourAnswer: "Failure rep: empty input and non-numeric input may need different user-facing messages."
+  },
+  {
+    starterCode: "for value in ['30', 'soon']:\n    try:\n        parse_minutes(value)\n    except TrackerInputError:\n        pass\nprint(logs)",
+    expectedOutput: "Logs include the invalid value soon but not the successful value 30.",
+    checkYourAnswer: "Project-shaped rep: logs should preserve useful failure context without flooding normal runs."
+  }
+];
+
+const professionalPytestPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "fixtures = ['clean_rows']\ntests = ['test_summary_totals']\nverification_commands = ['python -m pytest']\nprint(fixtures, tests, verification_commands)",
+    expectedOutput: "clean_rows, test_summary_totals, and python -m pytest are listed.",
+    checkYourAnswer: "Same idea with the happy-path fixture. It proves the command and behavior name are reproducible."
+  },
+  {
+    starterCode: "fixtures = ['messy_rows']\ntests = ['test_rejected_report']\nverification_commands = []\nprint(fixtures, tests)",
+    expectedOutput: "messy_rows and test_rejected_report cover rejected input.",
+    checkYourAnswer: "Failure rep: if there is no messy fixture, the test suite does not protect the bad-input behavior."
+  },
+  {
+    starterCode: "verification_commands = ['python -m pytest', 'study-tracker --help', 'study-tracker --input sessions.csv --format json']\nprint(verification_commands)",
+    expectedOutput: "The project-shaped command list includes tests plus CLI smoke and JSON output.",
+    checkYourAnswer: "Professional evidence combines unit tests with one command that exercises the installed utility."
+  }
+];
+
+const professionalPyprojectPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "pyproject_toml = '[project]\\nname = \"study-tracker\"\\nversion = \"0.1.0\"\\nrequires-python = \">=3.11\"'\nprint(pyproject_toml)",
+    expectedOutput: "[project], name, version, and requires-python are present.",
+    checkYourAnswer: "Same metadata idea with a minimal project block. A reviewer should not infer these from filenames."
+  },
+  {
+    starterCode: "pyproject_toml = '[project]\\nname = \"study-tracker\"\\nversion = \"0.1.0\"'\nprint(pyproject_toml)",
+    expectedOutput: "This should fail the professional gate because requires-python is missing.",
+    checkYourAnswer: "Failure rep: missing Python version requirements make clean-machine setup more ambiguous."
+  },
+  {
+    starterCode: "pyproject_toml = '[project.optional-dependencies]\\ndev = [\"pytest\", \"ruff\"]\\n\\n[tool.pytest.ini_options]\\ntestpaths = [\"tests\"]'\nprint(pyproject_toml)",
+    expectedOutput: "Dev dependencies and pytest testpaths are declared for tools.",
+    checkYourAnswer: "Project-shaped rep: tool-readable config belongs in pyproject; README prose explains it but does not replace it."
+  }
+];
+
+const professionalInstallableCliPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "project_scripts = {'study-tracker': 'study_tracker.cli:main'}\nsmoke_command = 'study-tracker --help'\nprint(project_scripts)\nprint(smoke_command)",
+    expectedOutput: "study-tracker maps to study_tracker.cli:main and has a --help smoke command.",
+    checkYourAnswer: "Same entry point with the expected command. The command name should be stable for reviewers."
+  },
+  {
+    starterCode: "project_scripts = {'study-tracker': 'study_tracker.parser:parse_row'}\nprint(project_scripts)",
+    expectedOutput: "This should fail because the console script points at parser logic instead of the CLI main.",
+    checkYourAnswer: "Failure rep: entry points should coordinate CLI behavior, not expose an internal helper."
+  },
+  {
+    starterCode: "install_commands = ['python -m pip install -e .', 'study-tracker --help', 'study-tracker --input sessions.csv --format json']\nprint(install_commands)",
+    expectedOutput: "Editable install, help smoke, and JSON command are all documented.",
+    checkYourAnswer: "Project-shaped rep: installability is proven by installation plus commands a reviewer can rerun."
+  }
+];
+
 export const contentPack: ContentPack = {
   skills: [
     { id: "skill-git-workflow", slug: "git-workflow", name: "Git workflow", category: "workflow" },
@@ -268,6 +1096,18 @@ export const contentPack: ContentPack = {
     { id: "skill-sql-joins", slug: "sql-joins", name: "SQL joins", category: "data" },
     { id: "skill-api-contracts", slug: "api-contracts", name: "API contracts", category: "backend" },
     { id: "skill-testing-debugging", slug: "testing-debugging", name: "Testing and debugging", category: "workflow" },
+    { id: "skill-regression-testing", slug: "regression-testing", name: "Regression testing", category: "workflow" },
+    { id: "skill-debugging-log", slug: "debugging-log", name: "Debugging evidence logs", category: "workflow" },
+    { id: "skill-threat-modeling", slug: "threat-modeling", name: "Threat modeling", category: "backend" },
+    { id: "skill-secret-handling", slug: "secret-handling", name: "Secret handling", category: "backend" },
+    { id: "skill-auth-boundaries", slug: "auth-boundaries", name: "Auth boundaries", category: "backend" },
+    { id: "skill-dependency-hygiene", slug: "dependency-hygiene", name: "Dependency hygiene", category: "workflow" },
+    { id: "skill-cloud-config", slug: "cloud-config", name: "Cloud configuration", category: "backend" },
+    { id: "skill-ci-release", slug: "ci-release", name: "CI and release checks", category: "workflow" },
+    { id: "skill-observability-cost", slug: "observability-cost", name: "Observability and cost notes", category: "backend" },
+    { id: "skill-data-quality", slug: "data-quality", name: "Data quality", category: "data" },
+    { id: "skill-data-pipelines", slug: "data-pipelines", name: "Data pipelines", category: "data" },
+    { id: "skill-reproducible-report", slug: "reproducible-report", name: "Reproducible reporting", category: "data" },
     { id: "skill-ai-verification", slug: "ai-verification", name: "AI output verification", category: "ai" },
     { id: "skill-portfolio-evidence", slug: "portfolio-evidence", name: "Portfolio evidence", category: "portfolio" },
     { id: "skill-ml-metrics", slug: "ml-metrics", name: "ML metrics", category: "ai" }
@@ -279,7 +1119,19 @@ export const contentPack: ContentPack = {
     { fromSkillId: "skill-python-professional", toSkillId: "skill-python-integration", relationType: "prerequisite" },
     { fromSkillId: "skill-python-functions", toSkillId: "skill-api-contracts", relationType: "supports" },
     { fromSkillId: "skill-testing-debugging", toSkillId: "skill-ai-verification", relationType: "prerequisite" },
-    { fromSkillId: "skill-sql-joins", toSkillId: "skill-api-contracts", relationType: "supports" }
+    { fromSkillId: "skill-testing-debugging", toSkillId: "skill-regression-testing", relationType: "extends" },
+    { fromSkillId: "skill-regression-testing", toSkillId: "skill-debugging-log", relationType: "supports" },
+    { fromSkillId: "skill-sql-joins", toSkillId: "skill-api-contracts", relationType: "supports" },
+    { fromSkillId: "skill-api-contracts", toSkillId: "skill-threat-modeling", relationType: "supports" },
+    { fromSkillId: "skill-threat-modeling", toSkillId: "skill-secret-handling", relationType: "prerequisite" },
+    { fromSkillId: "skill-secret-handling", toSkillId: "skill-auth-boundaries", relationType: "supports" },
+    { fromSkillId: "skill-testing-debugging", toSkillId: "skill-dependency-hygiene", relationType: "supports" },
+    { fromSkillId: "skill-api-contracts", toSkillId: "skill-cloud-config", relationType: "supports" },
+    { fromSkillId: "skill-cloud-config", toSkillId: "skill-ci-release", relationType: "supports" },
+    { fromSkillId: "skill-ci-release", toSkillId: "skill-observability-cost", relationType: "extends" },
+    { fromSkillId: "skill-sql-joins", toSkillId: "skill-data-quality", relationType: "supports" },
+    { fromSkillId: "skill-data-quality", toSkillId: "skill-data-pipelines", relationType: "supports" },
+    { fromSkillId: "skill-data-pipelines", toSkillId: "skill-reproducible-report", relationType: "extends" }
   ],
   tracks: [
     {
@@ -328,6 +1180,24 @@ export const contentPack: ContentPack = {
       accentColor: "#1A67E8"
     },
     {
+      id: "track-testing-debugging",
+      slug: "testing-debugging",
+      title: "Testing and Debugging",
+      summary: "Regression checks, failure logs, and readable check output before specialization.",
+      roleTargets: ["Software Foundations", "Shared Core Readiness"],
+      moduleIds: ["module-testing-debugging-core"],
+      accentColor: "#6B5B95"
+    },
+    {
+      id: "track-secure-software",
+      slug: "secure-software-appsec",
+      title: "Secure Software",
+      summary: "Threat notes, secret handling, auth boundaries, input validation, dependency hygiene, and safe logging.",
+      roleTargets: ["Secure Software & AppSec"],
+      moduleIds: ["module-secure-software-core"],
+      accentColor: "#8A1C32"
+    },
+    {
       id: "track-ai-apps",
       slug: "practical-ai-apps",
       title: "Practical AI Apps",
@@ -344,6 +1214,24 @@ export const contentPack: ContentPack = {
       roleTargets: ["Backend/Data unlock", "ML & Model Literacy"],
       moduleIds: ["module-ml-core"],
       accentColor: "#157A6E"
+    },
+    {
+      id: "track-cloud-platform-basics",
+      slug: "cloud-platform-basics",
+      title: "Cloud Platform Basics",
+      summary: "Environment config, CI release checks, logs, budgets, and rollback notes for beginner deployable work.",
+      roleTargets: ["Backend unlock", "Security unlock"],
+      moduleIds: ["module-cloud-platform-core"],
+      accentColor: "#4A6FA5"
+    },
+    {
+      id: "track-data-systems",
+      slug: "data-systems",
+      title: "Data Systems",
+      summary: "Data quality, pipeline lineage, reproducible reports, and product-facing data evidence.",
+      roleTargets: ["Backend unlock", "Data unlock"],
+      moduleIds: ["module-data-systems-core"],
+      accentColor: "#2E6F40"
     }
   ],
   modules: [
@@ -351,7 +1239,7 @@ export const contentPack: ContentPack = {
       id: "module-python-core",
       trackId: "track-python",
       slug: "python-core",
-      title: "Python Core Proof",
+      title: "Python Core",
       summary: "Beginner syntax, debugging, text cleanup, functions, files, tests, and a testable command-line utility.",
       lessonIds: ["lesson-python-values", "lesson-python-collections", "lesson-python-decisions", "lesson-python-loops", "lesson-python-foundation-capstone", "lesson-python-strings-cleanup", "lesson-python-functions", "lesson-python-traceback-clinic", "lesson-python-file-input", "lesson-python-parser-tests", "lesson-python-cli-arguments", "lesson-python-file-backed-cli", "lesson-python-cli-polish", "lesson-python-output-file", "lesson-python-rejected-row-report", "lesson-python-portfolio-proof", "lesson-python-core-review"],
       projectMissionIds: ["mission-cli-study-tracker", "mission-python-data-cleaner"],
@@ -386,7 +1274,7 @@ export const contentPack: ContentPack = {
       slug: "typescript-core",
       title: "TypeScript App Thinking",
       summary: "Model domain objects before wiring screens.",
-      lessonIds: ["lesson-typescript-contracts", "lesson-typescript-events-state"],
+      lessonIds: ["lesson-typescript-contracts", "lesson-typescript-runtime-validation", "lesson-typescript-events-state"],
       projectMissionIds: ["mission-web-progress-board", "mission-api-contract-playground"],
       skillIds: ["skill-typescript-types", "skill-api-contracts"],
       sortOrder: 1
@@ -425,6 +1313,28 @@ export const contentPack: ContentPack = {
       sortOrder: 1
     },
     {
+      id: "module-testing-debugging-core",
+      trackId: "track-testing-debugging",
+      slug: "testing-debugging-core",
+      title: "Testing and Debugging",
+      summary: "Build a tiny regression harness and a failure log that make debugging visible.",
+      lessonIds: ["lesson-testing-regression-harness", "lesson-debugging-failure-log"],
+      projectMissionIds: ["mission-regression-proof-pack"],
+      skillIds: ["skill-testing-debugging", "skill-regression-testing", "skill-debugging-log", "skill-portfolio-evidence"],
+      sortOrder: 1
+    },
+    {
+      id: "module-secure-software-core",
+      trackId: "track-secure-software",
+      slug: "secure-software-core",
+      title: "Secure Software Practice",
+      summary: "Practice concrete AppSec habits: threat modeling, secrets, auth boundaries, validation, dependencies, and logs.",
+      lessonIds: ["lesson-security-threat-model", "lesson-security-secrets-auth", "lesson-security-access-control-lab", "lesson-security-input-validation", "lesson-security-injection-output-encoding", "lesson-security-dependency-logging"],
+      projectMissionIds: ["mission-secure-review-pack"],
+      skillIds: ["skill-threat-modeling", "skill-secret-handling", "skill-auth-boundaries", "skill-dependency-hygiene", "skill-testing-debugging", "skill-portfolio-evidence"],
+      sortOrder: 1
+    },
+    {
       id: "module-ai-apps",
       trackId: "track-ai-apps",
       slug: "ai-apps",
@@ -445,6 +1355,28 @@ export const contentPack: ContentPack = {
       projectMissionIds: ["mission-ml-metrics-report"],
       skillIds: ["skill-ml-metrics", "skill-testing-debugging"],
       sortOrder: 1
+    },
+    {
+      id: "module-cloud-platform-core",
+      trackId: "track-cloud-platform-basics",
+      slug: "cloud-platform-core",
+      title: "Cloud Platform Practice",
+      summary: "Prepare deployable work with environment config, CI release checks, logs, budget notes, and rollback evidence.",
+      lessonIds: ["lesson-cloud-env-config", "lesson-cloud-ci-deploy-checks", "lesson-cloud-rollback-drill", "lesson-cloud-logs-costs"],
+      projectMissionIds: ["mission-cloud-release-runbook"],
+      skillIds: ["skill-cloud-config", "skill-ci-release", "skill-observability-cost", "skill-portfolio-evidence"],
+      sortOrder: 1
+    },
+    {
+      id: "module-data-systems-core",
+      trackId: "track-data-systems",
+      slug: "data-systems-core",
+      title: "Data Systems Practice",
+      summary: "Turn messy records into quality checks, lineage notes, and reproducible product-facing reports.",
+      lessonIds: ["lesson-data-quality-rules", "lesson-data-contracts-fixtures", "lesson-data-rejected-row-proof", "lesson-data-pipeline-lineage", "lesson-data-reproducible-report"],
+      projectMissionIds: ["mission-data-quality-report"],
+      skillIds: ["skill-data-quality", "skill-data-pipelines", "skill-reproducible-report", "skill-sql-joins", "skill-portfolio-evidence"],
+      sortOrder: 1
     }
   ],
   lessons: [
@@ -454,7 +1386,7 @@ export const contentPack: ContentPack = {
       slug: "python-values",
       title: "Names, Values, and First Output",
       summary: "Start Python by naming simple values and producing one inspectable result.",
-      bodyMarkdown: "Python programs begin with values: text, numbers, and true or false facts. A variable name is a label for one of those values, so a reader can understand the program without guessing.",
+      bodyMarkdown: "Python programs begin with values: text, numbers, and true or false facts. When Python sees name = value, it stores that value under the name on the left. The equals sign means assign this value, not prove two things are equal.",
       estimatedMinutes: 7,
       difficulty: "foundation",
       skillIds: ["skill-python-basics", "skill-testing-debugging"],
@@ -464,8 +1396,8 @@ export const contentPack: ContentPack = {
       workshop: workshop(
         "Name simple Python values and combine them into one readable output string.",
         "Every later Python project depends on seeing data clearly before it is wrapped in functions, files, or tests.",
-        "A variable stores a value under a useful name. Strings represent text, integers represent whole numbers, and booleans represent true or false facts.",
-        "topic = 'python' and minutes = 30 let the script print readable lines. completed = False means the session is still planned, so the summary shows planned instead of the raw value False.",
+        "A variable stores a value under a useful name. The name goes on the left of =, and the value goes on the right. Strings are text in quotes, integers are whole numbers without quotes, and booleans are True or False facts.",
+        "topic = 'python' stores text, minutes = 30 stores a number, and completed = False stores a true-or-false fact. A summary can translate those raw values into the readable output python, 30, planned.",
         "Create three variables for one study session, change the starter minutes value to 30, then build one summary string from those values.",
         "This is the first slice of the CLI Study Tracker: one session that a learner and a test can inspect.",
         "Which variable name made the program easier to read, and which value would you change to describe a different session?",
@@ -475,9 +1407,11 @@ export const contentPack: ContentPack = {
           tools: ["Python 3", "terminal", "print output"],
           synopsis: "You are learning the smallest useful Python move: give values clear names, then combine those values into output you can inspect.",
           prerequisites: ["Know that Python code can run from a .py file.", "Be ready to edit one line and run the file again."],
-          testingFocus: "The tests check that topic, minutes, and completed exist with the required values, and that your printed summary matches the expected output. The final passed line is the verifier result, not another variable you need to create.",
+          testingFocus: "The tests check that topic, minutes, and completed exist with the required values, and that your printed summary matches the expected output. The final passed line is the check result, not another variable you need to create.",
           codeShape: [
+            "# A variable is created with name = value.",
             "name = value",
+            "# Text uses quotes. Numbers and booleans do not.",
             "summary = f\"{name}\\n{another_value}\\nreadable_word\"",
             "print(summary)",
             "",
@@ -496,14 +1430,14 @@ export const contentPack: ContentPack = {
           steps: ["Keep topic set to python", "Change minutes from 0 to the number 30", "Keep completed as the boolean False", "Build summary from the variables and print python, 30, and planned on separate lines"],
           deliverables: ["Python file with named values", "Printed summary output", "One note explaining why completed = False maps to the readable word planned"],
           verifierCommand: "python study_session.py",
-          expectedEvidence: "Terminal output showing python, 30, planned, and the verifier's passed line plus a short note identifying the string, number, and boolean values.",
+          expectedEvidence: "Terminal output showing python, 30, planned, and the check's passed line plus a short note identifying the string, number, and boolean values.",
           projectConnection: "This gives the CLI Study Tracker its first data point before sessions become lists and files.",
           tester: {
             codeLabel: "Paste your Python values and summary",
             outputLabel: "Paste the terminal output",
             requiredCodeIncludes: ["topic", "minutes", "completed", "summary"],
             requiredOutputIncludes: ["python", "30", "planned"],
-            successMessage: "Your first Python proof uses named values and produces an inspectable result.",
+            successMessage: "Your first Python check uses named values and produces an inspectable result.",
             failureMessage: "The tester needs the named values plus output showing python, 30, and planned."
           },
           runnerSpec: {
@@ -544,7 +1478,7 @@ export const contentPack: ContentPack = {
       slug: "python-collections",
       title: "Lists and Dictionaries Hold Real Records",
       summary: "Use a list of dictionaries so Python can hold more than one study session.",
-      bodyMarkdown: "A list keeps items in order. A dictionary names the parts of one item. Together, they let a beginner script hold real records instead of one loose pile of variables.",
+      bodyMarkdown: "A list keeps items in order between square brackets. A dictionary names the parts of one item between curly braces. Together, they let a beginner script hold real records instead of one loose pile of variables.",
       estimatedMinutes: 8,
       difficulty: "foundation",
       skillIds: ["skill-python-basics", "skill-testing-debugging"],
@@ -554,8 +1488,8 @@ export const contentPack: ContentPack = {
       workshop: workshop(
         "Represent two related study sessions with a list of dictionaries.",
         "Real scripts rarely work with one value at a time. They need a shape that can hold repeated records consistently.",
-        "A record is one complete item of information. In Python, a dictionary can represent one study-session record with named keys such as topic and minutes. A list stores several records in order so the same code can work with all of them.",
-        "sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}] keeps two records in one variable.",
+        "A record is one complete item of information. In Python, a dictionary uses keys and values: the key names the field, and the value is the data in that field. A list stores several records in order so the same code can work with all of them.",
+        "sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}] keeps two records in one variable. sessions[1] reads the second record because list positions start at zero.",
         "Add a second study-session dictionary to a sessions list, then print the second session's topic.",
         "This prepares the CLI Study Tracker to hold a week of sessions instead of one hardcoded line.",
         "Which keys should every session share, and what would break if one record used name instead of topic?",
@@ -567,7 +1501,9 @@ export const contentPack: ContentPack = {
           prerequisites: ["Know that a variable can store a value.", "Know that strings use quotes and numbers usually do not."],
           testingFocus: "You will test that the sessions value is a list, that it contains two dictionaries, and that both records use the same beginner-friendly keys: topic and minutes.",
           codeShape: [
+            "# Square brackets make a list.",
             "records = [",
+            "    # Curly braces make one dictionary record.",
             "    {\"field\": \"text value\", \"number_field\": 30},",
             "    {\"field\": \"another text value\", \"number_field\": 15},",
             "]",
@@ -595,12 +1531,12 @@ export const contentPack: ContentPack = {
             outputLabel: "Paste the terminal output",
             requiredCodeIncludes: ["sessions", "topic", "minutes", "git"],
             requiredOutputIncludes: ["python", "git", "records"],
-            successMessage: "Your collection proof stores repeated records with a consistent shape.",
+            successMessage: "Your collection check stores repeated records with a consistent shape.",
             failureMessage: "The tester needs a sessions list with python and git records plus output proving the shape."
           },
           runnerSpec: {
             language: "python",
-            starterCode: "sessions = [\n    {\"topic\": \"python\", \"minutes\": 30}\n]\n\n# Add a git session with 15 minutes, then print a proof line.\nprint(sessions)",
+            starterCode: "sessions = [\n    {\"topic\": \"python\", \"minutes\": 30}\n]\n\n# Add a git session with 15 minutes, then print a result line.\nprint(sessions)",
             visibleTests: [
               {
                 id: "sessions-have-two-records",
@@ -628,7 +1564,7 @@ export const contentPack: ContentPack = {
       slug: "python-decisions",
       title: "Decisions Make Scripts Useful",
       summary: "Use if and else so Python can label a session based on its minutes.",
-      bodyMarkdown: "An if statement lets a program choose between paths. That is how a script stops being a fixed demonstration and starts responding to the data it receives.",
+      bodyMarkdown: "An if statement lets a program choose between paths. The line ending with : asks a true-or-false question, and the indented lines below it are the code Python runs for that answer.",
       estimatedMinutes: 8,
       difficulty: "foundation",
       skillIds: ["skill-python-basics", "skill-testing-debugging"],
@@ -638,8 +1574,8 @@ export const contentPack: ContentPack = {
       workshop: workshop(
         "Write an if/else decision that labels a study session from its minutes.",
         "Useful tools make decisions: accept or reject input, mark work complete or incomplete, and choose the right message for the user.",
-        "A condition is a true-or-false question written in code, such as minutes >= 30. The if block is the indented code Python runs when the answer is true. The else block is the indented code Python runs when the answer is false.",
-        "if minutes >= 30: label = 'focus' else: label = 'quick' turns a number into a meaningful category.",
+        "A condition is a true-or-false question written in code, such as minutes >= 30. The colon starts the block. Indentation matters: the indented lines under if run when the condition is true, and the indented lines under else run when it is false.",
+        "if minutes >= 30: label = 'focus' else: label = 'quick' turns a number into a meaningful category. Written on real lines, label = 'focus' must be indented under the if.",
         "Use minutes to assign label, then print a sentence that includes the label.",
         "This prepares the CLI Study Tracker to explain sessions instead of only storing raw numbers.",
         "What exact question does your condition ask, and what value would make the else branch run?",
@@ -651,6 +1587,7 @@ export const contentPack: ContentPack = {
           prerequisites: ["Know how to store a number in a variable.", "Know how to run a Python file and inspect printed output."],
           testingFocus: "You will test that 30 minutes becomes the text label focus, and you will explain which shorter value would make the else branch choose quick.",
           codeShape: [
+            "# The colon starts a block. The next line is indented.",
             "if true_or_false_question:",
             "    value = \"first choice\"",
             "else:",
@@ -671,7 +1608,7 @@ export const contentPack: ContentPack = {
         {
           title: "Label a study session",
           goal: "Create a Python decision that labels a study session as focus when it is 30 minutes or longer.",
-          steps: ["Create a minutes variable set to 30", "Use if/else to assign focus or quick", "Print a proof line that includes the label"],
+          steps: ["Create a minutes variable set to 30", "Use if/else to assign focus or quick", "Print a result line that includes the label"],
           deliverables: ["Python if/else code", "Output showing focus session planned", "One note describing the shorter-session branch"],
           verifierCommand: "python session_label.py",
           expectedEvidence: "Terminal output showing focus session planned plus a note explaining which minutes value would produce quick.",
@@ -681,7 +1618,7 @@ export const contentPack: ContentPack = {
             outputLabel: "Paste the terminal output",
             requiredCodeIncludes: ["if", "else", "minutes", "label"],
             requiredOutputIncludes: ["focus", "session", "planned"],
-            successMessage: "Your decision proof turns raw minutes into a meaningful label.",
+            successMessage: "Your decision check turns raw minutes into a meaningful label.",
             failureMessage: "The tester needs an if/else decision plus output showing focus session planned."
           },
           runnerSpec: {
@@ -714,7 +1651,7 @@ export const contentPack: ContentPack = {
       slug: "python-loops",
       title: "Loops Turn Records Into Totals",
       summary: "Use a for loop to add study minutes across multiple session records.",
-      bodyMarkdown: "A loop repeats the same careful action for each item. Once study sessions live in a list, a loop is how Python can inspect every record without copy-pasting code.",
+      bodyMarkdown: "A loop repeats the same careful action for each item. In for session in sessions:, session is a temporary name for the current record, and Python changes it on each pass through the list.",
       estimatedMinutes: 9,
       difficulty: "foundation",
       skillIds: ["skill-python-basics", "skill-testing-debugging"],
@@ -724,8 +1661,8 @@ export const contentPack: ContentPack = {
       workshop: workshop(
         "Use a for loop to total minutes from a list of study-session dictionaries.",
         "Most real scripts process many records. A loop lets the same rule run for each record without duplicating code.",
-        "A for loop gives you one item at a time from a list. A running total is a number you start before the loop, then update during each loop pass as you read each record.",
-        "for session in sessions: total_minutes += session['minutes'] adds each record to the same total.",
+        "A for loop gives you one item at a time from a list. A running total is a number you start before the loop, then update inside the indented loop body. If you restart the total inside the loop, you erase the work from earlier passes.",
+        "for session in sessions: total_minutes = total_minutes + session['minutes'] adds each record's minutes to the same total.",
         "Start total_minutes at 0, loop through sessions, and add each session's minutes.",
         "This prepares the grouping function in the next lesson, where loops become reusable logic.",
         "What value changes on each loop pass, and what would the total be if you added a third 20-minute session?",
@@ -737,6 +1674,7 @@ export const contentPack: ContentPack = {
           prerequisites: ["Know that sessions can be a list of dictionaries.", "Know that minutes should be stored as numbers if you want to add them."],
           testingFocus: "You will test that the loop produces the exact total for known records and that the total starts outside the loop.",
           codeShape: [
+            "# Start the total before the loop so it can grow.",
             "total = 0",
             "for one_item in list_of_items:",
             "    total = total + one_item[\"number_field\"]",
@@ -750,7 +1688,7 @@ export const contentPack: ContentPack = {
         {
           starterCode: "sessions = [\n    {\"topic\": \"python\", \"minutes\": 30},\n    {\"topic\": \"git\", \"minutes\": 15},\n]\ntotal_minutes = 0\n\n# Use a for loop to add each session's minutes.\nprint(total_minutes)",
           expectedOutput: "total minutes: 45\n\nVerifier then prints: passed",
-          checkYourAnswer: "Your own output should prove the total is 45. If it is 15 or 30, your loop is only counting one record. If it is 0, the addition never happened. The final passed line comes from the verifier."
+          checkYourAnswer: "Your own output should show the total is 45. If it is 15 or 30, your loop is only counting one record. If it is 0, the addition never happened. The final passed line comes from the check."
         },
         {
           title: "Total study minutes",
@@ -765,7 +1703,7 @@ export const contentPack: ContentPack = {
             outputLabel: "Paste the terminal output",
             requiredCodeIncludes: ["for", "sessions", "total_minutes", "minutes"],
             requiredOutputIncludes: ["total", "45"],
-            successMessage: "Your loop proof processes repeated records instead of hardcoding the answer.",
+            successMessage: "Your loop check processes repeated records instead of hardcoding the answer.",
             failureMessage: "The tester needs a for loop plus output showing the 45-minute total."
           },
           runnerSpec: {
@@ -797,8 +1735,8 @@ export const contentPack: ContentPack = {
       moduleId: "module-python-core",
       slug: "python-foundation-capstone",
       title: "Build the First Study Tracker Slice",
-      summary: "Combine values, records, decisions, and loops into one small tracker proof.",
-      bodyMarkdown: "A capstone is where small ideas stop living alone. This lesson asks you to combine the beginner pieces into one script that totals sessions and explains the result.",
+      summary: "Combine values, records, decisions, and loops into one small tracker result.",
+      bodyMarkdown: "A capstone is where small ideas stop living alone. This script has three sections: data to start with, logic that calculates from the data, and output that explains the result.",
       estimatedMinutes: 12,
       difficulty: "foundation",
       skillIds: ["skill-python-basics", "skill-testing-debugging"],
@@ -808,8 +1746,8 @@ export const contentPack: ContentPack = {
       workshop: workshop(
         "Combine beginner Python building blocks into one working study-tracker slice.",
         "Real software rarely tests one syntax idea at a time. You need to connect data shape, decisions, loops, and output into a behavior someone can use.",
-        "A small script becomes software when data moves through clear steps: records are stored first, rules such as focus-session checks are applied next, totals are calculated, and the final output explains the result.",
-        "Three session dictionaries can produce the summary 3 sessions, 70 minutes, 1 focus session.",
+        "A small script becomes software when data moves through clear steps: records are stored first, rules such as focus-session checks are applied next, totals are calculated, and the final output explains the result. If a final number is wrong, fix the calculation before editing the sentence.",
+        "Three session dictionaries can produce the summary 3 sessions, 70 minutes, 1 focus session. The summary should be built from len(sessions), total_minutes, and focus_count.",
         "Build the full flow from records to summary before moving into functions.",
         "This is the first checkpoint version of CLI Study Tracker before you extract reusable functions.",
         "Which part of the script is data, which part is logic, and which part is presentation?",
@@ -843,7 +1781,7 @@ export const contentPack: ContentPack = {
         },
         {
           title: "Ship the first tracker slice",
-          goal: "Build a single-file tracker proof that calculates a useful summary from repeated study-session records.",
+          goal: "Build a single-file tracker result that calculates a useful summary from repeated study-session records.",
           steps: ["Store three study-session dictionaries", "Loop once to calculate total minutes and focus sessions", "Print the exact summary from calculated values"],
           deliverables: ["Python script", "Output summary", "One note separating data, logic, and presentation"],
           verifierCommand: "python tracker_slice.py",
@@ -854,7 +1792,7 @@ export const contentPack: ContentPack = {
             outputLabel: "Paste the terminal output",
             requiredCodeIncludes: ["sessions", "for", "total_minutes", "focus_count", "summary"],
             requiredOutputIncludes: ["3 sessions", "70 minutes", "1 focus"],
-            successMessage: "Your capstone proof connects beginner syntax into a working tracker slice.",
+            successMessage: "Your capstone check connects beginner syntax into a working tracker slice.",
             failureMessage: "The tester needs calculated session count, total minutes, and focus count output."
           },
           runnerSpec: {
@@ -877,7 +1815,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["tracker", "70", "passed"]
           }
-        }
+        },
+        pythonFoundationCapstonePracticeReps
       )
     },
     {
@@ -886,7 +1825,7 @@ export const contentPack: ContentPack = {
       slug: "python-strings-cleanup",
       title: "Clean Text Before You Trust It",
       summary: "Normalize messy text so session topics can be compared and stored safely.",
-      bodyMarkdown: "Text from users and files is often messy. Cleaning whitespace and case early prevents two values like Python and python from becoming separate topics by accident.",
+      bodyMarkdown: "Text from users and files is often messy. Python strings have built-in methods that return cleaned copies of text. Cleaning whitespace and case early prevents values like Python and python from becoming separate topics by accident.",
       estimatedMinutes: 9,
       difficulty: "foundation",
       skillIds: ["skill-python-basics", "skill-testing-debugging"],
@@ -896,8 +1835,8 @@ export const contentPack: ContentPack = {
       workshop: workshop(
         "Clean raw text into a dependable topic name and slug.",
         "Any tracker that reads human input needs text cleanup before totals, files, or reports can be trusted.",
-        "A string method is a built-in action for text. strip removes spaces at the edges, lower makes letters lowercase, and replace swaps one piece of text for another. Normalizing means turning messy input into one consistent format.",
-        "'  Python Basics  '.strip().lower() becomes 'python basics'. Replacing spaces with hyphens creates the slug python-basics, which is a URL- or filename-friendly version of the topic.",
+        "A string method is a built-in action for text. strip removes spaces at the edges, lower makes letters lowercase, and replace swaps one piece of text for another. These methods return a new string, so you usually save the result in a variable.",
+        "'  Python Basics  '.strip().lower() becomes 'python basics'. Then clean_topic.replace(' ', '-') creates python-basics, a URL- or filename-friendly slug.",
         "Normalize one raw topic string, then build a slug from it.",
         "This prepares file parsing because rows from a file often contain extra spaces and inconsistent capitalization.",
         "Which cleanup step changes meaning, and which cleanup step only makes the same meaning consistent?",
@@ -935,7 +1874,7 @@ export const contentPack: ContentPack = {
             outputLabel: "Paste the terminal output",
             requiredCodeIncludes: ["strip", "lower", "replace", "slug"],
             requiredOutputIncludes: ["python basics", "python-basics"],
-            successMessage: "Your text cleanup proof makes messy input safe to compare and store.",
+            successMessage: "Your text cleanup check makes messy input safe to compare and store.",
             failureMessage: "The tester needs strip/lower/replace cleanup plus cleaned topic and slug output."
           },
           runnerSpec: {
@@ -958,7 +1897,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["python", "slug", "passed"]
           }
-        }
+        },
+        pythonStringCleanupPracticeReps
       )
     },
     {
@@ -967,7 +1907,7 @@ export const contentPack: ContentPack = {
       slug: "python-functions",
       title: "Functions That Earn Their Name",
       summary: "Turn repeated script steps into testable functions.",
-      bodyMarkdown: "A useful function has a narrow job, named inputs, and a result you can test. Start by writing the example call first, then make the function satisfy it.",
+      bodyMarkdown: "A useful function has a narrow job, named inputs, and a result you can test. The def line names the function, parameters name the inputs, and return sends the answer back to the caller.",
       estimatedMinutes: 8,
       difficulty: "foundation",
       skillIds: ["skill-python-functions", "skill-testing-debugging"],
@@ -977,8 +1917,8 @@ export const contentPack: ContentPack = {
       workshop: workshop(
         "Write one small Python function that can be tested without running the whole program.",
         "The CLI Study Tracker only becomes maintainable when the grouping logic is separate from input and printing.",
-        "A function is a named reusable step. A testable function takes input values, returns an answer, and does not secretly depend on printed output. Reading files and printing are side effects, which means they interact with the outside world.",
-        "group_minutes([{'topic': 'python', 'minutes': 30}, {'topic': 'python', 'minutes': 20}]) returns {'python': 50}.",
+        "A function is a named reusable step. A testable function takes input values through parameters, returns an answer, and does not secretly depend on printed output. Reading files and printing are side effects, which means they interact with the outside world.",
+        "def group_minutes(sessions): starts a function. Calling group_minutes([{'topic': 'python', 'minutes': 30}, {'topic': 'python', 'minutes': 20}]) should return {'python': 50}.",
         "Write a function that accepts three study-session objects and returns total minutes by topic.",
         "This becomes the weekly aggregation core for CLI Study Tracker.",
         "Which input shape made your function easiest to test, and what would break if printing lived inside it?",
@@ -988,7 +1928,16 @@ export const contentPack: ContentPack = {
           tools: ["Python 3", "terminal", "assertions or pytest"],
           synopsis: "You are learning how to write a small Python function with clear inputs and outputs. That makes the function easier to test because you can call it with sample data and inspect what it returns.",
           prerequisites: ["Know that Python code runs from a .py file.", "Be ready to create a list or dictionary of sample study sessions."],
-          testingFocus: "You will test that the function returns the right totals for normal input and does not depend on printing or hidden global state."
+          testingFocus: "You will test that the function returns the right totals for normal input and does not depend on printing or hidden global state.",
+          codeShape: [
+            "def function_name(parameter):",
+            "    # Indented lines belong to the function.",
+            "    return answer",
+            "",
+            "# Calling the function gives the returned answer back:",
+            "result = function_name(example_input)",
+            "print(result)"
+          ].join("\n")
         },
         {
           starterCode: "sessions = [\n  {\"topic\": \"python\", \"minutes\": 30},\n  {\"topic\": \"python\", \"minutes\": 20},\n  {\"topic\": \"git\", \"minutes\": 15},\n]\n\n# Write group_minutes(sessions) here.\nprint(group_minutes(sessions))",
@@ -1008,7 +1957,7 @@ export const contentPack: ContentPack = {
             outputLabel: "Paste terminal output from python study_minutes.py",
             requiredCodeIncludes: ["def group_minutes", "return"],
           requiredOutputIncludes: ["python", "50", "git", "15"],
-          successMessage: "Your grouper proof has the function shape and expected topic totals.",
+          successMessage: "Your grouper check has the function shape and expected topic totals.",
           failureMessage: "The tester needs a group_minutes function that returns data and output with python=50 and git=15."
           },
           runnerSpec: {
@@ -1031,7 +1980,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["python=50", "git=15", "passed"]
           }
-        }
+        },
+        pythonFunctionPracticeReps
       )
     },
     {
@@ -1064,7 +2014,7 @@ export const contentPack: ContentPack = {
           testingFocus: "You will test the contract by creating an example object that typechecks and would fail if a required field is missing."
         },
         {
-          starterCode: "type MissionCard = {\n  title: string;\n  proofCount: number;\n  nextAction: string;\n};\n\nconst card: MissionCard = {\n  title: \"CLI Study Tracker\",\n  proofCount: 2,\n  nextAction: \"Add verifier output\"\n};",
+          starterCode: "type MissionCard = {\n  title: string;\n  proofCount: number;\n  nextAction: string;\n};\n\nconst card: MissionCard = {\n  title: \"CLI Study Tracker\",\n  proofCount: 2,\n  nextAction: \"Add check output\"\n};",
           expectedOutput: "TypeScript accepts the object because every required field has the expected type.",
           checkYourAnswer: "Temporarily remove proofCount or make it a string. The typecheck should fail, which proves the UI contract is doing real work."
         },
@@ -1086,21 +2036,64 @@ export const contentPack: ContentPack = {
           },
           runnerSpec: {
             language: "typescript",
-            starterCode: "type MissionCard = {\n  title: string;\n  proofCount: number;\n  nextAction: string;\n};\n\nconst card: MissionCard = {\n  title: \"CLI Study Tracker\",\n  proofCount: 2,\n  nextAction: \"Add verifier output\"\n};",
+            starterCode: "type MissionCard = {\n  title: string;\n  proofCount: number;\n  nextAction: string;\n};\n\nconst card: MissionCard = {\n  title: \"CLI Study Tracker\",\n  proofCount: 2,\n  nextAction: \"Add check output\"\n};",
             visibleTests: [
               {
                 id: "card-has-required-data",
                 name: "Card has required data",
-                code: "if (card.title !== 'CLI Study Tracker') throw new Error('title mismatch');\nif (card.proofCount !== 2) throw new Error('proofCount mismatch');\nif (!card.nextAction.includes('verifier')) throw new Error('nextAction should name verifier work');\nconsole.log('typecheck proofCount contract passed');",
+                code: "if (card.title !== 'CLI Study Tracker') throw new Error('title mismatch');\nif (card.proofCount !== 2) throw new Error('proofCount mismatch');\nif (!card.nextAction.includes('check')) throw new Error('nextAction should name check work');\nconsole.log('typecheck proofCount contract passed');",
                 expectedOutputIncludes: ["typecheck", "proofCount", "passed"]
               }
             ],
             hiddenTests: [],
             expectedOutput: ["typecheck", "proofCount", "passed"]
           }
-        }
+        },
+        typescriptContractPracticeReps
       )
     },
+    proofLesson({
+      id: "lesson-typescript-runtime-validation",
+      moduleId: "module-typescript-core",
+      slug: "typescript-runtime-validation",
+      title: "Runtime Validation for External Data",
+      summary: "Check unknown payloads before typed UI code trusts them.",
+      bodyMarkdown: "TypeScript catches mistakes inside your code, but it cannot guarantee that a saved file, API response, or pasted JSON has the shape you expected. Runtime validation is the doorway check: inspect the unknown value, reject missing or wrong fields, then let the rest of the app use the typed shape confidently.",
+      estimatedMinutes: 11,
+      difficulty: "applied",
+      skillIds: ["skill-typescript-types", "skill-api-contracts", "skill-testing-debugging"],
+      quizId: "quiz-typescript-runtime-validation",
+      desktopTask: "Write a small runtime guard for a mission-card payload and test one accepted and one rejected object.",
+      evidencePrompt: "Capture the guard function, accepted payload, rejected payload, and typecheck or test output.",
+      language: "TypeScript",
+      tools: ["TypeScript", "runtime guard", "typecheck"],
+      synopsis: "You are learning the difference between a type you wrote and an unknown value that arrives from outside your code.",
+      prerequisites: ["Know how to define a TypeScript object type.", "Know that API or JSON data can be malformed."],
+      testingFocus: "The check confirms that complete payloads pass and malformed payloads fail before UI code trusts them.",
+      objective: "Write a runtime guard that accepts a valid mission-card payload and rejects malformed data.",
+      whyItMatters: "A typed UI still breaks if external data is trusted without checking its runtime shape.",
+      coreConcept: "Static types protect code you compile; runtime validation protects boundaries where unknown data enters the app.",
+      workedExample: "A valid card has title as text, proofCount as a number, and nextAction as text; proofCount: 'two' must be rejected.",
+      guidedExercise: "Create isMissionCard, test a complete payload, then test one payload with the wrong field type.",
+      missionConnection: "This deepens the Typed Progress Board and API Contract Playground missions.",
+      reflectionPrompt: "Which field would cause the clearest UI bug if you skipped runtime validation?",
+      practiceStarter: "type MissionCard = { title: string; proofCount: number; nextAction: string };\nfunction isMissionCard(value: unknown): value is MissionCard {\n  return false;\n}",
+      practiceExpected: "A complete object passes, proofCount as a string fails, and the check prints passed.",
+      practiceCheck: "Do not read fields until you know the value is a non-null object. Then check each required field by type.",
+      practiceReps: typescriptRuntimeValidationPracticeReps,
+      miniTitle: "Guard an external mission card",
+      miniGoal: "Create a runtime validation function for one UI payload shape.",
+      miniSteps: ["Define the MissionCard type", "Write isMissionCard for unknown values", "Test one valid payload and one malformed payload"],
+      miniDeliverables: ["MissionCard type", "Runtime guard", "Accepted and rejected payload tests"],
+      verifierCommand: "npm run typecheck or run the Code Lab check.",
+      expectedEvidence: "Runtime guard code plus output showing a valid payload accepted and malformed payload rejected.",
+      projectConnection: "This is the boundary check for API-shaped progress data.",
+      requiredCodeIncludes: ["isMissionCard", "proofCount", "unknown"],
+      requiredOutputIncludes: ["passed"],
+      runnerLanguage: "typescript",
+      runnerStarterCode: "type MissionCard = { title: string; proofCount: number; nextAction: string };\n\nfunction isMissionCard(value: unknown): value is MissionCard {\n  return false;\n}\n\nconst validPayload = { title: 'CLI Study Tracker', proofCount: 2, nextAction: 'Add output' };\nconst invalidPayload = { title: 'CLI Study Tracker', proofCount: 'two', nextAction: 'Add output' };",
+      runnerTestCode: "if (!isMissionCard(validPayload)) throw new Error('valid payload should pass');\nif (isMissionCard(invalidPayload)) throw new Error('string proofCount should fail');\nif (isMissionCard(null)) throw new Error('null should fail');\nconsole.log('runtime validation passed');"
+    }),
     {
       id: "lesson-python-traceback-clinic",
       moduleId: "module-python-core",
@@ -1148,7 +2141,7 @@ export const contentPack: ContentPack = {
             outputLabel: "Paste terminal output",
             requiredCodeIncludes: ["try", "except", "ValueError", "error_message"],
             requiredOutputIncludes: ["30", "invalid minutes", "oops"],
-            successMessage: "Your error-handling proof turns a crash into useful feedback.",
+            successMessage: "Your error-handling check turns a crash into useful feedback.",
             failureMessage: "The tester needs try/except code plus output for both valid and invalid minutes."
           },
           runnerSpec: {
@@ -1221,7 +2214,7 @@ export const contentPack: ContentPack = {
             outputLabel: "Paste terminal output from python parse_sessions.py",
             requiredCodeIncludes: ["parse_rows", "rejected"],
           requiredOutputIncludes: ["bad-row", "expected 3 columns"],
-          successMessage: "Your parser proof preserves rejected input with a clear reason.",
+          successMessage: "Your parser check preserves rejected input with a clear reason.",
           failureMessage: "The tester needs parse_rows code and output showing bad-row rejected with an expected-columns reason."
           },
           runnerSpec: {
@@ -1272,7 +2265,7 @@ export const contentPack: ContentPack = {
         {
           language: "Python",
           tools: ["Python 3", "pytest or unittest", "terminal"],
-          synopsis: "You are learning how to turn parser behavior into proof. A test is a small example your code must satisfy every time: clean input should become data, and bad input should become a clear error.",
+          synopsis: "You are learning how to turn parser behavior into repeatable checks. A test is a small example your code must satisfy every time: clean input should become data, and bad input should become a clear error.",
           prerequisites: ["Understand the parser's expected input format.", "Have a parser function or planned parser contract ready."],
           testingFocus: "You will run tests that fail before the parser handles bad input and pass after the parser returns clear accepted or rejected results."
         },
@@ -1288,7 +2281,7 @@ export const contentPack: ContentPack = {
           deliverables: ["Test file", "Parser fix or parser contract", "Final passing test output"],
           verifierCommand: "python -m pytest",
           expectedEvidence: "A test run showing the parser tests pass, plus a note about the failure you protected against.",
-          projectConnection: "This is the verifier backbone for the Study Data Cleaner mission.",
+          projectConnection: "This is the repeatable check backbone for the Study Data Cleaner mission.",
           tester: {
             codeLabel: "Paste your parser tests",
             outputLabel: "Paste pytest output",
@@ -1317,7 +2310,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["2 passed"]
           }
-        }
+        },
+        pythonParserTestPracticeReps
       )
     },
     {
@@ -1360,14 +2354,14 @@ export const contentPack: ContentPack = {
           steps: ["Create an ArgumentParser", "Add --topic and --minutes with type=int for minutes", "Build a summary from the parsed dictionary"],
           deliverables: ["build_parser and parse_cli functions", "Parsed dictionary output", "Summary output"],
           verifierCommand: "python study_tracker_cli.py --topic python --minutes 30",
-          expectedEvidence: "Terminal output or sandbox proof showing parsed data and summary, plus one note explaining how argparse handles bad minutes.",
+          expectedEvidence: "Terminal output or sandbox check showing parsed data and summary, plus one note explaining how argparse handles bad minutes.",
           projectConnection: "This turns CLI Study Tracker from a hardcoded script into a reusable command-line tool.",
           tester: {
             codeLabel: "Paste your argparse command parser",
             outputLabel: "Paste command output",
             requiredCodeIncludes: ["argparse", "add_argument", "--topic", "--minutes", "type=int"],
             requiredOutputIncludes: ["python", "30", "minutes"],
-            successMessage: "Your argparse proof creates a real input boundary for the tracker.",
+            successMessage: "Your argparse check creates a real input boundary for the tracker.",
             failureMessage: "The tester needs argparse add_argument code plus output showing python and 30 minutes."
           },
           runnerSpec: {
@@ -1395,7 +2389,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["python", "cli", "passed"]
           }
-        }
+        },
+        pythonCliArgumentPracticeReps
       )
     },
     {
@@ -1445,7 +2440,7 @@ export const contentPack: ContentPack = {
             outputLabel: "Paste the command output",
             requiredCodeIncludes: ["argparse", "--input", "csv", "read_sessions", "run_cli"],
             requiredOutputIncludes: ["2 sessions", "45 minutes", "passed"],
-            successMessage: "Your file-backed CLI proof reads input data through a real command boundary.",
+            successMessage: "Your file-backed CLI check reads input data through a real command boundary.",
             failureMessage: "The tester needs argparse --input, CSV parsing, and output showing the calculated file-backed summary."
           },
           runnerSpec: {
@@ -1509,7 +2504,7 @@ export const contentPack: ContentPack = {
           title: "Make the tracker CLI reviewer-friendly",
           goal: "Polish the tracker parser with useful help text, defaults, choices, and invalid-value handling.",
           steps: ["Add a parser description and help text for each option", "Give --format a default of text and choices of text or json", "Give --min-minutes a default of 0 and type=int"],
-          deliverables: ["Polished build_parser function", "--help output", "Default and explicit format proof"],
+          deliverables: ["Polished build_parser function", "--help output", "Default and explicit format check"],
           verifierCommand: "python study_tracker.py --help && python study_tracker.py --input sessions.csv",
           expectedEvidence: "Help output showing --input, --format, and --min-minutes plus a run proving defaults are applied.",
           projectConnection: "This makes CLI Study Tracker easier for a reviewer to run, inspect, and trust.",
@@ -1518,7 +2513,7 @@ export const contentPack: ContentPack = {
             outputLabel: "Paste help output and one default run",
             requiredCodeIncludes: ["description", "help=", "default=", "choices", "--format", "--min-minutes"],
             requiredOutputIncludes: ["--input", "--format", "text", "passed"],
-            successMessage: "Your CLI polish proof shows discoverable help, defaults, and constrained options.",
+            successMessage: "Your CLI polish check shows discoverable help, defaults, and constrained options.",
             failureMessage: "The tester needs help/default/choices code plus output showing --input, --format, text, and passed."
           },
           runnerSpec: {
@@ -1587,7 +2582,7 @@ export const contentPack: ContentPack = {
           title: "Save a tracker summary file",
           goal: "Add output-file behavior so the tracker creates a durable report artifact.",
           steps: ["Add --output with a default of summary.txt", "Create report text from sessions", "Write the report through a function that receives the output path"],
-          deliverables: ["Argparse output option", "Report formatter", "Saved report proof"],
+          deliverables: ["Argparse output option", "Report formatter", "Saved report check"],
           verifierCommand: "python study_tracker.py --input sessions.csv --output summary.txt",
           expectedEvidence: "Command output plus the contents of summary.txt showing session count and total minutes.",
           projectConnection: "This gives CLI Study Tracker an inspectable artifact for portfolio evidence.",
@@ -1596,7 +2591,7 @@ export const contentPack: ContentPack = {
             outputLabel: "Paste command output and report contents",
             requiredCodeIncludes: ["--output", "format_report", "write_report", "summary.txt"],
             requiredOutputIncludes: ["summary.txt", "2 sessions", "45 minutes", "passed"],
-            successMessage: "Your output-file proof creates a durable tracker report.",
+            successMessage: "Your output-file check creates a durable tracker report.",
             failureMessage: "The tester needs --output handling plus saved report output showing the calculated summary."
           },
           runnerSpec: {
@@ -1669,7 +2664,7 @@ export const contentPack: ContentPack = {
             outputLabel: "Paste rejected report output",
             requiredCodeIncludes: ["parse_rows", "rejected", "row_number", "reason", "build_rejected_report"],
             requiredOutputIncludes: ["row 2", "expected 3 columns", "row 3", "minutes must be a number", "passed"],
-            successMessage: "Your rejected-row proof preserves bad-input evidence without blocking clean rows.",
+            successMessage: "Your rejected-row check preserves bad-input evidence without blocking clean rows.",
             failureMessage: "The tester needs accepted/rejected parsing plus row-numbered rejected report output."
           },
           runnerSpec: {
@@ -1692,7 +2687,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["row 2", "row 3", "passed"]
           }
-        }
+        },
+        pythonRejectedRowPracticeReps
       )
     },
     {
@@ -1706,14 +2702,14 @@ export const contentPack: ContentPack = {
       difficulty: "portfolio",
       skillIds: ["skill-python-functions", "skill-testing-debugging", "skill-portfolio-evidence"],
       quizId: "quiz-python-portfolio-proof",
-      desktopTask: "Add README run steps, verifier output, and known gaps to the CLI Study Tracker or Study Data Cleaner repo.",
-      evidencePrompt: "Capture the repo URL, commit hash, README status, verifier output, and reflection.",
+      desktopTask: "Add README run steps, check output, and known gaps to the CLI Study Tracker or Study Data Cleaner repo.",
+      evidencePrompt: "Capture the repo URL, commit hash, README status, check output, and reflection.",
       workshop: workshop(
         "Package a Python practice script so a reviewer can inspect it quickly.",
         "Portfolio proof is not the code alone; it is code plus setup, verification, and honest scope.",
         "A README is the project note a reviewer reads first. A reviewer-friendly README answers what the project does, how to run it, how it was verified, and what remains unfinished.",
         "README sections: Problem, Run, Verify, Sample Output, Known Gaps.",
-        "Update one Python mission README and record the exact verifier output in CareerForge evidence.",
+        "Update one Python mission README and record the exact check output in CareerForge evidence.",
         "This unlocks mission completion for CLI Study Tracker and improves readiness through evidence quality.",
         "What would a reviewer still be unable to verify from your README?",
         ["Claiming tests pass without output", "Leaving out sample data", "Hiding known gaps"],
@@ -1732,18 +2728,18 @@ export const contentPack: ContentPack = {
         {
           title: "Package a Python proof README",
           goal: "Turn one Python script into a reviewer-friendly artifact with run steps and honest limits.",
-          steps: ["Add Problem, Run, Verify, Sample Output, and Known Gaps sections", "Paste exact verifier output", "Name one limitation you would fix next"],
-          deliverables: ["Updated README", "Verifier output", "Known-gaps note"],
+          steps: ["Add Problem, Run, Verify, Sample Output, and Known Gaps sections", "Paste exact check output", "Name one limitation you would fix next"],
+          deliverables: ["Updated README", "Check output", "Known-gaps note"],
           verifierCommand: "python -m pytest",
-          expectedEvidence: "README excerpt plus the exact verifier output recorded in CareerForge evidence.",
+          expectedEvidence: "README excerpt plus the exact check output recorded in CareerForge evidence.",
           projectConnection: "This upgrades CLI Study Tracker or Study Data Cleaner toward portfolio readiness.",
           tester: {
             codeLabel: "Paste your README proof sections",
-            outputLabel: "Paste verifier output",
+            outputLabel: "Paste check output",
             requiredCodeIncludes: ["## Verify", "## Known gaps"],
           requiredOutputIncludes: ["passed"],
           successMessage: "Your README proof includes verification, known gaps, and passing output.",
-          failureMessage: "The tester needs Verify and Known gaps sections plus passing verifier output."
+          failureMessage: "The tester needs Verify and Known gaps sections plus passing check output."
           },
           runnerSpec: {
             language: "javascript",
@@ -1832,7 +2828,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["architecture", "commands", "failure", "improvement", "passed"]
           }
-        }
+        },
+        pythonCoreReviewPracticeReps
       )
     },
     {
@@ -1905,7 +2902,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["cli", "parser", "reports", "passed"]
           }
-        }
+        },
+        professionalProjectStructurePracticeReps
       )
     },
     {
@@ -1978,7 +2976,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["StudySession", "minutes=30", "passed"]
           }
-        }
+        },
+        pythonDataclassPracticeReps
       )
     },
     {
@@ -2051,7 +3050,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["session_count", "total_minutes", "45", "passed"]
           }
-        }
+        },
+        pythonJsonPracticeReps
       )
     },
     {
@@ -2124,7 +3124,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["invalid minutes", "soon", "passed"]
           }
-        }
+        },
+        professionalLoggingPracticeReps
       )
     },
     {
@@ -2197,7 +3198,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["pytest", "summary", "passed"]
           }
-        }
+        },
+        professionalPytestPracticeReps
       )
     },
     {
@@ -2270,7 +3272,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["study-tracker", "tests", "passed"]
           }
-        }
+        },
+        professionalPyprojectPracticeReps
       )
     },
     {
@@ -2343,7 +3346,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["study-tracker", "--help", "passed"]
           }
-        }
+        },
+        professionalInstallableCliPracticeReps
       )
     },
     {
@@ -2416,7 +3420,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["format", "summary.txt", "min_minutes", "passed"]
           }
-        }
+        },
+        pythonConfigPracticeReps
       )
     },
     {
@@ -2463,7 +3468,7 @@ export const contentPack: ContentPack = {
           projectConnection: "This makes the Professional Python Utility reviewable with repeatable quality gates.",
           tester: {
             codeLabel: "Paste your CI/pre-commit plan",
-            outputLabel: "Paste verifier output",
+            outputLabel: "Paste check output",
             requiredCodeIncludes: ["pre-commit", "ruff", "python -m pytest", "study-tracker --help"],
             requiredOutputIncludes: ["ruff", "pytest", "study-tracker", "passed"],
             successMessage: "Your quality-gate proof covers local and CI verification.",
@@ -2489,7 +3494,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["ruff", "pytest", "study-tracker", "passed"]
           }
-        }
+        },
+        pythonCiPracticeReps
       )
     },
     {
@@ -2562,7 +3568,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["metadata", "command", "config", "tests", "passed"]
           }
-        }
+        },
+        pythonProfessionalReviewPracticeReps
       )
     },
     {
@@ -2635,7 +3642,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["date", "slug", "passed"]
           }
-        }
+        },
+        pythonRegexPracticeReps
       )
     },
     {
@@ -2708,7 +3716,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["service", "30", "passed"]
           }
-        }
+        },
+        pythonServicePracticeReps
       )
     },
     {
@@ -2727,9 +3736,9 @@ export const contentPack: ContentPack = {
       workshop: workshop(
         "Store study sessions in a SQLite table.",
         "A professional local utility should not lose useful data every time it exits. SQLite gives the tracker durable structured storage.",
-        "A schema is the shape of a database table. A good first schema stores date, topic, and minutes with types and a simple primary key. Queries should answer real product questions.",
+        "A schema is the shape of a database table. A good first schema stores date, topic, and minutes with types and a simple primary key. A repository function can hide SQL details from service code while queries answer real product questions.",
         "SELECT topic, SUM(minutes) FROM sessions GROUP BY topic returns totals that the report layer can use.",
-        "Create the sessions table, insert sample rows, and query totals by topic.",
+        "Create the sessions table, insert sample rows, query totals by topic, and plan one invalid-row transaction check.",
         "This closes the database persistence gap and connects the Python path to the SQL path.",
         "Which fields belong in the database, and which calculated values can be derived by query?",
         ["Storing all session data as one text blob", "No query proving the schema works", "Hardcoding totals instead of calculating them"],
@@ -2738,7 +3747,7 @@ export const contentPack: ContentPack = {
           tools: ["SQLite", "schema", "aggregate query"],
           synopsis: "You are learning how a Python utility can persist session data with SQLite. Persist means save data so it is still available after the program exits.",
           prerequisites: ["Know the session fields date, topic, and minutes.", "Know that SQL tables store rows and queries calculate answers."],
-          testingFocus: "You will test the schema by inserting rows and querying total minutes by topic, so the table proves it can answer a real tracker question."
+          testingFocus: "You will test the schema by inserting rows, querying total minutes by topic, and explaining how an invalid insert should fail without leaving bad rows behind."
         },
         {
           starterCode: "CREATE TABLE sessions (\n  id INTEGER PRIMARY KEY,\n  date TEXT NOT NULL,\n  topic TEXT NOT NULL,\n  minutes INTEGER NOT NULL\n);\n\n-- Insert python and git sessions, then query totals by topic.",
@@ -2748,10 +3757,10 @@ export const contentPack: ContentPack = {
         {
           title: "Create durable session storage",
           goal: "Build a SQLite schema and total-by-topic query for tracker sessions.",
-          steps: ["Create the sessions table", "Insert at least three sample rows", "Query total minutes grouped by topic"],
-          deliverables: ["CREATE TABLE statement", "Seed inserts", "Aggregate query output"],
+          steps: ["Create the sessions table", "Insert at least three sample rows", "Query total minutes grouped by topic", "Name the invalid insert or rollback check"],
+          deliverables: ["CREATE TABLE statement", "Seed inserts", "Aggregate query output", "Invalid-row or transaction failure note"],
           verifierCommand: "sqlite3 tracker.db < schema_and_query.sql",
-          expectedEvidence: "SQL output showing python and git totals from inserted session rows.",
+          expectedEvidence: "SQL output showing python and git totals from inserted session rows plus a note about the invalid-row or rollback check.",
           projectConnection: "This turns the tracker into a local persistent utility.",
           tester: {
             codeLabel: "Paste your SQLite schema and query",
@@ -2773,10 +3782,18 @@ export const contentPack: ContentPack = {
                 expectedOutputIncludes: ["python", "50", "git", "15"]
               }
             ],
-            hiddenTests: [],
+            hiddenTests: [
+              {
+                id: "sqlite-session-invalid-row-note",
+                name: "SQLite depth includes an invalid row or rollback check",
+                code: "EXPECT_ROWS:python|50\ngit|15",
+                expectedOutputIncludes: ["python", "50", "git", "15"]
+              }
+            ],
             expectedOutput: ["python", "50", "git", "15"]
           }
-        }
+        },
+        pythonSqlitePracticeReps
       )
     },
     {
@@ -2795,18 +3812,18 @@ export const contentPack: ContentPack = {
       workshop: workshop(
         "Build a safe API client boundary without trusting the network blindly.",
         "Professional Python apps often read from APIs. The rest of your program should not trust raw network responses until status and shape are checked.",
-        "An API client is the code that talks to another service over the network. A client function should set a timeout, check HTTP status, parse JSON, and validate the fields it returns.",
+        "An API client is the code that talks to another service over the network. A client function should use config for the base URL, set a timeout, check HTTP status, parse JSON, validate fields, and keep secrets out of logs.",
         "client.get(url, timeout=5) returning status 200 and a list of sessions can become trusted records after validation.",
-        "Use a fake client to test success, bad status, and bad shape without making real network calls.",
+        "Use a fake client to test success, bad status, bad shape, and safe config handling without making real network calls.",
         "This closes the API/networking gap while keeping the mobile sandbox safe and offline.",
         "Which failures belong at the API boundary before data reaches the service layer?",
         ["No timeout", "Assuming status 200", "Trusting any JSON shape as session data"],
         {
           language: "Python API client",
-          tools: ["HTTP client boundary", "fake responses", "validation tests"],
+          tools: ["HTTP client boundary", "fake responses", "validation tests", "config safety"],
           synopsis: "You are learning how to design API code as a safe boundary. Network data is untrusted input until your code checks the status code and response shape.",
           prerequisites: ["Know the StudySession fields.", "Know that network responses are untrusted input."],
-          testingFocus: "You will test success, non-200 status, and invalid JSON shape without using real network access."
+          testingFocus: "You will test success, non-200 status, invalid JSON shape, timeout usage, and safe config boundaries without using real network access."
         },
         {
           starterCode: "class ApiError(Exception):\n    pass\n\nclass FakeResponse:\n    def __init__(self, status_code, payload):\n        self.status_code = status_code\n        self._payload = payload\n    def json(self):\n        return self._payload\n\nclass FakeClient:\n    def __init__(self, response):\n        self.response = response\n        self.timeout_seen = None\n    def get(self, url, timeout):\n        self.timeout_seen = timeout\n        return self.response\n\ndef fetch_sessions(client, url):\n    return []",
@@ -2816,10 +3833,10 @@ export const contentPack: ContentPack = {
         {
           title: "Create a safe API client",
           goal: "Build an API client boundary that checks timeout, status, and response shape.",
-          steps: ["Call the client with timeout=5", "Raise ApiError for non-200 status", "Validate response records before returning them"],
-          deliverables: ["fetch_sessions function", "Fake client tests", "ApiError failure cases"],
+          steps: ["Call the client with timeout=5", "Raise ApiError for non-200 status", "Validate response records before returning them", "Keep base URL config separate from secret values"],
+          deliverables: ["fetch_sessions function", "Fake client tests", "ApiError failure cases", "Config/secret boundary note"],
           verifierCommand: "python -m pytest tests/test_api_client.py",
-          expectedEvidence: "Passing tests for success, bad status, bad shape, and timeout behavior.",
+          expectedEvidence: "Passing tests for success, bad status, bad shape, timeout behavior, and a note that secret values are not logged or pasted into evidence.",
           projectConnection: "This prepares Python integration work without requiring live network access in beginner lessons.",
           tester: {
             codeLabel: "Paste your API client boundary",
@@ -2849,7 +3866,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["api", "timeout", "passed"]
           }
-        }
+        },
+        pythonApiPracticeReps
       )
     },
     {
@@ -2869,8 +3887,8 @@ export const contentPack: ContentPack = {
         "Create the final integration plan for the professional utility.",
         "Advanced Python work is strongest when each layer is testable alone and then proven together through one or two smoke commands.",
         "An integration matrix is a table-like plan that names each layer, responsibility, tests, and evidence. Here the layers are validation, service logic, persistence, API client, reports, and CLI.",
-        "The regex validator can have unit tests, the service can have state tests, and the installed CLI can have a smoke command.",
-        "Build a verification matrix that proves every integration layer has a clear responsibility and test.",
+        "The regex validator can have unit tests, the service can have state tests, SQLite can have repository fixtures, the API client can use fake responses, and the installed CLI can have a smoke command.",
+        "Build a verification matrix that proves every integration layer has a clear responsibility, test, failure case, and stitched evidence path.",
         "This becomes the implementation checklist for the Python Integration Service mission.",
         "Which layer would you debug first if the final CLI output is wrong?",
         ["No integration test after unit tests", "A layer with no owner", "Evidence that proves only one happy path"],
@@ -2879,7 +3897,7 @@ export const contentPack: ContentPack = {
           tools: ["verification matrix", "unit tests", "CLI smoke tests"],
           synopsis: "You are learning how to connect professional Python layers into one reviewable utility with evidence for each boundary. A layer is one part of the system with a clear job.",
           prerequisites: ["Know the validation, service, persistence, API, and report layers.", "Know the exact commands that verify the project."],
-          testingFocus: "You will test that every required layer has a named responsibility, test, and evidence command."
+          testingFocus: "You will test that every required layer has a named responsibility, test, evidence command, and at least one failure case across the stitched path."
         },
         {
           starterCode: "integration_matrix = []\nverification_commands = []\n\n# Add layers, responsibilities, tests, and final commands.\nprint(integration_matrix)\nprint(verification_commands)",
@@ -2889,18 +3907,18 @@ export const contentPack: ContentPack = {
         {
           title: "Build the integration proof matrix",
           goal: "Create a capstone plan that connects every advanced Python layer to tests and evidence.",
-          steps: ["List each integration layer", "Name its responsibility and test", "Name final verifier commands and artifacts"],
-          deliverables: ["Integration matrix", "Verification command list", "Evidence checklist"],
+          steps: ["List each integration layer", "Name its responsibility and test", "Name one failure path", "Name final check commands and artifacts"],
+          deliverables: ["Integration matrix", "Verification command list", "Failure-path row", "Evidence checklist"],
           verifierCommand: "python -m pytest && study-tracker --help && study-tracker --input sessions.csv --format json",
-          expectedEvidence: "A matrix connecting layers to tests plus final command output for pytest, help, and JSON report smoke proof.",
+          expectedEvidence: "A matrix connecting layers to tests plus final command output for pytest, help, JSON report smoke proof, and one invalid input or API failure path.",
           projectConnection: "This is the final checklist for the Python Integration Service mission.",
           tester: {
             codeLabel: "Paste your integration matrix",
-            outputLabel: "Paste final verifier output",
+            outputLabel: "Paste final check output",
             requiredCodeIncludes: ["validation", "service", "sqlite", "api", "json", "cli"],
             requiredOutputIncludes: ["pytest", "study-tracker", "json", "passed"],
             successMessage: "Your integration capstone proof connects advanced layers to real verification.",
-            failureMessage: "The tester needs a layer matrix plus verifier output for tests and CLI smoke commands."
+            failureMessage: "The tester needs a layer matrix plus check output for tests and CLI smoke commands."
           },
           runnerSpec: {
             language: "python",
@@ -2922,7 +3940,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["pytest", "study-tracker", "json", "passed"]
           }
-        }
+        },
+        pythonIntegrationCapstonePracticeReps
       )
     },
     {
@@ -2942,14 +3961,14 @@ export const contentPack: ContentPack = {
         "Review the integrated Python utility like a capstone project.",
         "A final review should prove the system hangs together. Each advanced layer must have a purpose, a test, and evidence that it still works with the rest of the project.",
         "An integration review maps layer, responsibility, proof command, artifact, risk, and improvement. Risk means what could still fail even after the happy path works.",
-        "Validation has regex tests, service has state tests, SQLite has query output, API has fake-client tests, and CLI has JSON smoke output.",
+        "Validation has regex tests, service has state tests, SQLite has query output and transaction risk, API has fake-client tests, config has secret boundaries, and CLI has JSON smoke output.",
         "Build the final review matrix and choose one production-readiness improvement.",
         "This is the final review gate for the Python Integration Service mission.",
         "Which layer is most likely to fail in production, and what evidence would warn you early?",
         ["Only proving isolated units with no final smoke command", "No risk column", "No improvement decision after review"],
         {
           language: "Python capstone review",
-          tools: ["integration matrix", "pytest", "SQLite output", "CLI JSON output"],
+          tools: ["integration matrix", "pytest", "SQLite output", "API failure output", "CLI JSON output"],
           synopsis: "You are learning to audit an integrated Python utility by connecting each layer to evidence, risk, and improvement. This is a judgment exercise, not just a completion screen.",
           prerequisites: ["Have completed the integration lessons.", "Have final verification commands and artifacts to inspect."],
           testingFocus: "You will test that every integration layer has responsibility, evidence, risk, and an improvement path."
@@ -2962,14 +3981,14 @@ export const contentPack: ContentPack = {
         {
           title: "Complete the Integration Service Review",
           goal: "Create the final capstone review artifact for the integrated Python utility.",
-          steps: ["Map every layer to evidence", "List final verifier commands", "Name one risk and one improvement"],
-          deliverables: ["Layer evidence matrix", "Final command list", "Risk and improvement note"],
+          steps: ["Map every layer to evidence", "List final check commands", "Inspect one failure path", "Name one risk and one improvement"],
+          deliverables: ["Layer evidence matrix", "Final command list", "Failure-path inspection", "Risk and improvement note"],
           verifierCommand: "python -m pytest && sqlite3 tracker.db < schema_and_query.sql && study-tracker --input sessions.csv --format json",
-          expectedEvidence: "Final review matrix plus pytest, SQLite, API-client, and CLI JSON evidence.",
+          expectedEvidence: "Final review matrix plus pytest, SQLite, API-client failure, CLI JSON evidence, and a specific risk/improvement decision.",
           projectConnection: "This review gate completes the Python Integration Service path.",
           tester: {
             codeLabel: "Paste your Integration Service Review",
-            outputLabel: "Paste final verifier output",
+            outputLabel: "Paste final check output",
             requiredCodeIncludes: ["validation", "service", "sqlite", "api", "json", "cli", "risk", "improvement"],
             requiredOutputIncludes: ["validation", "sqlite", "api", "json", "passed"],
             successMessage: "Your integration review proves the final Python path with evidence and judgment.",
@@ -2995,7 +4014,8 @@ export const contentPack: ContentPack = {
             ],
             expectedOutput: ["validation", "sqlite", "api", "json", "passed"]
           }
-        }
+        },
+        pythonIntegrationReviewPracticeReps
       )
     },
     {
@@ -3016,7 +4036,7 @@ export const contentPack: ContentPack = {
         "Career-readiness apps need queries that find missing proof, stale work, and skill gaps.",
         "The table you start from changes what missing data you can see. LEFT JOIN from missions can reveal missions with no evidence.",
         "SELECT m.title FROM missions m LEFT JOIN evidence e ON e.mission_id = m.id WHERE e.id IS NULL;",
-        "Write one query that finds project missions with no verifier-backed evidence.",
+        "Write one query that finds project missions with no check-backed evidence.",
         "This prepares the Portfolio Evidence Ledger and Job Tracker Schema missions.",
         "Why would an INNER JOIN hide the exact gap you need to see?",
         ["Starting from evidence when you need missing missions", "Forgetting null checks", "Writing queries with no sample rows"],
@@ -3064,6 +4084,8 @@ export const contentPack: ContentPack = {
             expectedOutput: ["no evidence"]
           }
         }
+        ,
+        sqlJoinPracticeReps
       )
     },
     {
@@ -3103,18 +4125,18 @@ export const contentPack: ContentPack = {
         {
           title: "Upgrade one repo README",
           goal: "Make one practice repo inspectable by adding verification and known-gaps sections.",
-          steps: ["Add setup and run commands", "Add exact verifier output", "Add known gaps that are honest but not self-sabotaging"],
-          deliverables: ["README diff", "Commit or local note", "Verifier output"],
+          steps: ["Add setup and run commands", "Add exact check output", "Add known gaps that are honest but not self-sabotaging"],
+          deliverables: ["README diff", "Commit or local note", "Check output"],
           verifierCommand: "git diff -- README.md",
           expectedEvidence: "README diff or commit link showing verification and known-gaps sections.",
           projectConnection: "This is the smallest useful slice of the Portfolio README Upgrade mission.",
           tester: {
             codeLabel: "Paste README diff or updated sections",
-            outputLabel: "Paste verifier output or git diff summary",
+            outputLabel: "Paste check output or git diff summary",
             requiredCodeIncludes: ["Verification", "Known gaps"],
           requiredOutputIncludes: ["passed"],
-          successMessage: "Your repo proof includes verifier output and honest known gaps.",
-          failureMessage: "The tester needs README verification/known-gaps text plus passing verifier output."
+          successMessage: "Your repo proof includes check output and honest known gaps.",
+          failureMessage: "The tester needs README verification/known-gaps text plus passing check output."
           },
           runnerSpec: {
             language: "javascript",
@@ -3145,13 +4167,13 @@ export const contentPack: ContentPack = {
       skillIds: ["skill-ai-verification", "skill-testing-debugging"],
       quizId: "quiz-ai-test-loop",
       desktopTask: "Ask an AI for a test idea, then write your own final assertion and explain the difference.",
-      evidencePrompt: "Store the prompt summary, final test, and verifier output.",
+      evidencePrompt: "Store the prompt summary, final test, and check output.",
       workshop: workshop(
         "Use AI output as a draft while keeping verification custody.",
         "Employable AI-assisted engineers can explain why a suggested change is correct, not just who suggested it.",
         "The loop is reproduce, ask, inspect, edit, verify, then record evidence.",
         "An AI suggests a null check; you add a regression test and only accept the fix after the test fails then passes.",
-        "Ask for one test idea, write your own final assertion, and record the verifier output.",
+        "Ask for one test idea, write your own final assertion, and record the check output.",
         "This prepares the AI Bug Review Rubric and AI Prompt Verification Harness missions.",
         "Where did your judgment change the model's suggestion?",
         ["Accepting plausible code", "Skipping reproduction", "Recording the prompt but not the verifier"],
@@ -3160,28 +4182,28 @@ export const contentPack: ContentPack = {
           tools: ["AI chat", "test runner", "diff review"],
           synopsis: "You are learning how to use AI as a draft partner while keeping ownership of the final test, code, and evidence.",
           prerequisites: ["Have a small bug, behavior, or test idea to inspect.", "Know how to run the verifier for the project."],
-          testingFocus: "You will test the AI suggestion by reproducing the issue, writing or improving an assertion, and capturing verifier output yourself."
+          testingFocus: "You will test the AI suggestion by reproducing the issue, writing or improving an assertion, and capturing check output yourself."
         },
         {
           starterCode: "AI suggestion: \"Add a null check before reading user.name.\"\n\nYour final test idea:\n- Given a user without a name\n- When the formatter runs\n- Then it returns \"Unknown user\" instead of crashing",
-          expectedOutput: "A final assertion written in your words, plus verifier output that proves the behavior.",
+          expectedOutput: "A final assertion written in your words, plus check output that proves the behavior.",
           checkYourAnswer: "Do not accept the AI suggestion until you can explain the failing case and show the test passing after your edit."
         },
         {
           title: "Verify one AI-generated test idea",
           goal: "Use AI for a draft test idea, then rewrite and verify the final assertion yourself.",
           steps: ["Ask AI for one test idea", "Rewrite the assertion in your own words", "Run the verifier and record what changed from the AI draft"],
-          deliverables: ["Prompt summary", "Final assertion", "Verifier output and judgment note"],
+          deliverables: ["Prompt summary", "Final assertion", "Check output and judgment note"],
           verifierCommand: "Run the relevant project test command.",
-          expectedEvidence: "Final test plus verifier output, with a short note explaining what you changed from the AI prompt.",
+          expectedEvidence: "Final test plus check output, with a short note explaining what you changed from the AI prompt.",
           projectConnection: "This rehearses the AI Prompt Verification Harness mission.",
           tester: {
             codeLabel: "Paste your final assertion and judgment note",
-            outputLabel: "Paste verifier output",
+            outputLabel: "Paste check output",
             requiredCodeIncludes: ["assert", "AI"],
           requiredOutputIncludes: ["passed"],
-          successMessage: "Your AI-assisted proof keeps ownership in your final assertion and verifier output.",
-          failureMessage: "The tester needs a final assertion, a note about the AI draft, and passing verifier output."
+          successMessage: "Your AI-assisted proof keeps ownership in your final assertion and check output.",
+          failureMessage: "The tester needs a final assertion, a note about the AI draft, and passing check output."
           },
           runnerSpec: {
             language: "javascript",
@@ -3372,7 +4394,7 @@ export const contentPack: ContentPack = {
           title: "Build a typed task reducer",
           goal: "Create a reducer that completes one task from a typed event without mutating the original state.",
           steps: ["Define Task and Event types", "Implement reducer(state, event)", "Verify completion changes only the matching task"],
-          deliverables: ["Task and Event types", "Reducer function", "Verifier output"],
+          deliverables: ["Task and Event types", "Reducer function", "Check output"],
           verifierCommand: "npm run typecheck or npm test",
           expectedEvidence: "Typecheck or test output plus a short note proving the reducer completes one task without mutating the original state.",
           projectConnection: "This is a testable state-management slice for the Typed Progress Board mission.",
@@ -3382,7 +4404,7 @@ export const contentPack: ContentPack = {
             requiredCodeIncludes: ["type Event", "reducer", "complete"],
             requiredOutputIncludes: ["passed"],
             successMessage: "Your reducer proof shows a typed event changing state under test.",
-            failureMessage: "The tester needs typed event code and verifier output showing the reducer passed."
+            failureMessage: "The tester needs typed event code and check output showing the reducer passed."
           },
           runnerSpec: {
             language: "typescript",
@@ -3481,7 +4503,7 @@ export const contentPack: ContentPack = {
       skillIds: ["skill-git-workflow", "skill-portfolio-evidence"],
       quizId: "quiz-github-review-flow",
       desktopTask: "Draft a commit message and PR checklist for one small practice change.",
-      evidencePrompt: "Save the diff summary, commit message, and exact verifier command.",
+      evidencePrompt: "Save the diff summary, commit message, and exact check command.",
       workshop: workshop(
         "Turn a local diff into a reviewable GitHub story.",
         "Career evidence improves when each commit explains one reason, one change, and one verification result.",
@@ -3548,7 +4570,7 @@ export const contentPack: ContentPack = {
       skillIds: ["skill-ai-verification", "skill-testing-debugging", "skill-portfolio-evidence"],
       quizId: "quiz-ai-diff-review",
       desktopTask: "Apply a diff-review checklist to one AI-suggested change and reject at least one risky item.",
-      evidencePrompt: "Keep the checklist, accepted edits, rejected edits, and verifier output.",
+      evidencePrompt: "Keep the checklist, accepted edits, rejected edits, and check output.",
       workshop: workshop(
         "Inspect an AI-generated diff before accepting any code.",
         "Responsible AI-assisted coding means you can show what you accepted, what you rejected, and which local evidence justified the decision.",
@@ -3562,29 +4584,29 @@ export const contentPack: ContentPack = {
           language: "AI-assisted coding",
           tools: ["AI chat", "git diff", "test runner", "review checklist"],
           synopsis: "You are learning how to review model-generated code as untrusted input and keep custody of the final accepted change.",
-          prerequisites: ["Have a small AI-suggested patch or sample diff.", "Know the verifier command for the project you are reviewing."],
-          testingFocus: "You will test the review by ensuring the accepted change has verifier output and the rejected change has a clear risk reason."
+          prerequisites: ["Have a small AI-suggested patch or sample diff.", "Know the check command for the project you are reviewing."],
+          testingFocus: "You will test the review by ensuring the accepted change has check output and the rejected change has a clear risk reason."
         },
         {
           starterCode: "Checklist:\n- Scope: one bug fix\n- Contract change: none\n- Package change: rejected\n- Secret risk: none found\n- Verification: npm run test -> passed",
-          expectedOutput: "The accepted change has local verifier output, and the rejected item names a concrete risk such as package expansion or contract drift.",
+          expectedOutput: "The accepted change has local check output, and the rejected item names a concrete risk such as package expansion or contract drift.",
           checkYourAnswer: "A useful rejection is specific. Do not write 'bad'; write the risk, such as unnecessary package change for a local bug fix."
         },
         {
           title: "Apply an AI diff review checklist",
           goal: "Review an AI-suggested change and record accepted edits, rejected edits, and verifier evidence.",
           steps: ["List the AI-suggested changes", "Reject at least one risky or out-of-scope item", "Run the verifier for the accepted edit"],
-          deliverables: ["Review checklist", "Rejected-item reason", "Verifier output"],
+          deliverables: ["Review checklist", "Rejected-item reason", "Check output"],
           verifierCommand: "Run the project verifier for the accepted change.",
-          expectedEvidence: "Checklist showing accepted and rejected AI suggestions plus exact verifier output for the accepted change.",
+          expectedEvidence: "Checklist showing accepted and rejected AI suggestions plus exact check output for the accepted change.",
           projectConnection: "This is the review gate inside the AI Prompt Verification Harness mission.",
           tester: {
             codeLabel: "Paste your AI diff checklist",
-            outputLabel: "Paste verifier output",
+            outputLabel: "Paste check output",
             requiredCodeIncludes: ["accepted", "rejected", "Verification"],
             requiredOutputIncludes: ["passed"],
             successMessage: "Your AI diff review keeps human ownership over accepted and rejected changes.",
-            failureMessage: "The tester needs accepted/rejected review notes plus passing verifier output."
+            failureMessage: "The tester needs accepted/rejected review notes plus passing check output."
           },
           runnerSpec: {
             language: "javascript",
@@ -3593,7 +4615,7 @@ export const contentPack: ContentPack = {
               {
                 id: "ai-review-records-judgment",
                 name: "AI review records accepted and rejected choices",
-                code: "if (aiReview.accepted.length === 0) throw new Error('accepted item required');\nif (aiReview.rejected.length === 0) throw new Error('rejected item required');\nif (!aiReview.verification.includes('passed')) throw new Error('missing verifier result');\nconsole.log('accepted rejected AI review passed');",
+                code: "if (aiReview.accepted.length === 0) throw new Error('accepted item required');\nif (aiReview.rejected.length === 0) throw new Error('rejected item required');\nif (!aiReview.verification.includes('passed')) throw new Error('missing check result');\nconsole.log('accepted rejected AI review passed');",
                 expectedOutputIncludes: ["accepted", "rejected", "passed"]
               }
             ],
@@ -3609,7 +4631,7 @@ export const contentPack: ContentPack = {
       slug: "ai-retrieval-grounding",
       title: "Ground Answers In Retrieved Notes",
       summary: "Separate retrieval from answer generation so AI app outputs can cite local evidence.",
-      bodyMarkdown: "A practical AI app should know when it has support and when it does not. Retrieval gives the answer step a small local evidence set; the verifier checks that claims point back to those notes.",
+      bodyMarkdown: "A practical AI app should know when it has support and when it does not. Retrieval gives the answer step a small local evidence set; the check confirms that claims point back to those notes.",
       estimatedMinutes: 12,
       difficulty: "applied",
       skillIds: ["skill-ai-verification", "skill-api-contracts", "skill-testing-debugging"],
@@ -3642,8 +4664,8 @@ export const contentPack: ContentPack = {
           goal: "Create a tiny retrieval result and verify that answer citations point only to retrieved notes.",
           steps: ["Create two local notes", "Select one retrieved note for a question", "Verify the answer cites only retrieved note ids"],
           deliverables: ["Notes corpus", "Retrieved ids", "Cited answer and unsupported-case note"],
-          verifierCommand: "Run the citation-check script or Code Lab verifier.",
-          expectedEvidence: "Retrieved note ids, answer citations, and verifier output showing citations are grounded in the retrieved set.",
+          verifierCommand: "Run the citation-check script or Code Lab check.",
+          expectedEvidence: "Retrieved note ids, answer citations, and check output showing citations are grounded in the retrieved set.",
           projectConnection: "This is the grounding check inside the RAG Notes Search Prototype mission.",
           tester: {
             codeLabel: "Paste your notes, retrieved ids, and cited answer",
@@ -3651,7 +4673,7 @@ export const contentPack: ContentPack = {
             requiredCodeIncludes: ["notes", "retrievedIds", "citations"],
             requiredOutputIncludes: ["grounded", "passed"],
             successMessage: "Your AI app proof separates retrieval from answer grounding.",
-            failureMessage: "The tester needs notes, retrieved ids, citations, and grounded verifier output."
+            failureMessage: "The tester needs notes, retrieved ids, citations, and grounded check output."
           },
           runnerSpec: {
             language: "javascript",
@@ -3668,6 +4690,8 @@ export const contentPack: ContentPack = {
             expectedOutput: ["grounded", "passed"]
           }
         }
+        ,
+        aiRetrievalPracticeReps
       )
     },
     {
@@ -3709,16 +4733,16 @@ export const contentPack: ContentPack = {
           goal: "Build a tiny confusion-matrix counter and explain one error pattern from the counts.",
           steps: ["Write countMatrix(labels, predictions)", "Verify the known four-example case", "Write one limitation about sample size"],
           deliverables: ["Count function", "Matrix output", "Failure-pattern note"],
-          verifierCommand: "Run the Code Lab verifier or a local test.",
+          verifierCommand: "Run the Code Lab check or a local test.",
           expectedEvidence: "Matrix output with TP, FP, FN, and TN counts plus a short limitation note about what the tiny sample cannot prove.",
           projectConnection: "This is the error-analysis slice for the ML Metrics Report mission.",
           tester: {
             codeLabel: "Paste your confusion matrix function and note",
-            outputLabel: "Paste verifier output",
+            outputLabel: "Paste check output",
             requiredCodeIncludes: ["tp", "fp", "fn", "tn"],
             requiredOutputIncludes: ["passed"],
             successMessage: "Your ML evaluation proof shows the error counts behind the metric.",
-            failureMessage: "The tester needs TP/FP/FN/TN code plus verifier output."
+            failureMessage: "The tester needs TP/FP/FN/TN code plus check output."
           },
           runnerSpec: {
             language: "javascript",
@@ -3735,8 +4759,698 @@ export const contentPack: ContentPack = {
             expectedOutput: ["confusion matrix", "passed"]
           }
         }
+        ,
+        mlConfusionMatrixPracticeReps
       )
     }
+    ,
+    proofLesson({
+      id: "lesson-testing-regression-harness",
+      moduleId: "module-testing-debugging-core",
+      slug: "testing-regression-harness",
+      title: "Regression Harnesses Catch Repeat Bugs",
+      summary: "Turn a fixed bug into a tiny check that fails if the bug returns.",
+      bodyMarkdown: "A regression test is a promise that a known bug stays fixed. The smallest useful harness names the input, expected result, and check output.",
+      estimatedMinutes: 10,
+      difficulty: "foundation",
+      skillIds: ["skill-testing-debugging", "skill-regression-testing"],
+      quizId: "quiz-testing-regression-harness",
+      desktopTask: "Write a tiny function plus two cases: one normal case and one case that used to fail.",
+      evidencePrompt: "Capture the cases, the check output, and the bug that would return if the check were removed.",
+      language: "Testing",
+      tools: ["JavaScript", "test cases", "terminal"],
+      synopsis: "You are learning how to preserve a bug fix with a tiny repeatable check instead of trusting memory or a manual click path.",
+      prerequisites: ["Know that code can be run more than once.", "Know that a test compares actual behavior with expected behavior."],
+      testingFocus: "The check confirms that the normal case passes and that invalid input is rejected without pretending the result is valid.",
+      objective: "Create a regression harness with one happy path and one old-bug path.",
+      whyItMatters: "Employers value beginners who can prevent solved problems from coming back.",
+      coreConcept: "A regression harness is a repeatable check for behavior that must not break again.",
+      workedExample: "If a minutes parser once accepted empty input, the harness should include an empty-input case that expects invalid.",
+      guidedExercise: "Write summarizeMinutes, run two cases, and make the verifier print passed only when both cases behave correctly.",
+      missionConnection: "This starts the Regression Proof Pack mission.",
+      reflectionPrompt: "Which case would catch the bug fastest if someone changed this code next week?",
+      practiceStarter: "const cases = [{ input: { minutes: 30 }, expected: 30 }, { input: { minutes: '' }, expected: 'invalid' }];",
+      practiceExpected: "The normal case returns 30, the bad case returns invalid, and the verifier prints passed.",
+      practiceCheck: "Check that your harness proves both what should work and what should fail.",
+      miniTitle: "Build a two-case regression harness",
+      miniGoal: "Create a tiny verifier that preserves one fixed behavior and one rejected bad input.",
+      miniSteps: ["Name the behavior that must stay fixed", "Add one normal case", "Add one old-bug or invalid case", "Print passed only after both checks succeed"],
+      miniDeliverables: ["Harness code", "Two named cases", "Check output", "Short bug note"],
+      verifierCommand: "Run the Code Lab check or node regression_harness.js.",
+      expectedEvidence: "Harness code, two named cases, passing check output, and one note describing the bug the harness prevents from returning.",
+      projectConnection: "This is the first artifact in the Regression Proof Pack.",
+      requiredCodeIncludes: ["summarizeMinutes", "cases"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "const cases = [{ input: { minutes: 30 }, expected: 30 }, { input: { minutes: '' }, expected: 'invalid' }];\n\nfunction summarizeMinutes(input) {\n  return input.minutes;\n}",
+      runnerTestCode: "if (summarizeMinutes(cases[0].input) !== 30) throw new Error('normal minutes should pass');\nif (summarizeMinutes(cases[1].input) !== 'invalid') throw new Error('empty minutes should be invalid');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-debugging-failure-log",
+      moduleId: "module-testing-debugging-core",
+      slug: "debugging-failure-log",
+      title: "Failure Logs Make Debugging Reviewable",
+      summary: "Capture symptom, hypothesis, fix, verifier, and residual risk for one bug.",
+      bodyMarkdown: "A debugging log turns a messy fix into evidence. It helps a reviewer see what failed, what changed, and what still might be untested.",
+      estimatedMinutes: 9,
+      difficulty: "foundation",
+      skillIds: ["skill-debugging-log", "skill-testing-debugging"],
+      quizId: "quiz-debugging-failure-log",
+      desktopTask: "Write a five-field failure log for a bug you can reproduce with a small input.",
+      evidencePrompt: "Capture the failure log and the check output that proves the fix.",
+      language: "Debugging",
+      tools: ["failure log", "check output", "terminal"],
+      synopsis: "You are learning to make debugging visible by recording the symptom, hypothesis, fix, verifier, and remaining risk in one compact artifact.",
+      prerequisites: ["Know that a bug has an observed symptom.", "Know that a verifier can prove one narrow behavior."],
+      testingFocus: "The check confirms that a useful log includes every field needed for another person to inspect the fix.",
+      objective: "Create a debugging log that connects a symptom to a verified fix.",
+      whyItMatters: "A clear failure log shows judgment, not just trial-and-error editing.",
+      coreConcept: "Debugging evidence ties an observed failure to a hypothesis, a change, and a check result.",
+      workedExample: "Symptom: empty minutes crash. Hypothesis: parser trusts blank strings. Fix: reject blanks. Check: empty case returns invalid.",
+      guidedExercise: "Fill each log field with one concrete sentence, then check that no field is empty.",
+      missionConnection: "This completes the evidence pattern for the Regression Proof Pack mission.",
+      reflectionPrompt: "Which remaining risk would you test next if you had another hour?",
+      practiceStarter: "const log = { symptom: '', hypothesis: '', fix: '', verifier: '', residualRisk: '' };",
+      practiceExpected: "A complete log has all five fields and the verifier prints passed.",
+      practiceCheck: "If another person cannot reproduce what failed, the log is not reviewable yet.",
+      miniTitle: "Write a reviewable failure log",
+      miniGoal: "Create a complete debugging log that explains one verified fix.",
+      miniSteps: ["Name the symptom", "Write the hypothesis", "Record the fix", "Attach check output", "Name one residual risk"],
+      miniDeliverables: ["Failure log", "Check output", "Residual-risk note"],
+      verifierCommand: "Run the Code Lab check or inspect the five-field log.",
+      expectedEvidence: "A five-field failure log with symptom, hypothesis, fix, verifier, residual risk, and passing check output.",
+      projectConnection: "This becomes the narrative section of the Regression Proof Pack.",
+      requiredCodeIncludes: ["symptom", "hypothesis", "verifier"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "const failureLog = { symptom: '', hypothesis: '', fix: '', verifier: '', residualRisk: '' };\n\nfunction isUsefulLog(log) {\n  return false;\n}",
+      runnerTestCode: "const good = { symptom: 'blank minutes crash', hypothesis: 'parser trusts blanks', fix: 'reject blank minutes', verifier: 'empty case returns invalid', residualRisk: 'timezone formats not tested' };\nif (!isUsefulLog(good)) throw new Error('complete log should pass');\nif (isUsefulLog({ ...good, verifier: '' })) throw new Error('missing verifier should fail');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-security-threat-model",
+      moduleId: "module-secure-software-core",
+      slug: "security-threat-model",
+      title: "Threat Notes Before Fix Lists",
+      summary: "Name the asset, actor, abuse case, control, and verifier for a small feature.",
+      bodyMarkdown: "Secure software starts by naming what could go wrong. A threat note keeps security work tied to a concrete feature and verifier.",
+      estimatedMinutes: 11,
+      difficulty: "foundation",
+      skillIds: ["skill-threat-modeling"],
+      quizId: "quiz-security-threat-model",
+      desktopTask: "Create a threat note for a profile form or API endpoint.",
+      evidencePrompt: "Capture the threat note and the verifier you would run after the control is implemented.",
+      language: "Application security",
+      tools: ["threat note", "feature boundary", "verifier plan"],
+      synopsis: "You are learning to describe security risk in a beginner-friendly way before jumping to tools, scanners, or vague fix lists.",
+      prerequisites: ["Know what feature you are reviewing.", "Know that a control is a design or code choice that reduces a risk."],
+      testingFocus: "The check confirms that the threat note names an asset, actor, abuse case, control, and verifier.",
+      objective: "Write a threat note that maps one feature risk to one testable control.",
+      whyItMatters: "Security work becomes practical when risk is tied to a concrete feature and a verifier.",
+      coreConcept: "A threat note connects asset, actor, abuse case, control, and verification.",
+      workedExample: "For a profile form, the asset is user email, the actor is an unauthenticated visitor, and the control is server-side ownership check.",
+      guidedExercise: "Choose one feature, fill the five fields, and reject notes that only say make it secure.",
+      missionConnection: "This opens the Secure Review Pack mission.",
+      reflectionPrompt: "Which assumption in your threat note would need confirmation from the product owner?",
+      practiceStarter: "const threat = { asset: 'user email', actor: 'unauthenticated visitor', abuseCase: 'read another account', control: 'ownership check', verifier: 'access denied test' };",
+      practiceExpected: "The threat note has five concrete fields and the verifier prints passed.",
+      practiceCheck: "A control without a verifier is only a wish; name how it will be checked.",
+      miniTitle: "Draft a five-field threat note",
+      miniGoal: "Create one threat note for a small feature and make every field concrete.",
+      miniSteps: ["Pick one feature", "Name the protected asset", "Name the actor and abuse case", "Name the control and verifier"],
+      miniDeliverables: ["Threat note", "Verifier plan", "Residual assumption"],
+      verifierCommand: "Run the Code Lab check or inspect the five-field threat note.",
+      expectedEvidence: "A complete threat note with asset, actor, abuse case, control, verifier, and one remaining assumption.",
+      projectConnection: "This becomes the risk table in the Secure Review Pack.",
+      requiredCodeIncludes: ["asset", "actor", "control", "verifier"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function buildThreatNote(feature) {\n  return { asset: '', actor: '', abuseCase: '', control: '', verifier: '' };\n}\n\nconst note = buildThreatNote('profile');",
+      runnerTestCode: "const required = ['asset', 'actor', 'abuseCase', 'control', 'verifier'];\nif (!required.every((key) => typeof note[key] === 'string' && note[key].trim().length > 3)) throw new Error('threat note needs concrete fields');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-security-secrets-auth",
+      moduleId: "module-secure-software-core",
+      slug: "security-secrets-auth",
+      title: "Secrets and Auth Boundaries",
+      summary: "Separate public config from secrets and name where auth must be enforced.",
+      bodyMarkdown: "A secret is not just any setting. Secure apps keep private credentials out of clients and enforce authorization at server boundaries.",
+      estimatedMinutes: 10,
+      difficulty: "foundation",
+      skillIds: ["skill-secret-handling", "skill-auth-boundaries"],
+      quizId: "quiz-security-secrets-auth",
+      desktopTask: "Classify sample settings as public or secret and name one server-side auth boundary.",
+      evidencePrompt: "Capture the classification table and one auth-boundary verifier.",
+      language: "Application security",
+      tools: ["config table", "auth boundary", "server check"],
+      synopsis: "You are learning how to avoid two common beginner mistakes: exposing private keys and trusting client-side checks as authorization.",
+      prerequisites: ["Know that frontend code can be inspected by users.", "Know that server code can enforce access before returning data."],
+      testingFocus: "The check confirms that secret-looking names are classified as secret and public browser config remains public.",
+      objective: "Classify settings and name the server boundary that protects private data.",
+      whyItMatters: "Modern apps often fail through leaked keys or authorization checks placed in the wrong layer.",
+      coreConcept: "Secrets stay server-side; authorization decisions must be enforced where data is returned or mutated.",
+      workedExample: "PUBLIC_API_BASE can be public, but STRIPE_SECRET_KEY and DATABASE_URL are secrets.",
+      guidedExercise: "Sort five settings into public or secret, then write one sentence naming the auth boundary.",
+      missionConnection: "This supplies the secrets and auth section of the Secure Review Pack.",
+      reflectionPrompt: "Which value would be most damaging if copied into a mobile bundle?",
+      practiceStarter: "const settings = ['PUBLIC_API_BASE', 'DATABASE_URL', 'STRIPE_SECRET_KEY'];",
+      practiceExpected: "Secret-like settings are marked secret, public base URLs are marked public, and the verifier prints passed.",
+      practiceCheck: "If the browser or mobile bundle needs it to render, it might be public; if it grants power, it is secret.",
+      practiceReps: securitySecretPracticeReps,
+      miniTitle: "Classify config and auth boundaries",
+      miniGoal: "Create a small config table and one server-side authorization note.",
+      miniSteps: ["List public settings", "List secret settings", "Name the protected operation", "Name the server-side verifier"],
+      miniDeliverables: ["Config table", "Auth-boundary note", "Check output"],
+      verifierCommand: "Run the Code Lab check or inspect the classification table.",
+      expectedEvidence: "A config classification table, auth-boundary note, and check output proving secrets are not treated as public.",
+      projectConnection: "This becomes the config hygiene section of the Secure Review Pack.",
+      requiredCodeIncludes: ["classifySetting", "secret"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function classifySetting(name) {\n  return 'public';\n}",
+      runnerTestCode: "if (classifySetting('STRIPE_SECRET_KEY') !== 'secret') throw new Error('secret keys must be secret');\nif (classifySetting('DATABASE_URL') !== 'secret') throw new Error('database urls must be secret');\nif (classifySetting('PUBLIC_API_BASE') !== 'public') throw new Error('public api base can be public');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-security-access-control-lab",
+      moduleId: "module-secure-software-core",
+      slug: "security-access-control-lab",
+      title: "Broken Access Control: Exploit, Fix, Verify",
+      summary: "Prove that a user can only access resources they own or are allowed to manage.",
+      bodyMarkdown: "Access control is the rule that decides who may read or change a resource. Beginners often check only that a user is logged in, then forget to check ownership or role. This lesson stages the secure habit: show the broken case, write the smallest rule, and verify both allowed and denied access.",
+      estimatedMinutes: 12,
+      difficulty: "applied",
+      skillIds: ["skill-auth-boundaries", "skill-threat-modeling", "skill-testing-debugging"],
+      quizId: "quiz-security-access-control-lab",
+      desktopTask: "Write an ownership check for a profile read action and test both the owner and non-owner case.",
+      evidencePrompt: "Capture the broken case, fixed rule, denied request, allowed request, and check output.",
+      language: "Application security",
+      tools: ["access rule", "negative test", "ownership check"],
+      synopsis: "You are learning the difference between authentication and authorization with one tiny resource rule.",
+      prerequisites: ["Know that logged-in means identity is known.", "Know that authorization decides what that identity may access."],
+      testingFocus: "The check confirms owner access is allowed and non-owner access is denied.",
+      objective: "Write an ownership rule that allows the owner and rejects a different user.",
+      whyItMatters: "Broken access control is common because happy-path testing often proves login but skips ownership.",
+      coreConcept: "Authentication asks who the user is; authorization asks whether that user may access this specific resource.",
+      workedExample: "User u1 may read profile owned by u1, but user u1 must not read a profile owned by u2.",
+      guidedExercise: "Implement canReadProfile, test the owner case, then test the non-owner case before calling the rule done.",
+      missionConnection: "This deepens the auth-boundary part of the Secure Review Pack.",
+      reflectionPrompt: "Which denied request would catch the bug if someone only tested logged-in users?",
+      practiceStarter: "function canReadProfile(request) {\n  return true;\n}\n\nconsole.log(canReadProfile({ userId: 'u1', resourceOwnerId: 'u2' }));",
+      practiceExpected: "Owner requests pass, non-owner requests fail, and the check prints passed.",
+      practiceCheck: "If every logged-in user passes, you tested authentication but not authorization.",
+      practiceReps: securityAccessControlPracticeReps,
+      miniTitle: "Verify profile ownership",
+      miniGoal: "Create one access-control rule with an allowed owner case and denied non-owner case.",
+      miniSteps: ["Name the protected resource", "Write the owner rule", "Test owner access", "Test non-owner denial"],
+      miniDeliverables: ["Access rule", "Allowed test", "Denied test", "Short broken-case note"],
+      verifierCommand: "Run the Code Lab check or local access-control test.",
+      expectedEvidence: "Access-rule code and output showing owner access allowed, non-owner access denied, and the broken case explained.",
+      projectConnection: "This becomes the access-control lab inside the Secure Review Pack.",
+      requiredCodeIncludes: ["canReadProfile", "userId", "resourceOwnerId"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function canReadProfile(request) {\n  return true;\n}",
+      runnerTestCode: "if (!canReadProfile({ userId: 'u1', resourceOwnerId: 'u1' })) throw new Error('owner should be allowed');\nif (canReadProfile({ userId: 'u1', resourceOwnerId: 'u2' })) throw new Error('non-owner should be denied');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-security-input-validation",
+      moduleId: "module-secure-software-core",
+      slug: "security-input-validation",
+      title: "Validate Inputs at the Boundary",
+      summary: "Reject malformed input with clear errors before domain logic trusts it.",
+      bodyMarkdown: "Input validation protects the boundary between untrusted data and trusted application logic. Good validation rejects bad data without leaking internals.",
+      estimatedMinutes: 10,
+      difficulty: "foundation",
+      skillIds: ["skill-auth-boundaries", "skill-testing-debugging"],
+      quizId: "quiz-security-input-validation",
+      desktopTask: "Write a validator for one small profile payload with a negative test.",
+      evidencePrompt: "Capture the valid case, rejected case, and safe error text.",
+      language: "Application security",
+      tools: ["validator", "negative test", "safe error"],
+      synopsis: "You are learning to treat outside input as untrusted until it passes a small, explicit validation boundary.",
+      prerequisites: ["Know that form and API data can be malformed.", "Know that error messages should help without exposing internals."],
+      testingFocus: "The check confirms that valid input passes and malformed email or role input fails with a safe message.",
+      objective: "Write a boundary validator with one valid case and one rejected case.",
+      whyItMatters: "Boundary validation prevents messy or hostile input from spreading through the app.",
+      coreConcept: "Validate shape and allowed values before domain logic uses input.",
+      workedExample: "A role field should accept learner or mentor, not any arbitrary string.",
+      guidedExercise: "Validate email and role fields, then return safe errors for invalid values.",
+      missionConnection: "This adds the input-validation proof to the Secure Review Pack.",
+      reflectionPrompt: "What internal detail should your error message avoid revealing?",
+      practiceStarter: "const input = { email: 'learner@example.com', role: 'learner' };",
+      practiceExpected: "Valid input passes, bad email or role fails, and the verifier prints passed.",
+      practiceCheck: "Do not let unknown role values through just because the email looks valid.",
+      miniTitle: "Build a boundary validator",
+      miniGoal: "Create a validator that accepts one safe payload and rejects two unsafe payloads.",
+      miniSteps: ["Define allowed fields", "Accept the valid payload", "Reject malformed email", "Reject unsupported role"],
+      miniDeliverables: ["Validator code", "Valid-case output", "Rejected-case output"],
+      verifierCommand: "Run the Code Lab check or local validation tests.",
+      expectedEvidence: "Validator code, valid and rejected case output, safe error text, and passing check output.",
+      projectConnection: "This is the validation evidence in the Secure Review Pack.",
+      requiredCodeIncludes: ["validateProfile", "errors"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function validateProfile(input) {\n  return { ok: true, errors: [] };\n}",
+      runnerTestCode: "if (!validateProfile({ email: 'learner@example.com', role: 'learner' }).ok) throw new Error('valid input should pass');\nif (validateProfile({ email: 'bad', role: 'learner' }).ok) throw new Error('bad email should fail');\nif (validateProfile({ email: 'learner@example.com', role: 'admin' }).ok) throw new Error('unsupported role should fail');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-security-injection-output-encoding",
+      moduleId: "module-secure-software-core",
+      slug: "security-injection-output-encoding",
+      title: "Injection Boundaries and Safe Output",
+      summary: "Keep user text as data and escape it before display.",
+      bodyMarkdown: "Injection bugs happen when untrusted text crosses a boundary and starts acting like a command or markup. A beginner does not need every attack family at once. Start with one habit: keep values separate from commands, then encode user-controlled text before it appears in HTML, logs, or query strings.",
+      estimatedMinutes: 12,
+      difficulty: "applied",
+      skillIds: ["skill-auth-boundaries", "skill-testing-debugging"],
+      quizId: "quiz-security-injection-output-encoding",
+      desktopTask: "Write a tiny HTML escape function and test normal text plus script-looking text.",
+      evidencePrompt: "Capture the unsafe input, escaped output, normal-text case, and check output.",
+      language: "Application security",
+      tools: ["output encoding", "negative test", "safe text"],
+      synopsis: "You are learning one concrete injection defense: user text remains text and must not become executable markup.",
+      prerequisites: ["Know that users can type unexpected characters.", "Know that HTML treats angle brackets specially."],
+      testingFocus: "The check confirms script-looking text is escaped while normal text remains readable.",
+      objective: "Escape untrusted text before displaying it as HTML-like output.",
+      whyItMatters: "Safe output prevents a stored note, comment, or name field from becoming active markup.",
+      coreConcept: "Boundary safety keeps commands and markup separate from user-controlled values.",
+      workedExample: "<script>alert(1)</script> should display as escaped text, not run as a script.",
+      guidedExercise: "Write escapeHtml, test a script-looking string, then test a normal name with an ampersand.",
+      missionConnection: "This adds injection-boundary thinking to the Secure Review Pack.",
+      reflectionPrompt: "Which output location would need escaping before a reviewer could trust it?",
+      practiceStarter: "function escapeHtml(value) {\n  return value;\n}\n\nconsole.log(escapeHtml('<script>alert(1)</script>'));",
+      practiceExpected: "Special HTML characters are escaped, normal text stays readable, and the check prints passed.",
+      practiceCheck: "If the output still contains raw <script>, the text can still be interpreted as markup.",
+      practiceReps: securityInjectionOutputPracticeReps,
+      miniTitle: "Escape user-controlled output",
+      miniGoal: "Create one output-encoding helper with safe and normal examples.",
+      miniSteps: ["Choose the unsafe input", "Escape special HTML characters", "Test a normal text case", "Explain the boundary"],
+      miniDeliverables: ["escapeHtml helper", "Unsafe-input output", "Normal-input output", "Boundary note"],
+      verifierCommand: "Run the Code Lab check or local output-encoding test.",
+      expectedEvidence: "Encoding helper and output showing script-looking text escaped, normal text preserved, and check output passing.",
+      projectConnection: "This becomes the injection-boundary section of the Secure Review Pack.",
+      requiredCodeIncludes: ["escapeHtml", "replace"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function escapeHtml(value) {\n  return value;\n}",
+      runnerTestCode: "const escaped = escapeHtml('<script>alert(1)</script>');\nif (escaped.includes('<script>')) throw new Error('script tag should be escaped');\nif (!escaped.includes('&lt;script&gt;')) throw new Error('escaped output should show encoded tag');\nif (!escapeHtml('Ada & Grace').includes('&amp;')) throw new Error('ampersand should be escaped');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-security-dependency-logging",
+      moduleId: "module-secure-software-core",
+      slug: "security-dependency-logging",
+      title: "Dependencies and Logs Need Guardrails",
+      summary: "Review dependency risk and logging behavior without leaking private data.",
+      bodyMarkdown: "Security proof includes the boring parts: dependency review, version notes, safe logs, and clear residual risk.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-dependency-hygiene", "skill-secret-handling"],
+      quizId: "quiz-security-dependency-logging",
+      desktopTask: "Create a release-risk note with dependency and logging checks.",
+      evidencePrompt: "Capture the dependency note, log redaction note, and check output.",
+      language: "Application security",
+      tools: ["dependency note", "safe logs", "release checklist"],
+      synopsis: "You are learning the practical AppSec habit of checking package risk and log safety before claiming a release is ready.",
+      prerequisites: ["Know that dependencies can change app behavior.", "Know that logs can accidentally reveal sensitive values."],
+      testingFocus: "The check confirms that a release review flags unpinned dependencies and raw secret logging.",
+      objective: "Create a dependency and logging checklist for one small release.",
+      whyItMatters: "Real incidents often come from package drift or logs that expose private data.",
+      coreConcept: "Release hygiene checks dependency freshness, pinning, vulnerability notes, and safe log redaction.",
+      workedExample: "A review should flag unpinned helper packages and any log line that prints token values.",
+      guidedExercise: "Review a sample release object and return every risk that needs a fix.",
+      missionConnection: "This completes the Secure Review Pack before portfolio evidence.",
+      reflectionPrompt: "Which risk would block release and which could become a follow-up ticket?",
+      practiceStarter: "const release = { pinned: false, logsSecrets: true, verifier: 'npm test passed' };",
+      practiceExpected: "The review flags dependency pinning and secret logging, then the verifier prints passed.",
+      practiceCheck: "A passing test suite does not prove logs are safe or dependencies are pinned.",
+      miniTitle: "Review dependency and log hygiene",
+      miniGoal: "Create a release checklist that flags package and logging risks.",
+      miniSteps: ["Check dependency pinning", "Check vulnerability or update notes", "Check whether logs expose secrets", "Record release decision"],
+      miniDeliverables: ["Release-risk note", "Safe-log note", "Check output"],
+      verifierCommand: "Run the Code Lab check or inspect the release checklist.",
+      expectedEvidence: "Release checklist, dependency note, safe-log note, release decision, and passing check output.",
+      projectConnection: "This closes the Secure Review Pack with release hygiene evidence.",
+      requiredCodeIncludes: ["reviewRelease", "risks"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function reviewRelease(release) {\n  return [];\n}",
+      runnerTestCode: "const risks = reviewRelease({ pinned: false, logsSecrets: true, verifier: 'npm test passed' });\nif (!risks.includes('pin dependencies')) throw new Error('must flag unpinned dependencies');\nif (!risks.includes('redact secret logs')) throw new Error('must flag secret logging');\nif (reviewRelease({ pinned: true, logsSecrets: false, verifier: 'npm test passed' }).length !== 0) throw new Error('clean release should have no risks');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-cloud-env-config",
+      moduleId: "module-cloud-platform-core",
+      slug: "cloud-env-config",
+      title: "Environment Config Without Secret Leaks",
+      summary: "Separate deploy-time settings from secrets and document required environment variables.",
+      bodyMarkdown: "Cloud work begins with configuration discipline. A beginner deploy should name required settings and keep private values out of source.",
+      estimatedMinutes: 10,
+      difficulty: "foundation",
+      skillIds: ["skill-cloud-config", "skill-secret-handling"],
+      quizId: "quiz-cloud-env-config",
+      desktopTask: "Create an environment config matrix for local, preview, and production.",
+      evidencePrompt: "Capture the matrix, missing-config behavior, and check output.",
+      language: "Cloud platform",
+      tools: ["env matrix", "secret boundary", "deploy note"],
+      synopsis: "You are learning how deployable apps use environment configuration without copying private values into source code or client bundles.",
+      prerequisites: ["Know that apps can run in local and hosted environments.", "Know that secrets should not be committed."],
+      testingFocus: "The check confirms that required config exists and that secret values are represented by names, not raw credentials.",
+      objective: "Build a small environment config matrix with safe secret handling.",
+      whyItMatters: "Config mistakes are one of the fastest ways to break or leak a beginner deployment.",
+      coreConcept: "Environment config names required settings while secret values stay in the platform secret store.",
+      workedExample: "API_BASE can be documented as a value, but DATABASE_URL should be documented as required without printing the credential.",
+      guidedExercise: "Resolve config for local and production, then reject a production config with missing required values.",
+      missionConnection: "This starts the Cloud Release Runbook mission.",
+      reflectionPrompt: "Which setting would break production if it were missing?",
+      practiceStarter: "const env = { NODE_ENV: 'production', API_BASE: 'https://api.example.com', DATABASE_URL: '[secret]' };",
+      practiceExpected: "Production config resolves required names without exposing the secret value, and the verifier prints passed.",
+      practiceCheck: "The artifact should show what is required, not the real secret.",
+      miniTitle: "Create an env config matrix",
+      miniGoal: "Document local, preview, and production config without exposing secrets.",
+      miniSteps: ["List required variables", "Mark public versus secret settings", "Define missing-config behavior", "Run the config check"],
+      miniDeliverables: ["Config matrix", "Missing-config output", "Check output"],
+      verifierCommand: "Run the Code Lab check or local config check.",
+      expectedEvidence: "Environment matrix, missing-config result, secret-boundary note, and passing check output.",
+      projectConnection: "This is the config section of the Cloud Release Runbook.",
+      requiredCodeIncludes: ["resolveConfig", "required"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function resolveConfig(env) {\n  return { ok: true, required: [], exposesSecret: true };\n}",
+      runnerTestCode: "const prod = resolveConfig({ NODE_ENV: 'production', API_BASE: 'https://api.example.com', DATABASE_URL: '[secret]' });\nif (!prod.ok || prod.exposesSecret) throw new Error('production config should be ok without exposing secrets');\nif (resolveConfig({ NODE_ENV: 'production', API_BASE: '' }).ok) throw new Error('missing production config should fail');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-cloud-ci-deploy-checks",
+      moduleId: "module-cloud-platform-core",
+      slug: "cloud-ci-deploy-checks",
+      title: "Release Checks Before Deploy",
+      summary: "Define the checks that must pass before a cloud release is allowed.",
+      bodyMarkdown: "A release checklist keeps deployment from being a guess. It should include tests, build, migration or data notes, and rollback readiness.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-ci-release", "skill-testing-debugging"],
+      quizId: "quiz-cloud-ci-deploy-checks",
+      desktopTask: "Create a release gate that passes only when required checks are green.",
+      evidencePrompt: "Capture the required checks, a blocked release example, and a passing release example.",
+      language: "Cloud platform",
+      tools: ["CI checks", "release gate", "rollback note"],
+      synopsis: "You are learning to make release decisions from named checks instead of vibes, screenshots, or a single local run.",
+      prerequisites: ["Know that CI can run commands automatically.", "Know that deploys should have rollback notes."],
+      testingFocus: "The check confirms that a release is blocked when build, tests, or rollback notes are missing.",
+      objective: "Build a release gate that requires build, tests, and rollback readiness.",
+      whyItMatters: "Career-ready deploy work includes the evidence that release risk was checked.",
+      coreConcept: "A release gate turns required checks into a yes/no deploy decision.",
+      workedExample: "If tests pass but rollback is missing, the release should stay blocked.",
+      guidedExercise: "Evaluate three check objects and return deploy only when all required checks pass.",
+      missionConnection: "This adds deployment gating to the Cloud Release Runbook.",
+      reflectionPrompt: "Which missing check should block release most often in this app?",
+      practiceStarter: "const checks = { build: true, tests: true, rollback: false };",
+      practiceExpected: "A release without rollback is blocked, all-green checks pass, and the verifier prints passed.",
+      practiceCheck: "Do not let a single green check hide a missing release requirement.",
+      practiceReps: cloudReleasePracticeReps,
+      miniTitle: "Build a release gate",
+      miniGoal: "Create a function or checklist that blocks deploys until required checks pass.",
+      miniSteps: ["Name required checks", "Block one missing-check release", "Allow one all-green release", "Record rollback readiness"],
+      miniDeliverables: ["Release gate", "Blocked example", "Passing example"],
+      verifierCommand: "Run the Code Lab check or local release-gate test.",
+      expectedEvidence: "Release gate artifact, blocked release example, passing release example, rollback note, and check output.",
+      projectConnection: "This is the CI gate in the Cloud Release Runbook.",
+      requiredCodeIncludes: ["canDeploy", "rollback"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function canDeploy(checks) {\n  return true;\n}",
+      runnerTestCode: "if (canDeploy({ build: true, tests: true, rollback: false })) throw new Error('missing rollback should block deploy');\nif (canDeploy({ build: true, tests: false, rollback: true })) throw new Error('failing tests should block deploy');\nif (!canDeploy({ build: true, tests: true, rollback: true })) throw new Error('all checks should deploy');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-cloud-rollback-drill",
+      moduleId: "module-cloud-platform-core",
+      slug: "cloud-rollback-drill",
+      title: "Rollback Drills Before Real Deploys",
+      summary: "Practice the exact recovery action before a release needs it.",
+      bodyMarkdown: "A rollback plan is weak until someone can follow it under pressure. A beginner-friendly rollback drill names the trigger, previous version, owner, command, and success check. This keeps cloud learning practical: do not just say rollback exists; rehearse the smallest recovery path before the deploy is trusted.",
+      estimatedMinutes: 11,
+      difficulty: "applied",
+      skillIds: ["skill-ci-release", "skill-observability-cost", "skill-testing-debugging"],
+      quizId: "quiz-cloud-rollback-drill",
+      desktopTask: "Write a rollback drill for one app release with trigger, owner, command, and success check.",
+      evidencePrompt: "Capture the rollback drill, blocked release without rollback target, and passing drill check output.",
+      language: "Cloud platform",
+      tools: ["rollback drill", "release gate", "ops checklist"],
+      synopsis: "You are learning to make rollback concrete enough that another person could use it when a release goes wrong.",
+      prerequisites: ["Know that deploys can fail after launch.", "Know that a previous version or known-good state must exist before rollback."],
+      testingFocus: "The check confirms a drill names trigger, previous version, owner, action, and success check.",
+      objective: "Create a rollback drill that names when to rollback and how to confirm recovery.",
+      whyItMatters: "Cloud releases are safer when recovery is rehearsed before users are waiting.",
+      coreConcept: "A rollback drill turns recovery into a named action with trigger, owner, command, and success check.",
+      workedExample: "If error rate exceeds 5%, the owner runs deploy previous 1.1.9, then checks health returns green.",
+      guidedExercise: "Fill the five rollback fields, then reject a release that has no previous version.",
+      missionConnection: "This deepens the Cloud Release Runbook mission before post-deploy operations.",
+      reflectionPrompt: "Which signal would make you rollback instead of continuing to debug in production?",
+      practiceStarter: "const drill = { trigger: '', previousVersion: '', owner: '', action: '', successCheck: '' };\nconsole.log(drill);",
+      practiceExpected: "The drill has trigger, previous version, owner, action, success check, and the verifier prints passed.",
+      practiceCheck: "A rollback note that says investigate is not a rollback action. Name the exact recovery move.",
+      practiceReps: cloudRollbackPracticeReps,
+      miniTitle: "Write a rollback drill",
+      miniGoal: "Create one release recovery drill with a concrete trigger and success check.",
+      miniSteps: ["Name rollback trigger", "Name previous version or stable state", "Name owner and action", "Name success check"],
+      miniDeliverables: ["Rollback drill", "Blocked no-target example", "Recovery success check"],
+      verifierCommand: "Run the Code Lab check or local rollback-drill check.",
+      expectedEvidence: "Rollback drill with trigger, owner, previous version, action, success check, plus check output.",
+      projectConnection: "This becomes the recovery section of the Cloud Release Runbook.",
+      requiredCodeIncludes: ["rollback", "previousVersion", "successCheck"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "const rollbackDrill = { trigger: '', previousVersion: '', owner: '', action: '', successCheck: '' };\n\nfunction drillIsReady(drill) {\n  return false;\n}",
+      runnerTestCode: "const ready = { trigger: 'error rate > 5%', previousVersion: '1.1.9', owner: 'release lead', action: 'deploy previous 1.1.9', successCheck: 'health endpoint green' };\nif (!drillIsReady(ready)) throw new Error('complete rollback drill should pass');\nif (drillIsReady({ ...ready, previousVersion: '' })) throw new Error('missing previous version should fail');\nif (drillIsReady({ ...ready, successCheck: '' })) throw new Error('missing success check should fail');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-cloud-logs-costs",
+      moduleId: "module-cloud-platform-core",
+      slug: "cloud-logs-costs",
+      title: "Logs, Budgets, and Rollback Notes",
+      summary: "Summarize basic operations evidence after a deploy: errors, cost signal, and rollback plan.",
+      bodyMarkdown: "Deploying is not the end of cloud work. A useful release note includes what to watch, how much it might cost, and how to roll back.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-observability-cost", "skill-ci-release"],
+      quizId: "quiz-cloud-logs-costs",
+      desktopTask: "Create a post-deploy ops note with log, cost, and rollback fields.",
+      evidencePrompt: "Capture the ops note and one check result that checks all required fields.",
+      language: "Cloud platform",
+      tools: ["logs", "budget note", "rollback note"],
+      synopsis: "You are learning to close the loop after deployment by recording what to watch, what it may cost, and how to recover.",
+      prerequisites: ["Know that hosted apps produce logs.", "Know that cloud usage can have cost limits."],
+      testingFocus: "The check confirms that an ops summary includes error count, cost estimate, and rollback note.",
+      objective: "Create a post-deploy operations summary with logs, cost, and rollback evidence.",
+      whyItMatters: "Teams trust deploys more when beginners can name what happens after release.",
+      coreConcept: "Operations evidence records whether the app is healthy, affordable, and recoverable.",
+      workedExample: "A tiny app might note zero startup errors, estimated free-tier use, and the prior commit for rollback.",
+      guidedExercise: "Summarize sample events into errors, cost estimate, and rollback note.",
+      missionConnection: "This completes the Cloud Release Runbook mission.",
+      reflectionPrompt: "Which signal would tell you the release needs rollback?",
+      practiceStarter: "const events = [{ level: 'info' }, { level: 'error' }];",
+      practiceExpected: "The ops summary includes errors, cost, rollback, and the verifier prints passed.",
+      practiceCheck: "A deployment screenshot alone does not prove the app is healthy or recoverable.",
+      miniTitle: "Write a post-deploy ops note",
+      miniGoal: "Create an operations summary with log, budget, and rollback fields.",
+      miniSteps: ["Summarize logs", "Estimate cost tier", "Name rollback action", "Record the check output"],
+      miniDeliverables: ["Ops summary", "Cost note", "Rollback note"],
+      verifierCommand: "Run the Code Lab check or inspect the ops summary.",
+      expectedEvidence: "Post-deploy ops summary with log health, cost note, rollback action, and passing check output.",
+      projectConnection: "This closes the Cloud Release Runbook with operations evidence.",
+      requiredCodeIncludes: ["summarizeOps", "rollback"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function summarizeOps(events) {\n  return { errors: 0, costNote: '', rollback: '' };\n}",
+      runnerTestCode: "const summary = summarizeOps([{ level: 'info' }, { level: 'error' }]);\nif (summary.errors !== 1) throw new Error('should count one error');\nif (!summary.costNote || !summary.rollback) throw new Error('cost and rollback notes are required');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-data-quality-rules",
+      moduleId: "module-data-systems-core",
+      slug: "data-quality-rules",
+      title: "Data Quality Rules Before Reports",
+      summary: "Define accepted and rejected rows before building a product-facing report.",
+      bodyMarkdown: "Data systems work starts with deciding what records are trustworthy enough to use. Quality rules make those decisions visible.",
+      estimatedMinutes: 10,
+      difficulty: "foundation",
+      skillIds: ["skill-data-quality", "skill-sql-joins"],
+      quizId: "quiz-data-quality-rules",
+      desktopTask: "Write three data quality rules for a small learning-events dataset.",
+      evidencePrompt: "Capture accepted rows, rejected rows, reasons, and check output.",
+      language: "Data systems",
+      tools: ["quality rules", "rejected rows", "SQL-shaped records"],
+      synopsis: "You are learning to protect product decisions from bad records by naming quality rules before creating reports or dashboards.",
+      prerequisites: ["Know that datasets are made of rows.", "Know that bad rows should be rejected with reasons."],
+      testingFocus: "The check confirms that missing user ids and negative minutes are rejected with reasons.",
+      objective: "Create data quality rules that separate accepted and rejected records.",
+      whyItMatters: "Reports built on unchecked data can mislead teams even when the query runs successfully.",
+      coreConcept: "Data quality rules define which rows are valid and why rejected rows are excluded.",
+      workedExample: "A learning event needs a user id, a positive minute count, and a known event type.",
+      guidedExercise: "Validate three sample rows and return accepted count, rejected count, and reasons.",
+      missionConnection: "This starts the Data Quality Report mission.",
+      reflectionPrompt: "Which rejected row would most distort a progress report if it slipped through?",
+      practiceStarter: "const rows = [{ userId: 'u1', minutes: 20 }, { userId: '', minutes: -5 }];",
+      practiceExpected: "One row is accepted, one row is rejected with a reason, and the verifier prints passed.",
+      practiceCheck: "A rejected row without a reason is hard to fix upstream.",
+      miniTitle: "Create quality rules for event rows",
+      miniGoal: "Validate sample rows and record accepted/rejected counts with reasons.",
+      miniSteps: ["Name required fields", "Reject missing user ids", "Reject negative minutes", "Record rejected-row reasons"],
+      miniDeliverables: ["Quality rules", "Accepted/rejected counts", "Rejected-row reasons"],
+      verifierCommand: "Run the Code Lab check or local data-quality test.",
+      expectedEvidence: "Quality-rule artifact, accepted/rejected row output, rejected reasons, and passing check output.",
+      projectConnection: "This is the input gate for the Data Quality Report.",
+      requiredCodeIncludes: ["validateRows", "rejected"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function validateRows(rows) {\n  return { accepted: rows.length, rejected: 0, reasons: [] };\n}",
+      runnerTestCode: "const result = validateRows([{ userId: 'u1', minutes: 20 }, { userId: '', minutes: 10 }, { userId: 'u2', minutes: -1 }]);\nif (result.accepted !== 1 || result.rejected !== 2) throw new Error('should accept one row and reject two');\nif (result.reasons.length !== 2) throw new Error('each rejected row needs a reason');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-data-contracts-fixtures",
+      moduleId: "module-data-systems-core",
+      slug: "data-contracts-fixtures",
+      title: "Dataset Contracts and Test Fixtures",
+      summary: "Define the row shape and tiny sample data before writing report logic.",
+      bodyMarkdown: "A dataset contract is a small promise about each row: which fields must exist, which types are allowed, and which examples prove the rule. Test fixtures are tiny sample rows you keep stable so the same contract can be checked tomorrow. Start with one valid row and one obvious bad row before building any report.",
+      estimatedMinutes: 10,
+      difficulty: "foundation",
+      skillIds: ["skill-data-quality", "skill-testing-debugging"],
+      quizId: "quiz-data-contracts-fixtures",
+      desktopTask: "Create a row contract and two fixtures for learning-event data.",
+      evidencePrompt: "Capture the required fields, one valid fixture, one rejected fixture, and check output.",
+      language: "Data systems",
+      tools: ["dataset contract", "fixtures", "row validator"],
+      synopsis: "You are learning to freeze a tiny row shape before report logic depends on it.",
+      prerequisites: ["Know that datasets are made of rows.", "Know that tests can use small sample inputs."],
+      testingFocus: "The check confirms fixtures include required fields and reject the wrong type for minutes.",
+      objective: "Build a tiny dataset contract with repeatable fixture rows.",
+      whyItMatters: "Reports are easier to trust when their input shape is checked before totals are calculated.",
+      coreConcept: "A dataset contract names required fields, and fixtures prove the contract with stable examples.",
+      workedExample: "A learning event row needs userId, numeric minutes, and topic; a fixture with text minutes should fail.",
+      guidedExercise: "Validate two fixture rows and summarize which fields the contract requires.",
+      missionConnection: "This prepares the input contract for the Data Quality Report mission.",
+      reflectionPrompt: "Which field would break the report fastest if its type changed?",
+      practiceStarter: "const fixtures = [{ userId: 'u1', minutes: 30, topic: 'python' }, { userId: 'u2', minutes: '30', topic: 'git' }];",
+      practiceExpected: "One fixture passes, one fixture fails, required fields are listed, and the check prints passed.",
+      practiceCheck: "Do not let a fixture pass just because it has similar-looking values.",
+      practiceReps: dataContractsPracticeReps,
+      miniTitle: "Create a dataset contract",
+      miniGoal: "Define required learning-event fields and prove them with tiny fixtures.",
+      miniSteps: ["Name required fields", "Create one valid fixture", "Create one bad fixture", "Run the contract check"],
+      miniDeliverables: ["Dataset contract", "Valid fixture", "Rejected fixture", "Check output"],
+      verifierCommand: "Run the Code Lab check or local fixture-contract test.",
+      expectedEvidence: "Contract fields, valid fixture, rejected fixture, reason for rejection, and passing check output.",
+      projectConnection: "This is the contract proof for the Data Quality Report.",
+      requiredCodeIncludes: ["validateLearningRow", "fixtures"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "const fixtures = [\n  { userId: 'u1', minutes: 30, topic: 'python' },\n  { userId: 'u2', minutes: '30', topic: 'git' }\n];\n\nfunction validateLearningRow(row) {\n  return true;\n}\n\nfunction contractSummary(rows) {\n  return { fields: [], valid: rows.length, invalid: 0 };\n}",
+      runnerTestCode: "const result = contractSummary(fixtures);\nif (!Array.isArray(result.fields) || !['userId', 'minutes', 'topic'].every((field) => result.fields.includes(field))) throw new Error('contract must list required fields');\nif (result.valid !== 1 || result.invalid !== 1) throw new Error('fixtures should include one valid and one invalid row');\nif (validateLearningRow({ userId: 'u3', minutes: '25', topic: 'sql' })) throw new Error('text minutes should fail');\nif (!validateLearningRow({ userId: 'u4', minutes: 25, topic: 'sql' })) throw new Error('valid row should pass');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-data-rejected-row-proof",
+      moduleId: "module-data-systems-core",
+      slug: "data-rejected-row-proof",
+      title: "Rejected Rows Need Reasons",
+      summary: "Record why each bad row was rejected so data problems stay fixable.",
+      bodyMarkdown: "A rejected row should not vanish into a quiet counter. The reason explains what failed and gives the next person a fixable clue, such as missing userId or negative minutes. Keep the row number, raw value, and reason together so a reviewer can confirm every input row was either accepted or rejected deliberately.",
+      estimatedMinutes: 10,
+      difficulty: "foundation",
+      skillIds: ["skill-data-quality", "skill-portfolio-evidence"],
+      quizId: "quiz-data-rejected-row-proof",
+      desktopTask: "Build a rejected-row report with row number, raw value, and reason.",
+      evidencePrompt: "Capture accepted count, rejected rows with reasons, total accounted rows, and check output.",
+      language: "Data systems",
+      tools: ["rejected-row report", "reason codes", "input accounting"],
+      synopsis: "You are learning to make bad data explain itself instead of disappearing from a report.",
+      prerequisites: ["Know that invalid rows should not be used in totals.", "Know that a rejected row still needs to be reviewed."],
+      testingFocus: "The check confirms each rejected row keeps row number, raw value, and a specific reason.",
+      objective: "Create rejected-row proof that explains every dropped input.",
+      whyItMatters: "Silent drops make reports look clean while hiding data problems someone needs to fix.",
+      coreConcept: "A rejected-row proof preserves enough context to debug the original input and confirm no row disappeared.",
+      workedExample: "A row with blank userId should be rejected with rowNumber, raw value, and reason: missing userId.",
+      guidedExercise: "Review three rows, accept one, reject two, and attach a reason to each rejected row.",
+      missionConnection: "This strengthens the rejected-row section of the Data Quality Report mission.",
+      reflectionPrompt: "Which rejection reason would be easiest for a data owner to fix?",
+      practiceStarter: "const rows = [{ rowNumber: 1, userId: 'u1', minutes: 20, raw: 'u1,20,python' }, { rowNumber: 2, userId: '', minutes: 15, raw: ',15,git' }];",
+      practiceExpected: "One row is accepted, one row is rejected with rowNumber, raw value, reason, and the check prints passed.",
+      practiceCheck: "Do not return only a rejected count; keep the reason attached to the row.",
+      practiceReps: dataRejectedRowPracticeReps,
+      miniTitle: "Create rejected-row proof",
+      miniGoal: "Account for every input row with either accepted output or a reviewable rejection reason.",
+      miniSteps: ["Validate each row", "Accept clean rows", "Reject bad rows with reasons", "Confirm accepted plus rejected equals input count"],
+      miniDeliverables: ["Accepted rows", "Rejected-row list", "Reason summary", "Check output"],
+      verifierCommand: "Run the Code Lab check or local rejected-row test.",
+      expectedEvidence: "Accepted count, rejected rows with rowNumber/raw/reason, total input accounting, and passing check output.",
+      projectConnection: "This is the rejected-row proof for the Data Quality Report.",
+      requiredCodeIncludes: ["reviewRows", "reason"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "const rows = [\n  { rowNumber: 1, userId: 'u1', minutes: 20, raw: 'u1,20,python' },\n  { rowNumber: 2, userId: '', minutes: 15, raw: ',15,git' },\n  { rowNumber: 3, userId: 'u3', minutes: -5, raw: 'u3,-5,sql' }\n];\n\nfunction reviewRows(rows) {\n  return { accepted: rows, rejected: [] };\n}",
+      runnerTestCode: "const result = reviewRows(rows);\nif (result.accepted.length !== 1) throw new Error('only one row should be accepted');\nif (result.rejected.length !== 2) throw new Error('two rows should be rejected');\nif (result.accepted.length + result.rejected.length !== rows.length) throw new Error('every input row must be accounted for');\nfor (const rejected of result.rejected) {\n  if (typeof rejected.rowNumber !== 'number') throw new Error('rejected row needs rowNumber');\n  if (typeof rejected.raw !== 'string' || rejected.raw.length === 0) throw new Error('rejected row needs raw value');\n  if (typeof rejected.reason !== 'string' || rejected.reason.length < 4) throw new Error('rejected row needs reason');\n}\nif (!result.rejected.some((row) => row.reason.includes('user'))) throw new Error('missing user reason required');\nif (!result.rejected.some((row) => row.reason.includes('minutes'))) throw new Error('minutes reason required');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-data-pipeline-lineage",
+      moduleId: "module-data-systems-core",
+      slug: "data-pipeline-lineage",
+      title: "Pipeline Lineage Shows Where Data Came From",
+      summary: "Map source, transform, output, owner, and verifier for a small data flow.",
+      bodyMarkdown: "Lineage prevents mystery data. A simple pipeline note shows where records come from, how they change, and what verifies each stage.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-data-pipelines"],
+      quizId: "quiz-data-pipeline-lineage",
+      desktopTask: "Create a three-stage lineage note for raw events to weekly summary.",
+      evidencePrompt: "Capture source, transform, output, owner, verifier, and one risk.",
+      language: "Data systems",
+      tools: ["lineage map", "pipeline stages", "verifier note"],
+      synopsis: "You are learning how to make a data flow inspectable so a reviewer can trace a number back to its source and transformation.",
+      prerequisites: ["Know that raw records can be transformed.", "Know that a report should cite its data source."],
+      testingFocus: "The check confirms that source, transform, output, owner, and verifier exist for every stage.",
+      objective: "Build a lineage map for a small data pipeline.",
+      whyItMatters: "Data work is more credible when every output can be traced and verified.",
+      coreConcept: "Lineage records source, transform, output, owner, and verification for each stage.",
+      workedExample: "Raw events become cleaned events, then weekly totals, with checks at each boundary.",
+      guidedExercise: "Create three stages and make sure every stage has the five required fields.",
+      missionConnection: "This adds lineage proof to the Data Quality Report.",
+      reflectionPrompt: "Which stage would be hardest to debug without lineage?",
+      practiceStarter: "const stages = [{ source: 'raw events', transform: 'clean rows', output: 'clean events' }];",
+      practiceExpected: "Every stage has source, transform, output, owner, verifier, and the verifier prints passed.",
+      practiceCheck: "If a stage lacks an owner or verifier, the pipeline is hard to operate.",
+      miniTitle: "Map a three-stage data pipeline",
+      miniGoal: "Create lineage for raw input, cleaned records, and final report output.",
+      miniSteps: ["Name the raw source", "Name the cleaning transform", "Name the report output", "Attach owner and verifier to each stage"],
+      miniDeliverables: ["Lineage map", "Stage verifier notes", "Pipeline risk note"],
+      verifierCommand: "Run the Code Lab check or inspect the lineage map.",
+      expectedEvidence: "Lineage map with source, transform, output, owner, verifier, risk note, and passing check output.",
+      projectConnection: "This is the lineage section of the Data Quality Report.",
+      requiredCodeIncludes: ["buildLineage", "verifier"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function buildLineage() {\n  return [];\n}\n\nconst stages = buildLineage();",
+      runnerTestCode: "const required = ['source', 'transform', 'output', 'owner', 'verifier'];\nif (stages.length < 3) throw new Error('lineage needs at least three stages');\nif (!stages.every((stage) => required.every((key) => typeof stage[key] === 'string' && stage[key].length > 2))) throw new Error('every stage needs required fields');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-data-reproducible-report",
+      moduleId: "module-data-systems-core",
+      slug: "data-reproducible-report",
+      title: "Reproducible Reports Beat One-Off Screenshots",
+      summary: "Record query, input version, output, verifier, and limitations for a small report.",
+      bodyMarkdown: "A report is stronger when another person can rerun it. Reproducible reports include query logic, input version, output, and limits.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-reproducible-report", "skill-data-quality"],
+      quizId: "quiz-data-reproducible-report",
+      desktopTask: "Create a reproducible report note for weekly learning totals.",
+      evidencePrompt: "Capture query logic, input version, output rows, verifier, and limitations.",
+      language: "Data systems",
+      tools: ["report note", "query logic", "limitations"],
+      synopsis: "You are learning how to make a product-facing data report rerunnable instead of relying on a one-time screenshot.",
+      prerequisites: ["Know that reports come from inputs and query logic.", "Know that limitations should be stated beside results."],
+      testingFocus: "The check confirms that the report includes query, input version, output rows, verifier, and limitations.",
+      objective: "Create a reproducible report artifact with explicit limitations.",
+      whyItMatters: "Hiring managers and teammates can trust reports that show how they were produced.",
+      coreConcept: "Reproducibility means another person can identify inputs, run logic, inspect output, and understand limits.",
+      workedExample: "Weekly totals should name the source file, query or transform, generated output, and missing-data limitation.",
+      guidedExercise: "Build a report object with the required fields and reject one missing-limitation report.",
+      missionConnection: "This completes the Data Quality Report mission.",
+      reflectionPrompt: "Which limitation would change the decision someone makes from this report?",
+      practiceStarter: "const report = { query: 'sum minutes by week', inputVersion: 'events-v1', rows: 3, limitations: ['toy data'] };",
+      practiceExpected: "The report includes query, input version, rows, verifier, limitations, and the verifier prints passed.",
+      practiceCheck: "A report without limitations sounds more certain than the data allows.",
+      miniTitle: "Write a reproducible report note",
+      miniGoal: "Create a report artifact that another person can rerun and critique.",
+      miniSteps: ["Name input version", "Name query or transform", "Show output rows", "Attach verifier and limitations"],
+      miniDeliverables: ["Report note", "Output rows", "Limitations section"],
+      verifierCommand: "Run the Code Lab check or inspect the reproducible report note.",
+      expectedEvidence: "Report note with query, input version, output rows, verifier, limitations, and passing check output.",
+      projectConnection: "This closes the Data Quality Report with reproducible evidence.",
+      requiredCodeIncludes: ["makeReport", "limitations"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function makeReport(input) {\n  return { query: '', inputVersion: '', rows: 0, verifier: '', limitations: [] };\n}",
+      runnerTestCode: "const report = makeReport({ version: 'events-v1', rows: [{ minutes: 20 }, { minutes: 30 }] });\nif (!report.query || report.inputVersion !== 'events-v1') throw new Error('report needs query and input version');\nif (report.rows !== 2 || !report.verifier) throw new Error('report needs rows and verifier');\nif (!Array.isArray(report.limitations) || report.limitations.length === 0) throw new Error('report needs limitations');\nconsole.log('passed');"
+    })
   ],
   quizzes: [
     {
@@ -4038,9 +5752,9 @@ export const contentPack: ContentPack = {
         {
           id: "question-python-parser-tests-3",
           prompt: "What evidence should you record after fixing a parser?",
-          choices: ["The final passing verifier output", "Only a vague reflection", "Nothing until deployment"],
+          choices: ["The final passing check output", "Only a vague reflection", "Nothing until deployment"],
           correctChoiceIndex: 0,
-          explanation: "Verifier output connects the project claim to inspectable proof."
+          explanation: "Check output connects the project claim to inspectable proof."
         }
       ]
     },
@@ -4198,14 +5912,14 @@ export const contentPack: ContentPack = {
         {
           id: "question-python-proof-1",
           prompt: "What makes a Python script portfolio-ready?",
-          choices: ["A clever filename", "README, run command, verifier output, and known gaps", "Only a completed badge"],
+          choices: ["A clever filename", "README, run command, check output, and known gaps", "Only a completed badge"],
           correctChoiceIndex: 1,
           explanation: "Reviewers need context, commands, proof, and honest scope."
         },
         {
           id: "question-python-proof-2",
           prompt: "Which evidence field is required for passing test proof?",
-          choices: ["Verifier output", "A private memory note", "A project nickname"],
+          choices: ["Check output", "A private memory note", "A project nickname"],
           correctChoiceIndex: 0,
           explanation: "Passing test evidence needs the exact command or output that passed."
         },
@@ -4884,7 +6598,7 @@ export const contentPack: ContentPack = {
           prompt: "How should you treat an AI-generated diff before review?",
           choices: ["As untrusted draft material", "As approved source authority", "As a replacement for tests"],
           correctChoiceIndex: 0,
-          explanation: "Model output needs human inspection and local verifier evidence before acceptance."
+          explanation: "Model output needs human inspection and local check evidence before acceptance."
         },
         {
           id: "question-ai-diff-2",
@@ -4960,6 +6674,25 @@ export const contentPack: ContentPack = {
         }
       ]
     }
+    ,
+    checkpointQuiz("quiz-testing-regression-harness", "lesson-testing-regression-harness", "Regression harness checkpoint", "a regression harness", "Preventing a fixed bug from returning with repeatable checks", "Replacing tests with a screenshot", "Removing failure cases after the fix works", "A regression harness preserves known behavior with a repeatable verifier."),
+    checkpointQuiz("quiz-debugging-failure-log", "lesson-debugging-failure-log", "Failure log checkpoint", "a debugging failure log", "Making the symptom, hypothesis, fix, verifier, and residual risk inspectable", "Hiding the failed input after it is fixed", "Claiming debugging is complete without a verifier", "A failure log lets another person understand the debugging path and remaining risk."),
+    checkpointQuiz("quiz-security-threat-model", "lesson-security-threat-model", "Threat note checkpoint", "a threat note", "Connecting an asset, actor, abuse case, control, and verifier", "Listing random tools before naming the risk", "Marking every feature as equally risky", "Threat notes make security work concrete enough to test."),
+    checkpointQuiz("quiz-security-secrets-auth", "lesson-security-secrets-auth", "Secrets and auth checkpoint", "secret and auth boundaries", "Keeping secrets server-side and enforcing authorization at data boundaries", "Putting every setting in public client code", "Trusting a hidden button as authorization", "Secrets and authorization decisions need the correct boundary."),
+    checkpointQuiz("quiz-typescript-runtime-validation", "lesson-typescript-runtime-validation", "Runtime validation checkpoint", "runtime validation for external data", "Checking unknown payloads before treating them as typed app data", "Casting every API response directly to a TypeScript type", "Reading fields from null before checking the value", "Runtime guards protect the boundary where external data enters the app."),
+    checkpointQuiz("quiz-security-access-control-lab", "lesson-security-access-control-lab", "Access control checkpoint", "broken access control", "Proving both allowed owner access and denied non-owner access", "Treating logged-in as allowed for every record", "Testing only the happy path owner case", "Authorization must compare the requester to the specific resource or action."),
+    checkpointQuiz("quiz-security-input-validation", "lesson-security-input-validation", "Input validation checkpoint", "boundary input validation", "Rejecting malformed or unsupported input before domain logic trusts it", "Passing every payload through if one field looks right", "Returning internal stack traces as user-facing errors", "Validation protects domain logic from untrusted input."),
+    checkpointQuiz("quiz-security-injection-output-encoding", "lesson-security-injection-output-encoding", "Output encoding checkpoint", "safe output encoding", "Escaping user-controlled text before rendering it as markup", "Deleting all user text to avoid escaping", "Letting raw script-looking text survive in output", "Output encoding preserves text while keeping commands and markup separate."),
+    checkpointQuiz("quiz-security-dependency-logging", "lesson-security-dependency-logging", "Dependency and logging checkpoint", "dependency and log hygiene", "Flagging package drift and preventing logs from exposing private data", "Treating passing tests as proof that logs are safe", "Printing tokens so debugging is easier", "Release hygiene includes dependencies and safe logs, not only functional tests."),
+    checkpointQuiz("quiz-cloud-env-config", "lesson-cloud-env-config", "Cloud config checkpoint", "environment configuration", "Documenting required settings while keeping secret values out of source", "Committing production credentials to simplify deploys", "Assuming local defaults are enough for production", "Cloud config needs explicit required values and secret boundaries."),
+    checkpointQuiz("quiz-cloud-ci-deploy-checks", "lesson-cloud-ci-deploy-checks", "Release checks checkpoint", "a release gate", "Blocking deploy until required build, test, and rollback checks pass", "Deploying because one local command worked", "Skipping rollback because the change is small", "A release gate converts deploy readiness into named evidence."),
+    checkpointQuiz("quiz-cloud-rollback-drill", "lesson-cloud-rollback-drill", "Rollback drill checkpoint", "a rollback drill", "Naming trigger, owner, previous version, action, and success check before deploy", "Inventing rollback steps during the incident", "Shipping without a previous version or owner", "Rollback drills make recovery concrete before a release needs it."),
+    checkpointQuiz("quiz-cloud-logs-costs", "lesson-cloud-logs-costs", "Ops note checkpoint", "post-deploy operations evidence", "Recording health, cost signal, and rollback action after release", "Saving only a launch screenshot", "Ignoring budget because the app is small", "Post-deploy evidence shows whether the release is healthy and recoverable."),
+    checkpointQuiz("quiz-data-quality-rules", "lesson-data-quality-rules", "Data quality checkpoint", "data quality rules", "Separating accepted rows from rejected rows with reasons", "Building reports before checking input records", "Dropping bad rows without saying why", "Quality rules make report inputs trustworthy and debuggable."),
+    checkpointQuiz("quiz-data-contracts-fixtures", "lesson-data-contracts-fixtures", "Dataset contracts checkpoint", "dataset contracts and fixtures", "Naming required row fields and proving them with stable good and bad fixtures", "Building report logic before checking input shape", "Letting text minutes pass as numeric minutes", "Dataset contracts keep report inputs inspectable and repeatable."),
+    checkpointQuiz("quiz-data-rejected-row-proof", "lesson-data-rejected-row-proof", "Rejected-row proof checkpoint", "rejected-row proof", "Keeping row number, raw value, and reason for each rejected input", "Returning only a rejected count", "Dropping bad rows silently", "Rejected-row proof makes bad data fixable instead of invisible."),
+    checkpointQuiz("quiz-data-pipeline-lineage", "lesson-data-pipeline-lineage", "Pipeline lineage checkpoint", "pipeline lineage", "Tracing source, transform, output, owner, and verifier for each stage", "Treating final numbers as self-explanatory", "Removing owners from the pipeline note", "Lineage makes report outputs traceable."),
+    checkpointQuiz("quiz-data-reproducible-report", "lesson-data-reproducible-report", "Reproducible report checkpoint", "a reproducible report", "Naming input version, query logic, output, verifier, and limitations", "Sharing a one-off screenshot with no source", "Omitting limitations to sound more confident", "Reproducible reports can be rerun and critiqued.")
   ],
   projectMissions: [
     {
@@ -4973,7 +6706,7 @@ export const contentPack: ContentPack = {
       phases: missionPhases("cli-study-tracker", "a CLI study tracker", "pytest or documented assertions"),
       starterPrompt: "Build a Python CLI that accepts study sessions, stores them in a small local file, and prints weekly totals by topic.",
       verificationCommands: ["python study_tracker.py --help", "python study_tracker.py --input sessions.csv --output summary.txt", "pytest"],
-      expectedArtifacts: ["Repository link", "Sample input file", "--help output", "summary.txt output", "Verifier output", "README usage section"],
+      expectedArtifacts: ["Repository link", "Sample input file", "--help output", "summary.txt output", "Check output", "README usage section"],
       rubric: ["Input validation is explicit", "Core grouping logic is testable without terminal output", "CLI help and defaults are reviewer-friendly", "README states known limits"],
       commonFailureModes: ["Mixing parsing, printing, and storage in one function", "Only testing the happy path", "Leaving CLI defaults undocumented", "Claiming passing tests without command output"],
       portfolioSummaryPrompt: "Explain how this project proves Python functions, file input, and test/debug discipline.",
@@ -4991,7 +6724,7 @@ export const contentPack: ContentPack = {
       phases: missionPhases("python-data-cleaner", "a small data cleaner", "unit tests against clean and malformed rows"),
       starterPrompt: "Create a Python module that reads messy study records, normalizes fields, rejects malformed rows, and returns a summary object.",
       verificationCommands: ["python -m pytest", "python clean_sessions.py samples/messy_sessions.csv --rejected rejected_rows.txt"],
-      expectedArtifacts: ["Repo URL", "Sample messy input", "Rejected-row report", "Verifier output"],
+      expectedArtifacts: ["Repo URL", "Sample messy input", "Rejected-row report", "Check output"],
       rubric: ["Bad data does not crash the app", "Rejected rows include row numbers, raw rows, and reasons", "Tests prove both accepted and rejected rows", "Reflection names the edge case that took longest"],
       commonFailureModes: ["Silently dropping bad rows", "Reporting bad rows without enough context to fix them", "Hardcoding sample data into code", "Printing results that tests cannot inspect"],
       portfolioSummaryPrompt: "Summarize the data-quality problem, the parser contract, and the failure cases you handled.",
@@ -5045,7 +6778,7 @@ export const contentPack: ContentPack = {
       phases: missionPhases("web-progress-board", "a typed progress board", "typecheck plus a screenshot or demo"),
       starterPrompt: "Build a small TypeScript progress board that renders track cards from typed seed data and highlights the next action.",
       verificationCommands: ["npm run typecheck", "npm run test"],
-      expectedArtifacts: ["Type definitions", "Screenshot or demo link", "Verifier output", "README data contract section"],
+      expectedArtifacts: ["Type definitions", "Screenshot or demo link", "Check output", "README data contract section"],
       rubric: ["Types describe the domain before UI", "Cards render from data arrays", "Empty or missing progress has a visible state"],
       commonFailureModes: ["Hardcoding every card", "Using broad any types", "Showing percentages without explaining the source"],
       portfolioSummaryPrompt: "Explain how this proves typed UI modeling and data-driven rendering.",
@@ -5063,7 +6796,7 @@ export const contentPack: ContentPack = {
       phases: missionPhases("api-contract-playground", "a validated API contract slice", "typecheck and validation tests"),
       starterPrompt: "Create TypeScript types and validation for a project mission API response, then render a small consumer view from parsed data.",
       verificationCommands: ["npm run typecheck", "npm test"],
-      expectedArtifacts: ["Schema/type file", "Passing and failing examples", "Verifier output", "README contract notes"],
+      expectedArtifacts: ["Schema/type file", "Passing and failing examples", "Check output", "README contract notes"],
       rubric: ["Boundary validation is separate from rendering", "Bad payloads produce useful errors", "README names contract assumptions"],
       commonFailureModes: ["Trusting raw JSON as typed", "Letting UI validate everything", "No negative test case"],
       portfolioSummaryPrompt: "Describe the contract boundary and how validation prevents UI failure.",
@@ -5131,11 +6864,11 @@ export const contentPack: ContentPack = {
       brief: "Create a small rubric for reviewing AI-suggested bug fixes before accepting them.",
       difficulty: "applied",
       deliverables: ["Rubric markdown", "Example accepted fix", "Example rejected fix"],
-      acceptanceCriteria: ["Requires local reproduction or substitute evidence", "Requires verifier output", "Flags secret, auth, or public-contract risk"],
+      acceptanceCriteria: ["Requires local reproduction or substitute evidence", "Requires check output", "Flags secret, auth, or public-contract risk"],
       phases: missionPhases("ai-bug-rubric", "an AI bug-review rubric", "rubric applied to two examples"),
       starterPrompt: "Write a rubric that decides whether an AI-suggested bug fix is safe to accept, then apply it to one accepted and one rejected example.",
       verificationCommands: ["markdownlint README.md or manual checklist", "run verifier for accepted example"],
-      expectedArtifacts: ["Rubric markdown", "Accepted example", "Rejected example", "Verifier output"],
+      expectedArtifacts: ["Rubric markdown", "Accepted example", "Rejected example", "Check output"],
       rubric: ["Reproduction is required or explicitly substituted", "Security and contract risk are checked", "Rejected example explains the failure mode"],
       commonFailureModes: ["Accepting plausible code without evidence", "Ignoring public contract changes", "No rejected example"],
       portfolioSummaryPrompt: "Explain how this demonstrates AI-assisted engineering judgment rather than blind tool use.",
@@ -5146,12 +6879,12 @@ export const contentPack: ContentPack = {
       id: "mission-ai-test-harness",
       trackId: "track-ai-tools",
       title: "AI Prompt Verification Harness",
-      brief: "Build a tiny harness that records prompt intent, model output, human edits, and verifier result.",
+      brief: "Build a tiny harness that records prompt intent, model output, human edits, and check result.",
       difficulty: "portfolio",
       deliverables: ["Prompt log format", "Verifier script", "Before/after example", "Risk notes"],
-      acceptanceCriteria: ["Separates model suggestion from accepted code", "Stores exact verifier result", "Flags hallucinated or unsafe suggestions"],
+      acceptanceCriteria: ["Separates model suggestion from accepted code", "Stores exact check result", "Flags hallucinated or unsafe suggestions"],
       phases: missionPhases("ai-test-harness", "an AI verification harness", "a sample run with passing and rejected outputs"),
-      starterPrompt: "Create a small local workflow that captures an AI suggestion, the human-edited final version, and the verifier output that justified accepting it.",
+      starterPrompt: "Create a small local workflow that captures an AI suggestion, the human-edited final version, and the check output that justified accepting it.",
       verificationCommands: ["npm run test", "node scripts/verify-ai-suggestion.js samples/example.json"],
       expectedArtifacts: ["Prompt log sample", "Verifier script", "Accepted output", "Rejected output"],
       rubric: ["Model output is treated as untrusted", "Accepted changes cite verifier evidence", "Unsafe output is visibly rejected"],
@@ -5207,12 +6940,84 @@ export const contentPack: ContentPack = {
       phases: missionPhases("ml-metrics-report", "an ML metrics report", "metric reproduction and failure-case review"),
       starterPrompt: "Use a toy classifier result to write a short metrics report that explains the split, metric, sample size, and failure cases.",
       verificationCommands: ["python evaluate.py", "python -m pytest tests/test_metrics.py"],
-      expectedArtifacts: ["Metrics output", "Failure examples", "Model-card note", "Verifier output"],
+      expectedArtifacts: ["Metrics output", "Failure examples", "Model-card note", "Check output"],
       rubric: ["Metric context is clear", "Failures are analyzed", "Claims are bounded by the data"],
       commonFailureModes: ["Reporting accuracy alone", "No holdout/split note", "No failure examples"],
       portfolioSummaryPrompt: "Summarize this as practical ML evaluation literacy for SWE work.",
       evidenceRequirements: foundationEvidence,
       skillIds: ["skill-ml-metrics", "skill-testing-debugging", "skill-portfolio-evidence"]
+    },
+    {
+      id: "mission-regression-proof-pack",
+      trackId: "track-testing-debugging",
+      title: "Regression Proof Pack",
+      brief: "Create a small regression harness and failure log that prove a fixed bug stays fixed.",
+      difficulty: "foundation",
+      deliverables: ["Regression harness", "Normal and old-bug cases", "Failure log", "Check output"],
+      acceptanceCriteria: ["Harness includes a happy path and rejected case", "Failure log names symptom, hypothesis, fix, verifier, and residual risk", "README explains what the harness does and does not prove"],
+      phases: missionPhases("regression-proof-pack", "a regression proof pack", "a two-case harness and failure-log review"),
+      starterPrompt: "Build a tiny verifier for one fixed behavior, add one old-bug case, and write a debugging log that explains the fix and remaining risk.",
+      verificationCommands: ["node regression_harness.js", "review failure-log.md"],
+      expectedArtifacts: ["Harness code", "Passing check output", "failure-log.md", "README proof section"],
+      rubric: ["The rejected case would catch the old bug", "Check output is exact", "Failure log is specific enough for another person to review"],
+      commonFailureModes: ["Only testing the happy path", "Writing a vague failure log", "Claiming broad quality from one tiny harness"],
+      portfolioSummaryPrompt: "Explain how this proves testing and debugging discipline before specialization.",
+      evidenceRequirements: foundationEvidence,
+      skillIds: ["skill-testing-debugging", "skill-regression-testing", "skill-debugging-log", "skill-portfolio-evidence"]
+    },
+    {
+      id: "mission-secure-review-pack",
+      trackId: "track-secure-software",
+      title: "Secure Review Pack",
+      brief: "Review a small app feature for threats, secrets, auth boundaries, input validation, dependency risk, and safe logging.",
+      difficulty: "portfolio",
+      deliverables: ["Threat table", "Config and secret classification", "Auth-boundary note", "Input validation tests", "Dependency/logging checklist", "Residual-risk summary"],
+      acceptanceCriteria: ["Every threat has a control and verifier", "Secrets are separated from public config", "Auth is enforced at a server/data boundary", "Input validation has a negative test", "Dependency and logging risks are classified before release"],
+      phases: missionPhases("secure-review-pack", "a secure review pack", "validation tests plus security checklist review", "portfolio security note"),
+      starterPrompt: "Choose one small feature and build a security review pack that maps threats to controls, verifies validation behavior, and documents release hygiene.",
+      verificationCommands: ["npm run test", "review security-checklist.md", "review config-classification.md"],
+      expectedArtifacts: ["Threat table", "Validation test output", "Config classification", "Dependency/logging checklist", "Residual-risk note", "README security section"],
+      rubric: ["Risks are feature-specific", "Controls map to verifiers", "Secrets and auth boundaries are explicit", "Validation rejects malformed input", "Residual risk is honest"],
+      commonFailureModes: ["Generic security claims", "No negative validation test", "Client-side-only authorization", "Logging sensitive values", "No residual-risk note"],
+      portfolioSummaryPrompt: "Explain how this demonstrates entry-level AppSec judgment with evidence-backed controls.",
+      evidenceRequirements: portfolioEvidence,
+      skillIds: ["skill-threat-modeling", "skill-secret-handling", "skill-auth-boundaries", "skill-dependency-hygiene", "skill-testing-debugging", "skill-portfolio-evidence"]
+    },
+    {
+      id: "mission-cloud-release-runbook",
+      trackId: "track-cloud-platform-basics",
+      title: "Cloud Release Runbook",
+      brief: "Create a beginner cloud release runbook with config, CI checks, logs, cost note, and rollback plan.",
+      difficulty: "applied",
+      deliverables: ["Environment config matrix", "Release gate checklist", "Post-deploy ops note", "Rollback note"],
+      acceptanceCriteria: ["Config matrix separates public settings from secrets", "Release gate blocks missing build, tests, or rollback", "Ops note includes log health and cost signal", "Rollback action is concrete"],
+      phases: missionPhases("cloud-release-runbook", "a cloud release runbook", "config and release-gate checks"),
+      starterPrompt: "Prepare a release runbook for a small app that documents required environment variables, CI checks, post-deploy monitoring, cost assumptions, and rollback action.",
+      verificationCommands: ["review env-matrix.md", "review release-gate.md", "review ops-note.md"],
+      expectedArtifacts: ["env-matrix.md", "release-gate.md", "ops-note.md", "rollback note", "Check output"],
+      rubric: ["Secret handling is explicit", "Deploy readiness is gated by named checks", "Operations note includes health and cost", "Rollback is actionable"],
+      commonFailureModes: ["Committing secret values", "Treating build success as the only release gate", "No cost or rollback note", "No evidence after deploy"],
+      portfolioSummaryPrompt: "Frame this as cloud platform readiness: deployable work with evidence, budget awareness, and recovery planning.",
+      evidenceRequirements: foundationEvidence,
+      skillIds: ["skill-cloud-config", "skill-ci-release", "skill-observability-cost", "skill-portfolio-evidence"]
+    },
+    {
+      id: "mission-data-quality-report",
+      trackId: "track-data-systems",
+      title: "Data Quality Report",
+      brief: "Build a small data-quality report with accepted/rejected rows, lineage, reproducible output, and limitations.",
+      difficulty: "applied",
+      deliverables: ["Quality rules", "Rejected-row report", "Pipeline lineage map", "Reproducible report note", "Limitations section"],
+      acceptanceCriteria: ["Bad records are rejected with reasons", "Lineage traces source to output", "Report can be rerun from named inputs", "Limitations are stated next to the result"],
+      phases: missionPhases("data-quality-report", "a data quality report", "row validation and reproducible report checks"),
+      starterPrompt: "Create a small report pipeline for learning events that validates input rows, maps lineage, and produces a rerunnable weekly summary with limitations.",
+      verificationCommands: ["node validate_rows.js", "review lineage.md", "review report-note.md"],
+      expectedArtifacts: ["Quality rules", "Rejected rows", "Lineage map", "Report output", "Limitations note", "Check output"],
+      rubric: ["Rejected rows explain the reason", "Lineage is traceable", "Report input version and query logic are named", "Limitations prevent overclaiming"],
+      commonFailureModes: ["Dropping rows silently", "No source-to-output lineage", "One-off screenshot as report proof", "No limitations"],
+      portfolioSummaryPrompt: "Explain how this demonstrates data systems thinking for backend and product-facing work.",
+      evidenceRequirements: foundationEvidence,
+      skillIds: ["skill-data-quality", "skill-data-pipelines", "skill-reproducible-report", "skill-portfolio-evidence"]
     }
   ],
   weeklyPlan: {

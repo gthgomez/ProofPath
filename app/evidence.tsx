@@ -44,7 +44,7 @@ export default function EvidenceLogScreen(): ReactElement {
   const linkedMissionRequirements = linkedMission ? [
     linkedMission.evidenceRequirements.repoUrl ? "repo link" : undefined,
     linkedMission.evidenceRequirements.commitHash ? "commit hash" : undefined,
-    linkedMission.evidenceRequirements.passingVerifierOutput ? "passing verifier" : undefined,
+    linkedMission.evidenceRequirements.passingVerifierOutput ? "passing check" : undefined,
     linkedMission.evidenceRequirements.readmeStatus !== "missing" ? `README ${linkedMission.evidenceRequirements.readmeStatus}` : undefined,
     linkedMission.evidenceRequirements.artifactOrDeployment ? "artifact or deployment" : undefined,
     linkedMission.evidenceRequirements.reflection ? "reflection" : undefined
@@ -122,7 +122,7 @@ export default function EvidenceLogScreen(): ReactElement {
       return;
     }
 
-    setTitle(`${linkedMission.title} proof`);
+    setTitle(`${linkedMission.title} evidence`);
     setBody(`Evidence for ${linkedMission.title}: ${linkedMission.expectedArtifacts.join("; ")}.`);
     setVerifierOutput(linkedMission.verificationCommands.join("\n"));
     setReadmeStatus(linkedMission.evidenceRequirements.readmeStatus);
@@ -136,7 +136,7 @@ export default function EvidenceLogScreen(): ReactElement {
           <Badge tone="green">{progress.evidenceItems.length} entries</Badge>
           {isSaving ? <Badge tone="amber">saving</Badge> : null}
         </Row>
-        <SectionTitle>Interview-ready proof</SectionTitle>
+        <SectionTitle>Interview-ready evidence</SectionTitle>
         <MutedText>
           Your portfolio is evidence you can explain in an interview: repo links, passing test output, screenshots, and short notes about what you built and verified.
         </MutedText>
@@ -166,12 +166,12 @@ export default function EvidenceLogScreen(): ReactElement {
           </Row>
         ) : null}
         <ButtonShell
-          accessibilityHint="Prefills the evidence form with this mission's expected proof fields."
+          accessibilityHint="Prefills the evidence form with this mission's expected evidence fields."
           disabled={!linkedMission}
           onPress={applyMissionProofTemplate}
           tone="teal"
         >
-          Use proof template
+          Use evidence template
         </ButtonShell>
         <TextInput
           accessibilityHint="Required. Give this evidence a short name."
@@ -194,22 +194,22 @@ export default function EvidenceLogScreen(): ReactElement {
         />
         <TextInput
           accessibilityHint="Required when test status is passing."
-          accessibilityLabel="Verifier output"
+          accessibilityLabel="Check output"
           multiline
           onChangeText={setVerifierOutput}
-          placeholder="Verifier output or exact command"
+          placeholder="Check output or exact command"
           placeholderTextColor={colors.muted}
           style={[styles.input, styles.noteInput]}
           value={verifierOutput}
         />
         <ButtonShell
-          accessibilityHint={showProofDetails ? "Hides repo, commit, README, artifact, deployment, and reflection fields." : "Shows optional proof detail fields."}
+          accessibilityHint={showProofDetails ? "Hides repo, commit, README, artifact, deployment, and reflection fields." : "Shows optional evidence detail fields."}
           accessibilityState={{ expanded: showProofDetails }}
           onPress={() => setShowProofDetails((current) => !current)}
           tone="ink"
           variant="secondary"
         >
-          {showProofDetails ? "Hide proof details" : "Add repo, README, artifact, or reflection"}
+          {showProofDetails ? "Hide evidence details" : "Add repo, README, artifact, or reflection"}
         </ButtonShell>
         {showProofDetails ? (
           <View style={styles.detailFields}>
@@ -289,11 +289,11 @@ export default function EvidenceLogScreen(): ReactElement {
               value={deploymentUrl}
             />
             <TextInput
-              accessibilityHint="Optional. Explain what this evidence proves."
+              accessibilityHint="Optional. Explain what this evidence confirms."
               accessibilityLabel="Evidence reflection"
               multiline
               onChangeText={setReflection}
-              placeholder="Reflection: what this proves and what remains"
+              placeholder="Reflection: what this confirms and what remains"
               placeholderTextColor={colors.muted}
               style={[styles.input, styles.noteInput]}
               value={reflection}
@@ -314,7 +314,7 @@ export default function EvidenceLogScreen(): ReactElement {
       {progress.evidenceItems.length === 0 ? (
         <Panel>
           <SectionTitle>No evidence saved yet</SectionTitle>
-          <MutedText>Start with a repo, verifier output, screenshot, or reflection tied to the suggested mission.</MutedText>
+          <MutedText>Start with a repo, check output, screenshot, or reflection tied to the suggested mission.</MutedText>
         </Panel>
       ) : null}
 
@@ -338,18 +338,18 @@ export default function EvidenceLogScreen(): ReactElement {
           {item.commitHash ? <MutedText>Commit: {item.commitHash}</MutedText> : null}
           {item.artifactUri ? <MutedText>Artifact: {item.artifactUri}</MutedText> : null}
           {item.deploymentUrl ? <MutedText>Deployment: {item.deploymentUrl}</MutedText> : null}
-          {item.verifierOutput ? <MutedText>Verifier: {item.verifierOutput}</MutedText> : null}
+          {item.verifierOutput ? <MutedText>Check output: {item.verifierOutput}</MutedText> : null}
           {item.reflection ? <MutedText>Reflection: {item.reflection}</MutedText> : null}
           {item.proofArtifact ? (
             <>
-              <SectionTitle>Proof artifact</SectionTitle>
+              <SectionTitle>Check artifact</SectionTitle>
               <MutedText>Command: {item.proofArtifact.command}</MutedText>
               <MutedText>Language: {item.proofArtifact.language}</MutedText>
               <MutedText>Run mode: {item.proofArtifact.runMode}</MutedText>
               <MutedText>Runtime: {item.proofArtifact.runtimeMs}ms</MutedText>
               <MutedText>Result: {item.proofArtifact.passed ? "passed" : "failed"}</MutedText>
               <MutedText>Visible checks: {item.proofArtifact.visibleCheckResults.filter((result) => result.passed).length}/{item.proofArtifact.visibleCheckResults.length} passed</MutedText>
-              <MutedText>Private verifier details: redacted</MutedText>
+              <MutedText>Private check details: redacted</MutedText>
               <MutedText>Code hash: {item.proofArtifact.codeHash}</MutedText>
               {item.proofArtifact.missionId ? <MutedText>Mission: {item.proofArtifact.missionId}</MutedText> : null}
               <MutedText>Transcript: {formatTerminalTranscript(item.proofArtifact.terminalTranscript)}</MutedText>
@@ -389,7 +389,7 @@ function trustLabel(trust: "auto_verified_code_lab" | "manual_verifier_output" |
   }
 
   if (trust === "manual_verifier_output") {
-    return "self-reported verifier";
+    return "self-reported check";
   }
 
   return "self-reported note";

@@ -1,5 +1,6 @@
-import { DEFAULT_ROLE_TARGET_ID, legacyCareerPathIdMap, roleTargets } from "@/content/roles";
+import { DEFAULT_ROLE_TARGET_ID, legacyCareerPathIdMap, pathProofGates, roleTargets, type CareerUnlock, type PathProofGate } from "@/content/roles";
 import { findLesson, getLessonsForModule, getModulesForTrack } from "@/domain/content";
+import { getMissionProofChecklist, missionEvidenceMeetsRequirements, type MissionProofChecklistItem } from "@/domain/progress";
 import type { ContentPack, Lesson, Module, ProjectMission, RoleTarget, UserProfile, UserProgress } from "@/domain/types";
 
 export function getRoleTarget(roleTargetId?: string): RoleTarget {
@@ -112,4 +113,90 @@ export function getRoleTrackOnboardingSummary(content: ContentPack, roleTargetId
       .filter((track) => !includedTrackIds.has(track.id))
       .map((track) => track.title)
   };
+}
+
+export type FutureUnlockLabel = "Roadmap" | "Locked specialization" | "Coming later";
+
+export interface PathProofMissionStatus {
+  missionId: string;
+  title: string;
+  complete: boolean;
+  checklist: MissionProofChecklistItem[];
+}
+
+export interface PathProofGateStatus {
+  gate: PathProofGate;
+  complete: boolean;
+  completedMissionCount: number;
+  requiredMissionCount: number;
+  missions: PathProofMissionStatus[];
+}
+
+export interface FutureUnlockStatus extends CareerUnlock {
+  label: FutureUnlockLabel;
+  availableInContent: boolean;
+  gateComplete: boolean;
+}
+
+export function getPathProofGateForRole(roleTargetId: string): PathProofGate | undefined {
+  const roleTarget = getRoleTarget(roleTargetId);
+  return pathProofGates.find((gate) => gate.pathId === roleTarget.id);
+}
+
+export function evaluatePathProofGate(content: ContentPack, progress: UserProgress, roleTargetId = progress.profile.roleTargetId): PathProofGateStatus | undefined {
+  const gate = getPathProofGateForRole(roleTargetId);
+
+  if (!gate) {
+    return undefined;
+  }
+
+  const missions = gate.requiredMissionIds.map((missionId) => {
+    const mission = content.projectMissions.find((candidate) => candidate.id === missionId);
+    const checklist = mission ? getMissionProofChecklist(progress, mission) : [];
+    const complete = mission
+      ? progress.completedProjectMissionIds.includes(mission.id) && missionEvidenceMeetsRequirements(progress, mission)
+      : false;
+
+    return {
+      missionId,
+      title: mission?.title ?? missionId,
+      complete,
+      checklist
+    };
+  });
+  const completedMissionCount = missions.filter((mission) => mission.complete).length;
+
+  return {
+    gate,
+    complete: missions.length > 0 && completedMissionCount === missions.length,
+    completedMissionCount,
+    requiredMissionCount: missions.length,
+    missions
+  };
+}
+
+export function getFutureUnlocksForRole(content: ContentPack, progress: UserProgress, roleTargetId = progress.profile.roleTargetId): FutureUnlockStatus[] {
+  const gateStatus = evaluatePathProofGate(content, progress, roleTargetId);
+
+  if (!gateStatus) {
+    return [];
+  }
+
+  return gateStatus.gate.unlocks.map((unlock) => {
+    const availableInContent = unlock.kind === "path"
+      ? roleTargets.some((roleTarget) => roleTarget.id === unlock.id)
+      : content.tracks.some((track) => track.id === unlock.id);
+    const label: FutureUnlockLabel = availableInContent
+      ? gateStatus.complete
+        ? "Roadmap"
+        : "Locked specialization"
+      : "Coming later";
+
+    return {
+      ...unlock,
+      label,
+      availableInContent,
+      gateComplete: gateStatus.complete
+    };
+  });
 }

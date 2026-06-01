@@ -114,7 +114,7 @@ export function validateEvidenceDraft(draft: EvidenceDraft): string | null {
   }
 
   if (draft.testStatus === "passing" && !optionalTrimmed(draft.verifierOutput)) {
-    return "Passing test evidence needs verifier output.";
+    return "Passing test evidence needs check output.";
   }
 
   return null;

@@ -1,6 +1,6 @@
 import { Link, Redirect, useLocalSearchParams } from "expo-router";
 import type { ReactElement } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { contentPack } from "@/content/seed";
 import { findLesson } from "@/domain/content";
@@ -10,15 +10,32 @@ import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
 import { colors, radius, spacing } from "@/ui/theme";
 
+const beginnerPythonSupportLessonIds = new Set([
+  "lesson-python-values",
+  "lesson-python-collections",
+  "lesson-python-decisions",
+  "lesson-python-loops",
+  "lesson-python-foundation-capstone",
+  "lesson-python-strings-cleanup",
+  "lesson-python-functions"
+]);
+
 export default function LessonDetailScreen(): ReactElement {
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
+  const lessonIdValue = typeof lessonId === "string" ? lessonId : "";
+  const opensBeginnerPythonSupport = beginnerPythonSupportLessonIds.has(lessonIdValue);
   const lesson = findLesson(contentPack, lessonId);
   const { isCheckingOnboarding, needsOnboarding } = useOnboardingGate();
   const { isSaving, progress, recordCodeRun, submitQuiz } = useProgress();
   const [selectedChoiceIndexes, setSelectedChoiceIndexes] = useState<number[]>([]);
-  const [showConceptNotes, setShowConceptNotes] = useState(false);
+  const [showConceptNotes, setShowConceptNotes] = useState(opensBeginnerPythonSupport);
   const [showCommonMistakes, setShowCommonMistakes] = useState(false);
-  const [showFluencyReps, setShowFluencyReps] = useState(false);
+  const [showFluencyReps, setShowFluencyReps] = useState(opensBeginnerPythonSupport);
+
+  useEffect(() => {
+    setShowConceptNotes(opensBeginnerPythonSupport);
+    setShowFluencyReps(opensBeginnerPythonSupport);
+  }, [lessonIdValue, opensBeginnerPythonSupport]);
 
   if (isCheckingOnboarding) {
     return (
@@ -66,6 +83,8 @@ export default function LessonDetailScreen(): ReactElement {
   const lessonPosition = moduleLessonIds.indexOf(lesson.id);
   const nextLessonId = lessonPosition >= 0 ? moduleLessonIds[lessonPosition + 1] : undefined;
   const nextLesson = nextLessonId ? findLesson(contentPack, nextLessonId) : undefined;
+  const fluencyRepTone = opensBeginnerPythonSupport ? "green" : "teal";
+  const fluencyRepLabel = opensBeginnerPythonSupport ? "guided reps" : "optional reps";
   const stickyActionLabel = lessonDone
     ? "Lesson complete"
     : canCompleteLesson
@@ -139,8 +158,8 @@ export default function LessonDetailScreen(): ReactElement {
         ) : null}
         <SectionTitle>Why this lesson exists</SectionTitle>
         <BodyText>{lesson.workshop.synopsis}</BodyText>
-        <SectionTitle>How you will prove it</SectionTitle>
-        <BodyText>Make the Code Lab verifier pass, then pass a short checkpoint and keep the evidence.</BodyText>
+        <SectionTitle>How you will practice it</SectionTitle>
+        <BodyText>Run the Code Lab check, answer a short checkpoint, then save what you learned when the check passes.</BodyText>
         <Row>
           {lesson.workshop.tools.map((tool) => (
             <Badge key={tool} tone="teal">{tool}</Badge>
@@ -149,7 +168,7 @@ export default function LessonDetailScreen(): ReactElement {
         <ProgressBar label="Lesson progress" value={lessonProgressPercent} />
         <View
           accessible
-          accessibilityLabel={`Lesson flow: Learn, Code Lab ${miniProjectDone ? "complete" : "pending"}, Checkpoint ${quizDone ? "complete" : "pending"}, Evidence`}
+          accessibilityLabel={`Lesson flow: Learn, Code Lab ${miniProjectDone ? "complete" : "pending"}, Checkpoint ${quizDone ? "complete" : "pending"}, Review`}
           style={styles.stepFlow}
         >
           <Row>
@@ -159,13 +178,13 @@ export default function LessonDetailScreen(): ReactElement {
             <MutedText>-&gt;</MutedText>
             <Badge tone={quizDone ? "green" : "amber"}>Checkpoint</Badge>
             <MutedText>-&gt;</MutedText>
-            <Badge tone={latestPassingCheckRun ? "green" : "teal"}>Evidence</Badge>
+            <Badge tone={latestPassingCheckRun ? "green" : "teal"}>Review</Badge>
           </Row>
         </View>
         <MutedText>
           {lessonDone
-            ? "Lesson complete: Code Lab proof and checkpoint are both done."
-            : "This lesson completes itself after the Code Lab verifier passes and the checkpoint is passed."}
+            ? "Lesson complete: Code Lab check and checkpoint are both done."
+            : "This lesson completes itself after the Code Lab check passes and the checkpoint is passed."}
         </MutedText>
       </Panel>
 
@@ -211,8 +230,8 @@ export default function LessonDetailScreen(): ReactElement {
       <Panel>
         <Row>
           <Badge tone="blue">Step 2</Badge>
-          <Badge tone={miniProjectDone ? "green" : "amber"}>{miniProjectDone ? "proof captured" : "code lab"}</Badge>
-          <Badge tone="teal">offline verifier</Badge>
+          <Badge tone={miniProjectDone ? "green" : "amber"}>{miniProjectDone ? "check passed" : "code lab"}</Badge>
+          <Badge tone="teal">offline check</Badge>
         </Row>
         <SectionTitle>Code Lab: {lesson.workshop.miniProject.title}</SectionTitle>
         <BodyText>{lesson.workshop.miniProject.goal}</BodyText>
@@ -224,11 +243,11 @@ export default function LessonDetailScreen(): ReactElement {
         {lesson.workshop.miniProject.deliverables.map((deliverable) => (
           <MutedText key={deliverable}>{deliverable}</MutedText>
         ))}
-        <SectionTitle>Verifier</SectionTitle>
+        <SectionTitle>Check command</SectionTitle>
         <Text selectable style={styles.codeBlock}>{lesson.workshop.miniProject.verifierCommand}</Text>
         <SectionTitle>Expected output</SectionTitle>
         <BodyText>{lesson.workshop.testingFocus}</BodyText>
-        <MutedText>If you see a final passed line, that is the verifier confirming your code. Only print it yourself when the lesson explicitly asks you to.</MutedText>
+        <MutedText>If you see a final passed line, the app check confirmed your code. Only print it yourself when the lesson explicitly asks you to.</MutedText>
         {lesson.workshop.miniProject.runnerSpec.expectedOutput.length > 0 ? (
           <Text selectable style={styles.codeBlock}>{lesson.workshop.miniProject.runnerSpec.expectedOutput.join("\n")}</Text>
         ) : null}
@@ -241,16 +260,16 @@ export default function LessonDetailScreen(): ReactElement {
           runnerSpec={lesson.workshop.miniProject.runnerSpec}
         />
         {latestPassingCheckRun ? (
-          <SubPanel accessibilityLabel="Code Lab proof captured" accessibilityLiveRegion="polite">
+          <SubPanel accessibilityLabel="Code Lab check passed" accessibilityLiveRegion="polite">
             <Row>
-              <Badge tone="green">Proof captured</Badge>
+              <Badge tone="green">Check passed</Badge>
               <Badge tone="amber">Mission closer</Badge>
             </Row>
             <SectionTitle>Add evidence now</SectionTitle>
             <BodyText>{lesson.workshop.miniProject.expectedEvidence}</BodyText>
             <MutedText>{lesson.workshop.miniProject.projectConnection}</MutedText>
             <Link href="/evidence" asChild>
-              <ButtonShell accessibilityHint="Opens evidence capture so this passing verifier can become portfolio proof." tone="green">
+              <ButtonShell accessibilityHint="Opens evidence capture so this passing check can become portfolio evidence." tone="green">
                 Add evidence now
               </ButtonShell>
             </Link>
@@ -258,7 +277,7 @@ export default function LessonDetailScreen(): ReactElement {
         ) : (
           <SubPanel>
             <SectionTitle>Focused hint</SectionTitle>
-            <MutedText>Make one small change, run the verifier, then inspect the exact pass or fail message before editing again.</MutedText>
+            <MutedText>Make one small change, run the check, then inspect the exact pass or fail message before editing again.</MutedText>
           </SubPanel>
         )}
         {nextLesson ? <MutedText>Next lesson connection: this prepares you for {nextLesson.title}.</MutedText> : null}
@@ -301,10 +320,14 @@ export default function LessonDetailScreen(): ReactElement {
       {lesson.workshop.practiceReps && lesson.workshop.practiceReps.length > 0 ? (
         <SubPanel>
           <Row>
-            <Badge tone="teal">optional reps</Badge>
+            <Badge tone={fluencyRepTone}>{fluencyRepLabel}</Badge>
           </Row>
           <SectionTitle>After the first task: fluency reps</SectionTitle>
-          <BodyText>Do these small variations when you want more confidence before the checkpoint.</BodyText>
+          <BodyText>
+            {opensBeginnerPythonSupport
+              ? "Do these small variations before the checkpoint so the syntax becomes familiar instead of one copied answer."
+              : "Do these small variations when you want more confidence before the checkpoint."}
+          </BodyText>
           <ButtonShell
             accessibilityHint={showFluencyReps ? "Hides fluency reps." : "Shows fluency reps."}
             accessibilityState={{ expanded: showFluencyReps }}
@@ -332,10 +355,32 @@ export default function LessonDetailScreen(): ReactElement {
         </SubPanel>
       ) : null}
 
+      <Panel>
+        <Row>
+          <Badge tone="blue">Step 4</Badge>
+          <Badge tone="teal">remember it later</Badge>
+        </Row>
+        <SectionTitle>Recall cards</SectionTitle>
+        <BodyText>Use these prompts after the lesson to keep the idea available without rereading everything.</BodyText>
+        {lesson.workshop.recallCards.map((card) => (
+          <SubPanel key={card.id}>
+            <Row>
+              <Badge tone="teal">{card.type}</Badge>
+            </Row>
+            <SectionTitle>{card.prompt}</SectionTitle>
+            <MutedText>{card.answerHint}</MutedText>
+          </SubPanel>
+        ))}
+        <SectionTitle>Mistake check</SectionTitle>
+        {lesson.workshop.misconceptionChecks.map((check, checkIndex) => (
+          <MutedText key={`${lesson.id}-misconception-${checkIndex}`}>{check.checkPrompt}</MutedText>
+        ))}
+      </Panel>
+
       {quiz ? (
         <Panel>
           <Row>
-            <Badge tone="blue">Step 4</Badge>
+            <Badge tone="blue">Step 5</Badge>
             <Badge tone={quizDone ? "green" : "amber"}>{quizDone ? "passed" : `${quiz.passingScore}% target`}</Badge>
             {latestQuizAttempt ? <Badge tone={latestQuizAttempt.passed ? "green" : "rose"}>{latestQuizAttempt.score}% last</Badge> : null}
             <Badge tone="blue">{answeredCount}/{quiz.questions.length} answered</Badge>
@@ -411,7 +456,7 @@ export default function LessonDetailScreen(): ReactElement {
 
       <Panel>
         <Row>
-          <Badge tone="blue">Step 5</Badge>
+          <Badge tone="blue">Step 6</Badge>
           <Badge tone={quizDone ? "green" : "amber"}>{quizDone ? "quiz passed" : "quiz required"}</Badge>
           <Badge tone={miniProjectDone ? "green" : "amber"}>{miniProjectDone ? "project complete" : "project required"}</Badge>
           {lessonDone ? <Badge tone="green">lesson complete</Badge> : null}
@@ -420,7 +465,7 @@ export default function LessonDetailScreen(): ReactElement {
         <BodyText>
           {lessonDone
             ? "This lesson is complete from real activity: a passing Code Lab run and a passed checkpoint."
-            : "No manual marking here. Progress updates automatically when the verifier and checkpoint are both complete."}
+            : "No manual marking here. Progress updates automatically when the Code Lab check and checkpoint are both complete."}
         </BodyText>
         <ProgressBar label="Progress" value={lessonProgressPercent} />
         <SectionTitle>Portfolio extension</SectionTitle>

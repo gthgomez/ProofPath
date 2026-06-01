@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { contentPack } from "@/content/seed";
-import { createInitialProgress, setLessonCompletion, setRoleTarget } from "@/domain/progress";
+import { addEvidenceItem, createInitialProgress, setLessonCompletion, setMissionCompletion, setRoleTarget } from "@/domain/progress";
 import { calculateReadinessScore } from "@/domain/readiness";
-import { getContentForRole, getMissionsForRole, getNextLessonForRole, getNextMissionForRole, getRoleTarget, getRoleTrackOnboardingSummary, getTracksForRole, isOnboardingComplete } from "@/domain/role-routing";
+import { evaluatePathProofGate, getContentForRole, getFutureUnlocksForRole, getMissionsForRole, getNextLessonForRole, getNextMissionForRole, getRoleTarget, getRoleTrackOnboardingSummary, getTracksForRole, isOnboardingComplete } from "@/domain/role-routing";
 
 const NOW = "2026-05-04T16:50:00.000Z";
 
@@ -48,8 +48,9 @@ describe("role routing", () => {
     const junior = getRoleTrackOnboardingSummary(contentPack, "path-software-foundations");
     const python = getRoleTrackOnboardingSummary(contentPack, "path-backend-api-data");
 
-    expect(junior.trackCount).toBe(5);
+    expect(junior.trackCount).toBe(6);
     expect(junior.includedTrackTitles).toContain("Python Fundamentals");
+    expect(junior.includedTrackTitles).toContain("Testing and Debugging");
     expect(junior.excludedTrackTitles).toContain("Practical AI Apps");
     expect(junior.excludedTrackTitles).toContain("ML Foundations");
     expect(python.excludedTrackTitles).toContain("AI-Assisted Coding");
@@ -82,5 +83,43 @@ describe("role routing", () => {
     expect(roleContent.projectMissions.map((mission) => mission.id)).not.toContain("mission-ai-bug-rubric");
     expect(readiness.breakdown.projectCompletion).toBe(0);
     expect(readiness.breakdown.evidenceHygiene).toBe(0);
+  });
+
+  it("evaluates path proof gates and labels future unlocks", () => {
+    const baseProgress = setRoleTarget(createInitialProgress(NOW), "path-secure-software-appsec", true, NOW);
+    const mission = contentPack.projectMissions.find((candidate) => candidate.id === "mission-secure-review-pack");
+
+    expect(mission).toBeTruthy();
+    expect(evaluatePathProofGate(contentPack, baseProgress)?.complete).toBe(false);
+    expect(getFutureUnlocksForRole(contentPack, baseProgress).map((unlock) => [unlock.id, unlock.label])).toContainEqual([
+      "track-cloud-platform-basics",
+      "Locked specialization"
+    ]);
+    expect(getFutureUnlocksForRole(contentPack, baseProgress).map((unlock) => [unlock.id, unlock.label])).toContainEqual([
+      "track-ai-security",
+      "Coming later"
+    ]);
+
+    const withEvidence = addEvidenceItem(baseProgress, {
+      type: "repo",
+      title: "Secure review proof",
+      body: "This secure review pack names the feature-specific threats, controls, validation evidence, dependency risk, logging behavior, and residual security limits for the reviewed app slice.",
+      linkedProjectMissionId: "mission-secure-review-pack",
+      linkedSkillIds: ["skill-threat-modeling", "skill-secret-handling"],
+      repoUrl: "https://github.com/example/secure-review",
+      commitHash: "abcdef1",
+      testStatus: "passing",
+      readmeStatus: "complete",
+      artifactUri: "https://example.com/security-review",
+      verifierOutput: "security review checks passed",
+      reflection: "The largest remaining risk is that the sample validator only covers one feature boundary."
+    }, NOW);
+    const completed = setMissionCompletion(withEvidence, mission!, true, NOW);
+
+    expect(evaluatePathProofGate(contentPack, completed)?.complete).toBe(true);
+    expect(getFutureUnlocksForRole(contentPack, completed).map((unlock) => [unlock.id, unlock.label])).toContainEqual([
+      "track-cloud-platform-basics",
+      "Roadmap"
+    ]);
   });
 });

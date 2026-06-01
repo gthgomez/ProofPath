@@ -17,7 +17,7 @@ import {
   type LessonStatus,
   type MissionStatus
 } from "@/domain/learning-path";
-import { getTracksForRole } from "@/domain/role-routing";
+import { evaluatePathProofGate, getFutureUnlocksForRole, getTracksForRole, type FutureUnlockLabel } from "@/domain/role-routing";
 import type { Lesson, Module, ProjectMission } from "@/domain/types";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, ProgressBar, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
@@ -28,6 +28,8 @@ export default function LearningPathScreen(): ReactElement {
   const { progress, roleTarget } = useProgress();
   const { isCheckingOnboarding, needsOnboarding } = useOnboardingGate();
   const tracks = getTracksForRole(contentPack, roleTarget.id);
+  const proofGate = evaluatePathProofGate(contentPack, progress, roleTarget.id);
+  const futureUnlocks = getFutureUnlocksForRole(contentPack, progress, roleTarget.id);
 
   if (isCheckingOnboarding) {
     return (
@@ -58,6 +60,46 @@ export default function LearningPathScreen(): ReactElement {
         <Panel>
           <SectionTitle>No Learn tracks for this path yet</SectionTitle>
           <MutedText>Choose another career path or add path track mappings to the local content pack.</MutedText>
+        </Panel>
+      ) : null}
+
+      {proofGate ? (
+        <Panel>
+          <Row>
+            <Badge tone={proofGate.complete ? "green" : "amber"}>
+              {proofGate.completedMissionCount}/{proofGate.requiredMissionCount} projects
+            </Badge>
+            <Badge tone={proofGate.complete ? "green" : "ink"}>
+              {proofGate.complete ? "Gate complete" : "Readiness gate"}
+            </Badge>
+          </Row>
+          <SectionTitle>{proofGate.gate.title}</SectionTitle>
+          <BodyText>{proofGate.gate.summary}</BodyText>
+          <View style={styles.unlockGrid}>
+            {proofGate.missions.map((mission) => (
+              <SubPanel key={mission.missionId}>
+                <Row>
+                  <Badge tone={mission.complete ? "green" : "ink"}>{mission.complete ? "complete" : "needed"}</Badge>
+                  <Badge tone="teal">{mission.checklist.filter((item) => item.complete).length}/{mission.checklist.length} checks</Badge>
+                </Row>
+                <SectionTitle>{mission.title}</SectionTitle>
+              </SubPanel>
+            ))}
+          </View>
+          {futureUnlocks.length > 0 ? (
+            <View style={styles.unlockGrid}>
+              <SectionTitle>Future paths</SectionTitle>
+              {futureUnlocks.map((unlock) => (
+                <SubPanel key={unlock.id}>
+                  <Row>
+                    <Badge tone={unlockBadgeTone(unlock.label)}>{unlock.label}</Badge>
+                    <Badge tone="teal">{unlock.kind}</Badge>
+                  </Row>
+                  <SectionTitle>{unlock.title}</SectionTitle>
+                </SubPanel>
+              ))}
+            </View>
+          ) : null}
         </Panel>
       ) : null}
 
@@ -147,7 +189,7 @@ function ModuleRoadmap({ moduleItem, nextModule, progress }: ModuleRoadmapProps)
           <SectionTitle>{activeLesson ? activeLesson.title : "Build missions ready"}</SectionTitle>
           <MutedText>
             {activeLesson
-              ? `You are here. Finish this lesson to move ${moduleItem.title} closer to portfolio proof.`
+              ? `You are here. Finish this lesson to make ${moduleItem.title} easier to use in a real project.`
               : "Lessons are complete. Turn the module into project evidence with Build."}
           </MutedText>
           <Link href={moduleHref} asChild>
@@ -179,7 +221,7 @@ function ModuleRoadmap({ moduleItem, nextModule, progress }: ModuleRoadmapProps)
       {missions.length > 0 ? (
         <View style={styles.missionSection}>
           <SectionTitle>Build</SectionTitle>
-          <BodyText>Build missions turn this module into proof you can show, explain, and verify.</BodyText>
+          <BodyText>Build missions turn this module into work you can show, explain, and verify.</BodyText>
           {missions.map((mission, missionIndex) => (
             <MissionCard key={mission.id} lessons={lessons} mission={mission} missionIndex={missionIndex} progress={progress} />
           ))}
@@ -283,7 +325,7 @@ function LessonCard({ activeLessonId, lesson, position, status }: LessonCardProp
       <SectionTitle>{lesson.title}</SectionTitle>
       <MutedText>{lesson.summary}</MutedText>
       <MutedText>Build: {lesson.workshop.miniProject.title}</MutedText>
-      <MutedText>Proof: {lesson.workshop.miniProject.expectedEvidence}</MutedText>
+      <MutedText>After practice: {lesson.workshop.miniProject.expectedEvidence}</MutedText>
       <Link href={{ pathname: "/lesson/[lessonId]", params: { lessonId: lesson.id } }} asChild>
         <ButtonShell
           accessibilityHint={`Opens ${lesson.title}.`}
@@ -397,6 +439,18 @@ function missionStatusText(status: MissionStatus): string {
   return status.replace("_", " ");
 }
 
+function unlockBadgeTone(label: FutureUnlockLabel): "blue" | "teal" | "amber" | "rose" | "green" | "ink" {
+  if (label === "Roadmap") {
+    return "blue";
+  }
+
+  if (label === "Coming later") {
+    return "ink";
+  }
+
+  return "amber";
+}
+
 const styles = StyleSheet.create({
   moduleItem: {
     borderColor: colors.border,
@@ -447,6 +501,9 @@ const styles = StyleSheet.create({
     borderWidth: 2
   },
   missionSection: {
+    gap: spacing.sm
+  },
+  unlockGrid: {
     gap: spacing.sm
   }
 });

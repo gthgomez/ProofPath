@@ -62,7 +62,7 @@ export default function DashboardScreen(): ReactElement {
           {isSaving ? <Badge tone="amber">saving</Badge> : null}
         </Row>
         <SectionTitle>Today's 3-step plan</SectionTitle>
-        <BodyText>CareerForge turns practice into job proof. Start with Learn, Build, and Portfolio; use Browse all areas when you need the full map.</BodyText>
+        <BodyText>CareerForge turns practice into work you can explain. Start with Learn, Build, and Portfolio; use Browse all areas when you need the full map.</BodyText>
 
         {nextLesson ? (
           <TodayTask
@@ -77,7 +77,7 @@ export default function DashboardScreen(): ReactElement {
           <TodayTask
             actionLabel="Open path"
             badge="Learn"
-            detail="Lessons are complete for this career path. Use review or proof work to keep momentum."
+            detail="Lessons are complete for this career path. Use review or portfolio work to keep momentum."
             href="/path"
             tone="green"
             title="Lessons complete"
@@ -86,7 +86,7 @@ export default function DashboardScreen(): ReactElement {
 
         {nextMission ? (
           <TodayTask
-            actionLabel={missionHasWork ? "Add proof" : "Open build"}
+            actionLabel={missionHasWork ? "Add evidence" : "Open build"}
             badge="Build"
             detail={missionHasWork ? "Turn the current mission work into evidence while it is fresh." : nextMission.brief}
             href={missionHasWork ? { pathname: "/evidence" as const, params: { missionId: nextMission.id } } : { pathname: "/mission/[missionId]" as const, params: { missionId: nextMission.id } }}
@@ -161,14 +161,14 @@ export default function DashboardScreen(): ReactElement {
             />
             <RouteCard
               actionLabel="Open"
-              detail="Portfolio missions that turn lessons into interview-ready proof."
+              detail="Portfolio missions that turn lessons into interview-ready work."
               href="/projects"
               label="Build"
               tone="amber"
             />
             <RouteCard
               actionLabel="Open"
-              detail="Saved repo links, verifier output, screenshots, notes, and reflections."
+              detail="Saved repo links, check output, screenshots, notes, and reflections."
               href="/evidence"
               label="Portfolio"
               tone="green"

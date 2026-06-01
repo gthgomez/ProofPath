@@ -36,7 +36,7 @@ export default function ProjectMissionsScreen(): ReactElement {
       {missions.length === 0 ? (
         <Panel>
           <SectionTitle>No missions for this path</SectionTitle>
-          <MutedText>Choose another career path or add a mission to this track before collecting project proof.</MutedText>
+          <MutedText>Choose another career path or add a mission to this track before collecting project evidence.</MutedText>
         </Panel>
       ) : null}
 

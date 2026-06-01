@@ -1,6 +1,6 @@
 # Career Paths Status And Plan, 2026
 
-**Last updated:** 2026-05-31  
+**Last updated:** 2026-06-01
 **Purpose:** Maintainer view of the active CareerForge path taxonomy, current track coverage, and next curriculum work.  
 **Code anchors:** `src/content/roles.ts`, `src/content/seed.ts`, `app/onboarding.tsx`, `app/settings.tsx`.
 
@@ -14,9 +14,9 @@ See [career-paths-current-curriculum-2026.md](./career-paths-current-curriculum-
 
 | Path ID | Display name | Tracks (`trackIds` order) | Default | Status |
 | --- | --- | --- | --- | --- |
-| `path-software-foundations` | Software Foundations | `track-python`, `track-typescript`, `track-sql`, `track-git`, `track-ai-tools` | **Yes** | Shipped default |
+| `path-software-foundations` | Software Foundations | `track-python`, `track-typescript`, `track-sql`, `track-git`, `track-testing-debugging`, `track-ai-tools` | **Yes** | Shipped default with core proof gate |
 | `path-backend-api-data` | Backend, APIs & Data Systems | `track-python`, `track-sql`, `track-typescript`, `track-git` | No | Shipped |
-| `path-secure-software-appsec` | Secure Software & AppSec | `track-git`, `track-python`, `track-sql`, `track-typescript`, `track-ai-tools` | No | Shipped as security-first routing; needs dedicated security track |
+| `path-secure-software-appsec` | Secure Software & AppSec | `track-secure-software`, `track-git`, `track-python`, `track-sql`, `track-typescript`, `track-ai-tools` | No | Shipped with dedicated security track and proof gate |
 | `path-ai-product-engineering` | AI Product Engineering | `track-typescript`, `track-ai-tools`, `track-ai-apps`, `track-sql`, `track-python`, `track-git` | No | Shipped |
 
 **Where learners choose paths:** first-run onboarding and Settings > Career path.
@@ -36,12 +36,16 @@ See [career-paths-current-curriculum-2026.md](./career-paths-current-curriculum-
 | Track ID | Title | Current role in curriculum | Phase |
 | --- | --- | --- | --- |
 | `track-python` | Python Fundamentals | Core for software, backend/data, security, and AI product. | 1 |
-| `track-typescript` | TypeScript and Web | Core for software and AI product; supports API/UI contracts. | 1 |
+| `track-typescript` | TypeScript and Web | Core for software and AI product; supports API/UI contracts plus runtime validation for external data. | 1 |
 | `track-sql` | SQL and Postgres | Core for backend/data; required before analytics, data, and ML unlocks. | 1 |
 | `track-git` | Git and GitHub | Core evidence path for every learner. | 1 |
+| `track-testing-debugging` | Testing and Debugging | Core regression harness and failure-log proof before specialization. | 1 |
 | `track-ai-tools` | AI-Assisted Coding | AI-output verification, test harness thinking, review discipline. | 1 |
+| `track-secure-software` | Secure Software | AppSec foundation: threat notes, secrets, auth, access control, validation, output encoding, dependency/logging hygiene. | 1/2 |
 | `track-ai-apps` | Practical AI Apps | RAG/evals/guardrails for AI Product; also a backend unlock. | 1/2 |
 | `track-ml` | ML Foundations | Present in catalog; keep behind proof gates. | 2+ |
+| `track-cloud-platform-basics` | Cloud Platform Basics | Backend/security unlock: config, CI release gates, rollback drills, logs, cost. | 2 |
+| `track-data-systems` | Data Systems | Backend/data unlock: quality rules, dataset contracts, rejected-row proof, lineage, reproducible reports. | 2 |
 
 ---
 
@@ -50,8 +54,9 @@ See [career-paths-current-curriculum-2026.md](./career-paths-current-curriculum-
 - Path selection changes track order, Today recommendations, missions shown first, weekly plan scope, and readiness scoring.
 - Switching paths does not delete completed work.
 - Readiness still favors mission/evidence proof over lesson checkboxes.
+- Learn now shows path-level proof gates and future unlock labels: `Locked specialization`, `Roadmap`, and `Coming later`.
+- `track-secure-software`, `track-testing-debugging`, `track-cloud-platform-basics`, and `track-data-systems` are implemented as real curriculum content with staged mini-arcs and repeated practice reps in the thinnest non-Python areas.
 - `track-ml` remains advanced/unwired by default; do not market it as a beginner ML engineer path.
-- Secure Software is now a selectable path, but the curriculum still needs dedicated security lessons and missions before it is fully credible.
 
 ---
 
@@ -59,10 +64,10 @@ See [career-paths-current-curriculum-2026.md](./career-paths-current-curriculum-
 
 | Priority | Work | Reason |
 | --- | --- | --- |
-| 1 | Add `track-secure-software` | Security/AppSec is the biggest missing 2026 path. |
-| 2 | Add `track-data-systems` | Backend/Data needs data cleaning, data quality, and pipeline proof beyond SQL basics. |
-| 3 | Add path gates | Core Proof, Portfolio Proof, Specialization Unlock, Advanced Unlock. |
-| 4 | Add Backend -> AI/Data/Cloud/ML unlock UX | Backend is the cleanest bridge into AI product, analytics/data systems, cloud/platform, and ML/model literacy. |
+| 1 | Continue deepening `track-secure-software` | Access-control and output-encoding labs now exist; add broader exploit/fix variations and OWASP-style review depth after review-pack proof. |
+| 2 | Continue deepening `track-data-systems` | Dataset contracts and rejected-row proof now exist; add analytics/data-system depth beyond lineage and reproducible reports. |
+| 3 | Add `track-analytics-systems` | Backend/data should open decision systems only after data-system proof exists. |
+| 4 | Deepen Backend -> AI/Data/Cloud/ML unlock UX | Backend is the cleanest bridge into AI product, data systems, cloud/platform, and ML/model literacy. |
 | 5 | Anti-hype copy audit | Remove job guarantees, ML conflation, cloud-architect beginner claims, and standalone prompt-engineering claims. |
 
 ---

@@ -11,7 +11,7 @@ export default function ReadinessScreen(): ReactElement {
     ["Lesson completion", readiness.breakdown.lessonCompletion],
     ["Quiz performance", readiness.breakdown.quizPerformance],
     ["Project completion", readiness.breakdown.projectCompletion],
-    ["Proof quality", readiness.breakdown.evidenceHygiene],
+    ["Evidence quality", readiness.breakdown.evidenceHygiene],
     ["Review cadence", readiness.breakdown.reviewCadence]
   ] as const;
 
@@ -40,7 +40,7 @@ export default function ReadinessScreen(): ReactElement {
           <Badge tone="rose">{readiness.weakestArea}</Badge>
         </Row>
         <BodyText>
-          The score is project-heavy: missions and evidence drive most of readiness, while lessons, checkpoints, and reviews support the proof.
+          The score is project-heavy: missions and evidence drive most of readiness, while lessons, checkpoints, and reviews support the work.
         </BodyText>
         <ProgressBar label="Career readiness" value={readiness.score} />
       </Panel>

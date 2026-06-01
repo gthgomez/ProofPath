@@ -14,19 +14,42 @@ import { createInitialProgress, recordCodeRunAttempt, setLessonCompletion } from
 
 const pythonModule = contentPack.modules.find((moduleItem) => moduleItem.id === "module-python-core")!;
 const pythonLessons = getLessonsForModule(contentPack, pythonModule.id);
+const pythonProfessionalModule = contentPack.modules.find((moduleItem) => moduleItem.id === "module-python-professional")!;
+const pythonProfessionalLessons = getLessonsForModule(contentPack, pythonProfessionalModule.id);
+const pythonIntegrationModule = contentPack.modules.find((moduleItem) => moduleItem.id === "module-python-integration")!;
+const pythonIntegrationLessons = getLessonsForModule(contentPack, pythonIntegrationModule.id);
 const cliMission = contentPack.projectMissions.find((mission) => mission.id === "mission-cli-study-tracker")!;
 
 describe("learning path state model", () => {
-  it("groups Python Core into named proof arcs", () => {
+  it("groups Python Core into named learning arcs", () => {
     const arcs = getLessonArcs(pythonModule, pythonLessons);
 
     expect(arcs.map((arc) => arc.title)).toEqual([
       "Python Basics",
       "Clean and Validate Data",
       "Build a Real CLI",
-      "Package as Proof"
+      "Package for Review"
     ]);
     expect(arcs.flatMap((arc) => arc.lessonIndexes)).toHaveLength(17);
+  });
+
+  it("groups Python Professional and Integration into depth arcs", () => {
+    const professionalArcs = getLessonArcs(pythonProfessionalModule, pythonProfessionalLessons);
+    const integrationArcs = getLessonArcs(pythonIntegrationModule, pythonIntegrationLessons);
+
+    expect(professionalArcs.map((arc) => arc.title)).toEqual([
+      "Structure and Models",
+      "Errors, Config, and Quality",
+      "Professional Review Gate"
+    ]);
+    expect(professionalArcs.flatMap((arc) => arc.lessonIndexes)).toHaveLength(pythonProfessionalLessons.length);
+
+    expect(integrationArcs.map((arc) => arc.title)).toEqual([
+      "Validation and Services",
+      "Persistence and APIs",
+      "Integration Review"
+    ]);
+    expect(integrationArcs.flatMap((arc) => arc.lessonIndexes)).toHaveLength(pythonIntegrationLessons.length);
   });
 
   it("uses one canonical lesson status for roadmap cards", () => {
@@ -73,7 +96,7 @@ describe("learning path state model", () => {
     );
 
     expect(getModuleStatus(pythonLessons, [cliMission], initialProgress)).toBe("not_started");
-    expect(getModuleCtaLabel(pythonModule, pythonLessons, [cliMission], initialProgress)).toBe("Start Python Core Proof");
+    expect(getModuleCtaLabel(pythonModule, pythonLessons, [cliMission], initialProgress)).toBe("Start Python Core");
     expect(getModuleStatus(pythonLessons, [cliMission], completedProgress)).toBe("mission_ready");
     expect(getModuleCtaLabel(pythonModule, pythonLessons, [cliMission], completedProgress)).toBe("Open portfolio missions");
   });

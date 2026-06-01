@@ -60,14 +60,14 @@ export default function MissionDetailScreen(): ReactElement {
         <Row>
           <Badge tone={mission.difficulty === "foundation" ? "blue" : "amber"}>{mission.difficulty}</Badge>
           <Badge tone="green">{mission.skillIds.length} skills</Badge>
-          <Badge tone={missionDone ? "green" : hasVerifierEvidence ? "amber" : "rose"}>{missionDone ? "award captured" : "proof required"}</Badge>
+          <Badge tone={missionDone ? "green" : hasVerifierEvidence ? "amber" : "rose"}>{missionDone ? "award captured" : "evidence required"}</Badge>
         </Row>
         <BodyText>{mission.brief}</BodyText>
         <ProgressBar label="Mission award progress" tone="amber" value={missionAwardProgress} />
         <MutedText>
           {missionDone
             ? "Award captured from completed preparation and required evidence."
-            : "No manual completion. This mission awards itself when the linked lesson preparation and proof checklist are complete."}
+            : "No manual completion. This mission awards itself when the linked lesson preparation and evidence checklist are complete."}
         </MutedText>
       </Panel>
 
@@ -101,7 +101,7 @@ export default function MissionDetailScreen(): ReactElement {
 
       <Panel>
         <SectionTitle>Deliverables</SectionTitle>
-        <BodyText>Deliverables unlock as an award only after the required evidence proves the mission is real.</BodyText>
+        <BodyText>Deliverables unlock as an award only after the required evidence shows the mission is real.</BodyText>
         {mission.deliverables.map((deliverable) => (
           <SubPanel key={deliverable}>
             <Row>
@@ -128,7 +128,7 @@ export default function MissionDetailScreen(): ReactElement {
       </Panel>
 
       <Panel>
-        <SectionTitle>Proof checklist</SectionTitle>
+        <SectionTitle>Evidence checklist</SectionTitle>
         {proofChecklist.map((requirement) => (
           <Row key={requirement.id}>
             <Badge tone={requirement.complete ? "green" : "rose"}>{requirement.complete ? "done" : "missing"}</Badge>
