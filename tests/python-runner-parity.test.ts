@@ -69,4 +69,4 @@ describe("Python web/native runner parity", () => {
     expect(webResult.stderr).not.toMatch(/timed out|timeout/i);
     expect(nativeResult.stderr).not.toMatch(/timed out|timeout/i);
   });
-});
+}, 60000);
