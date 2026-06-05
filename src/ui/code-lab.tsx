@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { buildRunningTerminalEvents, emptyHiddenCheckSummary, formatTerminalTranscript, runtimeCapabilitiesFor } from "@/domain/code-run";
 import type { CodeRunAttempt, CodeRunMode, HiddenCheckSummary, TerminalEvent } from "@/domain/types";
-import { runLessonSandbox } from "@/sandbox/runner";
+import { runLessonSandbox, getSandboxCapabilityLabel } from "@/sandbox/runner";
 import { Badge, BodyText, ButtonShell, MutedText, Row, SectionTitle } from "@/ui/primitives";
 import { colors, radius, semanticColors, spacing } from "@/ui/theme";
 import { CodeProblems } from "@/ui/code-problems";
@@ -99,6 +99,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const proofCaptured = learnerLatestRun?.runMode === "run_checks" && learnerLatestRun.passed;
   const fileRan = learnerLatestRun?.runMode === "run_file" && learnerLatestRun.passed;
   const runtimeCapabilities = runtimeCapabilitiesFor(runnerSpec.language);
+  const capability = getSandboxCapabilityLabel(runnerSpec.language);
   const terminalEvents: TerminalEvent[] = isRunning
     ? buildRunningTerminalEvents(runnerSpec.language, activeRunMode, activePhaseIndex)
     : learnerLatestRun?.terminalTranscript ?? buildRunningTerminalEvents(runnerSpec.language, "run_checks", -1);
@@ -117,11 +118,11 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
 
   return (
     <View style={styles.codeLab}>
-      <Row>
+      <Row style={{ flexWrap: "wrap", gap: spacing.xs }}>
         <Badge tone="blue">{runnerSpec.language}</Badge>
         <Badge tone="amber">{runnerSpec.timeoutMs}ms limit</Badge>
         <Badge tone="teal">network off</Badge>
-        {runnerSpec.language === "typescript" ? <Badge tone="ink">{runtimeCapabilities.workflowLabel}</Badge> : null}
+        <Badge tone="ink">{capability.label}</Badge>
         {learnerLatestRun ? <Badge tone={learnerLatestRun.passed ? "green" : "rose"}>{latestRunBadgeLabel(learnerLatestRun)}</Badge> : null}
       </Row>
       <SectionTitle>Code Lab</SectionTitle>
@@ -142,6 +143,9 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
       </View>
       <SectionTitle>Code editor</SectionTitle>
       <MutedText>Syntax highlighting helps you read the code structure. Run file shows program output; Run checks validates the lesson goal.</MutedText>
+      <MutedText style={{ fontStyle: "italic", marginBottom: spacing.xs }}>
+        Sandbox capabilities: {capability.note}
+      </MutedText>
       {runtimeCapabilities.beginnerNote ? <MutedText>{runtimeCapabilities.beginnerNote}</MutedText> : null}
       <SyntaxHighlightedEditor
         accessibilityLabel={`${runnerSpec.language} code editor`}

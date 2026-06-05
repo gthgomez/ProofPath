@@ -348,6 +348,7 @@ export interface ProofArtifact {
 export interface UserProfile {
   roleTargetId: string;
   onboardingCompletedAt?: string;
+  dashboardTourDismissed?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -400,6 +401,8 @@ export interface UserProgress {
   completedLessonIds: string[];
   completedLessonMiniProjectIds: string[];
   completedQuizIds: string[];
+  placedOutLessonIds: string[];
+  placedOutQuizIds: string[];
   completedProjectMissionIds: string[];
   completedProjectMissionDeliverableIds: string[];
   completedProjectMissionPhaseIds: string[];

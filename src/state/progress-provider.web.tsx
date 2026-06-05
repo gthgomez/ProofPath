@@ -5,6 +5,8 @@ import { roleTargets } from "@/content/roles";
 import {
   addEvidenceItem,
   createInitialProgress,
+  dismissDashboardTour,
+  fastTrackLessons,
   generateWeeklyReport,
   recordCodeRunAttempt,
   recordReview,
@@ -63,6 +65,8 @@ interface ProgressContextValue {
   addEvidence: (input: EvidenceInput) => boolean;
   generateWeeklyCareerReport: () => void;
   resetLocalProgress: () => Promise<void>;
+  dismissTour: () => void;
+  fastTrack: (lessonIds: string[], quizIds: string[]) => void;
 }
 
 const ProgressContext = createContext<ProgressContextValue | null>(null);
@@ -188,6 +192,12 @@ export function ProgressProvider({ children }: PropsWithChildren): ReactElement 
       },
       generateWeeklyCareerReport: () => {
         updateProgress((currentProgress) => generateWeeklyReport(currentProgress, roleScopedContent));
+      },
+      dismissTour: () => {
+        updateProgress((currentProgress) => dismissDashboardTour(currentProgress));
+      },
+      fastTrack: (lessonIds, quizIds) => {
+        updateProgress((currentProgress) => fastTrackLessons(currentProgress, lessonIds, quizIds));
       },
       resetLocalProgress: async () => {
         const initialProgress = createInitialProgress();

@@ -244,7 +244,7 @@ export function getLessonStatus(lesson: Lesson, lessons: Lesson[], progress: Use
     return "in_progress";
   }
 
-  return getNextLessonId(lessons, progress) === lesson.id ? "current" : "upcoming";
+  return getNextLessonId(lessons, progress) === lesson.id ? "current" : "locked";
 }
 
 export function getModuleStatus(lessons: Lesson[], missions: ProjectMission[], progress: UserProgress): ModuleStatus {

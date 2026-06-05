@@ -45,6 +45,8 @@ function withTimestamp(progress: Omit<UserProgress, "updatedAt">, now: string): 
     completedLessonIds: uniqueValues(progress.completedLessonIds),
     completedLessonMiniProjectIds: uniqueValues(progress.completedLessonMiniProjectIds),
     completedQuizIds: uniqueValues(progress.completedQuizIds),
+    placedOutLessonIds: uniqueValues(progress.placedOutLessonIds || []),
+    placedOutQuizIds: uniqueValues(progress.placedOutQuizIds || []),
     completedProjectMissionIds: uniqueValues(progress.completedProjectMissionIds),
     completedProjectMissionDeliverableIds: uniqueValues(progress.completedProjectMissionDeliverableIds),
     completedProjectMissionPhaseIds: uniqueValues(progress.completedProjectMissionPhaseIds),
@@ -152,9 +154,21 @@ function createEvidenceItemFromProof(proof: ProofArtifact, now: string): Evidenc
 export function createInitialProfile(now = new Date().toISOString()): UserProfile {
   return {
     roleTargetId: DEFAULT_ROLE_TARGET_ID,
+    dashboardTourDismissed: false,
     createdAt: now,
     updatedAt: now
   };
+}
+
+export function dismissDashboardTour(progress: UserProgress, now = new Date().toISOString()): UserProgress {
+  return withTimestamp({
+    ...progress,
+    profile: {
+      ...progress.profile,
+      dashboardTourDismissed: true,
+      updatedAt: now
+    }
+  }, now);
 }
 
 function normalizeCareerPathId(roleTargetId?: string): string {
@@ -165,9 +179,9 @@ function normalizeCareerPathId(roleTargetId?: string): string {
   return legacyCareerPathIdMap[roleTargetId] ?? roleTargetId;
 }
 
-type StoredProgress = Omit<UserProgress, "profile" | "evidenceItems" | "quizAttempts" | "codeRunAttempts" | "completedLessonMiniProjectIds" | "completedProjectMissionDeliverableIds" | "completedProjectMissionPhaseIds" | "reviewItems" | "reviewEvents" | "weeklyReports">
+type StoredProgress = Omit<UserProgress, "profile" | "evidenceItems" | "quizAttempts" | "codeRunAttempts" | "completedLessonMiniProjectIds" | "completedProjectMissionDeliverableIds" | "completedProjectMissionPhaseIds" | "reviewItems" | "reviewEvents" | "weeklyReports" | "placedOutLessonIds" | "placedOutQuizIds">
   & { evidenceItems: StoredEvidenceItem[] }
-  & Partial<Pick<UserProgress, "profile" | "quizAttempts" | "codeRunAttempts" | "completedLessonMiniProjectIds" | "completedProjectMissionDeliverableIds" | "completedProjectMissionPhaseIds" | "reviewItems" | "reviewEvents" | "weeklyReports">>;
+  & Partial<Pick<UserProgress, "profile" | "quizAttempts" | "codeRunAttempts" | "completedLessonMiniProjectIds" | "completedProjectMissionDeliverableIds" | "completedProjectMissionPhaseIds" | "reviewItems" | "reviewEvents" | "weeklyReports" | "placedOutLessonIds" | "placedOutQuizIds">>;
 
 export function ensureProgressProfile(progress: StoredProgress, now = new Date().toISOString()): UserProgress {
   const fallbackProfile = createInitialProfile(now);
@@ -185,6 +199,8 @@ export function ensureProgressProfile(progress: StoredProgress, now = new Date()
     quizAttempts: progress.quizAttempts ?? [],
     codeRunAttempts: (progress.codeRunAttempts ?? []).map(normalizeCodeRunAttempt),
     completedLessonMiniProjectIds: progress.completedLessonMiniProjectIds ?? [],
+    placedOutLessonIds: progress.placedOutLessonIds ?? [],
+    placedOutQuizIds: progress.placedOutQuizIds ?? [],
     completedProjectMissionDeliverableIds: progress.completedProjectMissionDeliverableIds ?? [],
     completedProjectMissionPhaseIds: progress.completedProjectMissionPhaseIds ?? [],
     reviewItems: progress.reviewItems ?? [],
@@ -199,6 +215,8 @@ export function createInitialProgress(now = new Date().toISOString()): UserProgr
     completedLessonIds: [],
     completedLessonMiniProjectIds: [],
     completedQuizIds: [],
+    placedOutLessonIds: [],
+    placedOutQuizIds: [],
     completedProjectMissionIds: [],
     completedProjectMissionDeliverableIds: [],
     completedProjectMissionPhaseIds: [],
@@ -629,5 +647,25 @@ export function generateWeeklyReport(progress: UserProgress, content: ContentPac
   return withTimestamp({
     ...progress,
     weeklyReports: upsertWeeklyReport(progress.weeklyReports, snapshot)
+  }, now);
+}
+
+export function fastTrackLessons(progress: UserProgress, lessonIds: string[], quizIds: string[], now = new Date().toISOString()): UserProgress {
+  let updated = progress;
+  for (const lessonId of lessonIds) {
+    updated = setLessonCompletion(updated, lessonId, true, now);
+    updated = setLessonMiniProjectCompletion(updated, lessonId, true, now);
+  }
+  for (const quizId of quizIds) {
+    updated = setQuizCompletion(updated, quizId, true, now);
+  }
+  return updated;
+}
+
+export function placementSkip(progress: UserProgress, lessonIds: string[], quizIds: string[], now = new Date().toISOString()): UserProgress {
+  return withTimestamp({
+    ...progress,
+    placedOutLessonIds: uniqueValues([...(progress.placedOutLessonIds || []), ...lessonIds]),
+    placedOutQuizIds: uniqueValues([...(progress.placedOutQuizIds || []), ...quizIds])
   }, now);
 }

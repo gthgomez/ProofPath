@@ -64,7 +64,8 @@ const touchTargetContracts: Array<[string, string]> = [
   ["src/ui/code-terminal.tsx", "expandButton"],
   ["src/ui/code-problems.tsx", "locationButton"],
   ["src/ui/code-problems.tsx", "rawDetailButton"],
-  ["src/ui/syntax-highlighted-editor.tsx", "completionChip"]
+  ["src/ui/syntax-highlighted-editor.tsx", "completionChip"],
+  ["app/onboarding.tsx", "indicatorDotContainer"]
 ];
 
 describe("ui accessibility helpers", () => {

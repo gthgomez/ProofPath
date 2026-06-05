@@ -38,7 +38,7 @@ export const legacyCareerPathIdMap: Record<string, string> = {
 export const roleTargets: RoleTarget[] = [
   {
     id: DEFAULT_ROLE_TARGET_ID,
-    title: "Software Foundations",
+    title: "Intern Generalist",
     summary: "Build the shared skill base for modern software work: Python, TypeScript, SQL, Git, tests, and AI-output verification.",
     trackIds: ["track-python", "track-typescript", "track-sql", "track-git", "track-testing-debugging", "track-ai-tools"],
     default: true
@@ -52,14 +52,14 @@ export const roleTargets: RoleTarget[] = [
   },
   {
     id: PATH_SECURE_SOFTWARE_APPSEC_ID,
-    title: "Secure Software & AppSec",
+    title: "AppSec & Secure Software",
     summary: "Learn to build and review software with security habits: auth boundaries, secrets, data leakage, testing, and threat notes.",
     trackIds: ["track-secure-software", "track-git", "track-python", "track-sql", "track-typescript", "track-ai-tools"],
     default: false
   },
   {
     id: PATH_AI_PRODUCT_ENGINEERING_ID,
-    title: "AI Product Engineering",
+    title: "AI Product Features (TS-Led)",
     summary: "Build AI-powered product features with TypeScript, model APIs, RAG, evals, guardrails, data boundaries, and cost notes.",
     trackIds: ["track-typescript", "track-ai-tools", "track-ai-apps", "track-sql", "track-python", "track-git"],
     default: false

@@ -1,32 +1,78 @@
+import { useState, type ReactElement } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import { Link, Redirect } from "expo-router";
-import type { ReactElement } from "react";
-import { useState } from "react";
-import { StyleSheet, View } from "react-native";
 import { contentPack } from "@/content/seed";
-import { findMission, getLessonsForModule, getModulesForTrack } from "@/domain/content";
-import {
-  formatEstimatedMinutes,
-  getLessonArcs,
-  getLessonCtaRule,
-  getLessonStatus,
-  getMissionReadiness,
-  getModuleCtaLabel,
-  getModuleStatus,
-  getNextLessonId,
-  type LessonArc,
-  type LessonStatus,
-  type MissionStatus
-} from "@/domain/learning-path";
-import { evaluatePathProofGate, getFutureUnlocksForRole, getTracksForRole, type FutureUnlockLabel } from "@/domain/role-routing";
-import type { Lesson, Module, ProjectMission } from "@/domain/types";
-import { Badge, BodyText, ButtonShell, MutedText, Panel, ProgressBar, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
+import { getLessonsForModule, getModulesForTrack } from "@/domain/content";
+import { evaluatePathProofGate, getFutureUnlocksForRole, getTracksForRole, getPathNodes, type FutureUnlockLabel } from "@/domain/role-routing";
+import type { ProjectMission } from "@/domain/types";
+import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { colors, radius, semanticColors, spacing } from "@/ui/theme";
 import { useProgress } from "@/state/progress-provider";
 
+interface PlacementQuestion {
+  prompt: string;
+  choices: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+interface PlacementState {
+  trackId: string;
+  trackTitle: string;
+  questions: PlacementQuestion[];
+  currentQuestionIndex: number;
+  selectedAnswers: number[];
+  failed: boolean;
+  success: boolean;
+}
+
 export default function LearningPathScreen(): ReactElement {
-  const { progress, roleTarget } = useProgress();
+  const { progress, roleTarget, placement } = useProgress();
   const { isCheckingOnboarding, needsOnboarding } = useOnboardingGate();
+  const [placementState, setPlacementState] = useState<PlacementState | null>(null);
+  const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
+
+  const startPlacement = (trackId: string, trackTitle: string) => {
+    const trackModules = getModulesForTrack(contentPack, trackId);
+    const trackLessons = trackModules.flatMap((m) => getLessonsForModule(contentPack, m.id));
+    
+    const questions: PlacementQuestion[] = [];
+
+    for (const lesson of trackLessons) {
+      const quiz = contentPack.quizzes.find((q) => q.id === lesson.quizId);
+      if (quiz && quiz.questions.length > 0) {
+        const question = quiz.questions[0];
+        questions.push({
+          prompt: question.prompt,
+          choices: question.choices,
+          correctIndex: question.correctChoiceIndex,
+          explanation: question.explanation
+        });
+      }
+    }
+
+    if (questions.length === 0) {
+      questions.push({
+        prompt: `Are you ready to test out of ${trackTitle}?`,
+        choices: ["Yes, I am ready", "No, go back"],
+        correctIndex: 0,
+        explanation: "Basic test confirmation."
+      });
+    }
+
+    setSelectedChoice(null);
+    setPlacementState({
+      trackId,
+      trackTitle,
+      questions: questions.slice(0, 5),
+      currentQuestionIndex: 0,
+      selectedAnswers: [],
+      failed: false,
+      success: false
+    });
+  };
+
   const tracks = getTracksForRole(contentPack, roleTarget.id);
   const proofGate = evaluatePathProofGate(contentPack, progress, roleTarget.id);
   const futureUnlocks = getFutureUnlocksForRole(contentPack, progress, roleTarget.id);
@@ -88,7 +134,7 @@ export default function LearningPathScreen(): ReactElement {
           </View>
           {futureUnlocks.length > 0 ? (
             <View style={styles.unlockGrid}>
-              <SectionTitle>Future paths</SectionTitle>
+              <SectionTitle style={styles.futureTitle}>Future paths</SectionTitle>
               {futureUnlocks.map((unlock) => (
                 <SubPanel key={unlock.id}>
                   <Row>
@@ -104,339 +150,228 @@ export default function LearningPathScreen(): ReactElement {
       ) : null}
 
       {tracks.map((track) => {
-        const modules = getModulesForTrack(contentPack, track.id);
+        const pathNodes = getPathNodes(contentPack, track.id, progress);
 
         return (
           <Panel key={track.id}>
             <Row>
-              <Badge>{track.roleTargets[0]}</Badge>
-              <Badge tone="teal">{track.moduleIds.length} module</Badge>
+              <Badge>{track.roleTargets[0] || "Foundations"}</Badge>
+              <Badge tone="teal">{track.moduleIds.length} modules</Badge>
             </Row>
             <SectionTitle>{track.title}</SectionTitle>
-            <MutedText>{track.summary}</MutedText>
-            {modules.map((moduleItem, moduleIndex) => {
-              const nextModule = modules[moduleIndex + 1];
+            <MutedText style={styles.trackSummary}>{track.summary}</MutedText>
+            {!pathNodes.every((node) => node.status === "completed" || node.status === "placed-out") ? (
+              <ButtonShell
+                accessibilityHint={`Start a placement test to test out of ${track.title} lessons.`}
+                onPress={() => startPlacement(track.id, track.title)}
+                size="compact"
+                tone="rose"
+                variant="secondary"
+                style={styles.fastTrackButton}
+              >
+                Placement: Test out of this track
+              </ButtonShell>
+            ) : (
+              <Row style={{ marginBottom: spacing.sm }}>
+                <Badge tone="green">Track completed</Badge>
+              </Row>
+            )}
 
-              return (
-                <ModuleRoadmap
-                  key={moduleItem.id}
-                  moduleItem={moduleItem}
-                  nextModule={nextModule}
-                  progress={progress}
-                />
-              );
-            })}
+            <View style={styles.nodeListContainer}>
+              {pathNodes.map((node, index) => {
+                const isLast = index === pathNodes.length - 1;
+                const isCompleted = node.status === "completed";
+                const isPlacedOut = node.status === "placed-out";
+                const isCurrent = node.status === "current";
+                const isLocked = node.status === "locked" || node.status === "upcoming";
+
+                const nodeHref = node.type === "mission"
+                  ? { pathname: "/mission/[missionId]" as const, params: { missionId: node.id } }
+                  : { pathname: "/lesson/[lessonId]" as const, params: { lessonId: node.id } };
+
+                return (
+                  <View key={node.id} style={styles.timelineNode}>
+                    {!isLast ? <View style={styles.lineConnector} /> : null}
+                    <View style={[
+                      styles.circleNode,
+                      isCompleted ? styles.circleCompleted : isPlacedOut ? styles.circlePlacedOut : isCurrent ? styles.circleCurrent : styles.circleLocked
+                    ]}>
+                      {isCompleted ? <Text style={styles.circleText}>✓</Text> : isPlacedOut ? <Text style={styles.circleTextPlacedOut}>—</Text> : null}
+                    </View>
+                    <View style={styles.nodeContent}>
+                      <Row>
+                        <Badge tone={isCompleted ? "green" : isCurrent ? "blue" : "ink"}>
+                          {node.status === "placed-out" ? "placed out" : node.type}
+                        </Badge>
+                        {node.estimatedMinutes ? (
+                          <Badge tone="teal">{node.estimatedMinutes} min</Badge>
+                        ) : null}
+                        {node.language ? (
+                          <Badge tone="amber">{node.language}</Badge>
+                        ) : null}
+                      </Row>
+                      <SectionTitle style={styles.nodeTitleText}>{node.title}</SectionTitle>
+                      {isLocked ? (
+                        <ButtonShell
+                          accessibilityHint="This item is locked until you complete the previous lessons."
+                          size="compact"
+                          disabled={true}
+                          tone="ink"
+                          variant="secondary"
+                        >
+                          Locked
+                        </ButtonShell>
+                      ) : (
+                        <Link href={nodeHref} asChild>
+                          <ButtonShell
+                            accessibilityHint={`Opens ${node.title}.`}
+                            size="compact"
+                            tone={isCompleted || isPlacedOut ? "ink" : isCurrent ? "blue" : "teal"}
+                            variant={isCurrent || isCompleted || isPlacedOut ? "primary" : "secondary"}
+                          >
+                            {isCompleted || isPlacedOut ? "Review" : isCurrent ? "Continue" : "Start"}
+                          </ButtonShell>
+                        </Link>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
           </Panel>
         );
       })}
+      {placementState ? (
+        <View style={styles.overlayContainer} accessibilityViewIsModal accessibilityLabel="Placement Test Modal">
+          <Panel style={styles.modalPanel}>
+            {placementState.success ? (
+              <View style={styles.modalCenter}>
+                <Badge tone="green">passed</Badge>
+                <SectionTitle style={styles.modalTitle}>Passed Placement Test!</SectionTitle>
+                <BodyText style={styles.modalBody}>
+                  Concepts marked as placed out. Complete lessons individually for full readiness credit.
+                </BodyText>
+                <ButtonShell
+                  accessibilityHint="Closes this modal and returns to the roadmap."
+                  onPress={() => setPlacementState(null)}
+                  tone="green"
+                >
+                  Back to Roadmap
+                </ButtonShell>
+              </View>
+            ) : placementState.failed && placementState.currentQuestionIndex >= placementState.questions.length ? (
+              <View style={styles.modalCenter}>
+                <Badge tone="rose">test failed</Badge>
+                <SectionTitle style={styles.modalTitle}>Placement Test Failed</SectionTitle>
+                <BodyText style={styles.modalBody}>
+                  You missed one or more questions. We recommend continuing with the lessons on the roadmap to build your readiness score.
+                </BodyText>
+                <ButtonShell
+                  accessibilityHint="Closes this modal and returns to the roadmap."
+                  onPress={() => setPlacementState(null)}
+                  tone="rose"
+                >
+                  Back to Roadmap
+                </ButtonShell>
+              </View>
+            ) : (
+              <View>
+                <Row>
+                  <Badge tone="blue">{placementState.trackTitle} Test</Badge>
+                  <Badge tone="teal">
+                    Question {placementState.currentQuestionIndex + 1} of {placementState.questions.length}
+                  </Badge>
+                </Row>
+                <SectionTitle style={styles.modalQuestionTitle}>
+                  {placementState.questions[placementState.currentQuestionIndex].prompt}
+                </SectionTitle>
+                <View style={styles.choicesList}>
+                  {placementState.questions[placementState.currentQuestionIndex].choices.map((choice, cIndex) => {
+                    const isChoiceSelected = selectedChoice === cIndex;
+                    return (
+                      <ButtonShell
+                        key={`choice-${cIndex}`}
+                        accessibilityHint={`Selects answer option: ${choice}.`}
+                        onPress={() => setSelectedChoice(cIndex)}
+                        selected={isChoiceSelected}
+                        tone={isChoiceSelected ? "blue" : "ink"}
+                        variant={isChoiceSelected ? "primary" : "secondary"}
+                        style={styles.choiceButton}
+                      >
+                        {choice}
+                      </ButtonShell>
+                    );
+                  })}
+                </View>
+                <ButtonShell
+                  accessibilityHint="Submit your selected answer for this question."
+                  disabled={selectedChoice === null}
+                  onPress={() => {
+                    if (selectedChoice === null) return;
+                    
+                    const currentQ = placementState.questions[placementState.currentQuestionIndex];
+                    const isCorrect = selectedChoice === currentQ.correctIndex;
+                    
+                    const nextAnswers = [...placementState.selectedAnswers, selectedChoice];
+                    const nextIndex = placementState.currentQuestionIndex + 1;
+                    const isEnd = nextIndex >= placementState.questions.length;
+                    const hasFailed = placementState.failed || !isCorrect;
+
+                    setSelectedChoice(null);
+
+                    if (isEnd) {
+                      if (hasFailed) {
+                        setPlacementState((prev) => prev ? {
+                          ...prev,
+                          selectedAnswers: nextAnswers,
+                          currentQuestionIndex: nextIndex,
+                          failed: true
+                        } : null);
+                      } else {
+                        // Success! Skip track
+                        const trackModules = getModulesForTrack(contentPack, placementState.trackId);
+                        const trackLessons = trackModules.flatMap((m) => getLessonsForModule(contentPack, m.id));
+                        const lessonIds = trackLessons.map((l) => l.id);
+                        const quizIds = trackLessons.map((l) => l.quizId).filter(Boolean);
+                        placement(lessonIds, quizIds);
+
+                        setPlacementState((prev) => prev ? {
+                          ...prev,
+                          selectedAnswers: nextAnswers,
+                          currentQuestionIndex: nextIndex,
+                          success: true
+                        } : null);
+                      }
+                    } else {
+                      setPlacementState((prev) => prev ? {
+                        ...prev,
+                        selectedAnswers: nextAnswers,
+                        currentQuestionIndex: nextIndex,
+                        failed: hasFailed
+                      } : null);
+                    }
+                  }}
+                  tone="blue"
+                  style={styles.submitButton}
+                >
+                  {placementState.currentQuestionIndex === placementState.questions.length - 1 ? "Finish Test" : "Submit Answer"}
+                </ButtonShell>
+                <ButtonShell
+                  accessibilityHint="Cancel the placement test and return to roadmap."
+                  onPress={() => setPlacementState(null)}
+                  tone="ink"
+                  variant="tertiary"
+                  style={styles.cancelButton}
+                >
+                  Cancel Test
+                </ButtonShell>
+              </View>
+            )}
+          </Panel>
+        </View>
+      ) : null}
     </Screen>
   );
-}
-
-interface ModuleRoadmapProps {
-  moduleItem: Module;
-  nextModule?: Module;
-  progress: ReturnType<typeof useProgress>["progress"];
-}
-
-function ModuleRoadmap({ moduleItem, nextModule, progress }: ModuleRoadmapProps): ReactElement {
-  const lessons = getLessonsForModule(contentPack, moduleItem.id);
-  const firstLesson = lessons[0];
-  const nextLessonId = getNextLessonId(lessons, progress);
-  const activeLesson = lessons.find((lesson) => lesson.id === nextLessonId);
-  const completedLessons = lessons.filter((lesson) => progress.completedLessonIds.includes(lesson.id)).length;
-  const missions = moduleItem.projectMissionIds
-    .map((missionId) => findMission(contentPack, missionId))
-    .filter((mission): mission is ProjectMission => Boolean(mission));
-  const completedMissions = missions.filter((mission) => progress.completedProjectMissionIds.includes(mission.id)).length;
-  const moduleStatus = getModuleStatus(lessons, missions, progress);
-  const moduleCtaLabel = getModuleCtaLabel(moduleItem, lessons, missions, progress);
-  const arcs = getLessonArcs(moduleItem, lessons);
-  const activeArc = arcs.find((arc) => arc.lessonIndexes.some((lessonIndex) => lessons[lessonIndex]?.id === activeLesson?.id)) ?? arcs[0];
-  const [expandedArcIds, setExpandedArcIds] = useState<string[]>(() => activeArc ? [activeArc.id] : []);
-  const lessonProgress = lessons.length === 0 ? 0 : (completedLessons / lessons.length) * 100;
-  const missionProgress = missions.length === 0 ? 0 : (completedMissions / missions.length) * 100;
-
-  function toggleArc(arcId: string): void {
-    setExpandedArcIds((currentIds) => currentIds.includes(arcId)
-      ? currentIds.filter((currentId) => currentId !== arcId)
-      : [...currentIds, arcId]);
-  }
-
-  const moduleHref = moduleStatus === "mission_ready" && missions[0]
-    ? { pathname: "/mission/[missionId]" as const, params: { missionId: missions[0].id } }
-    : { pathname: "/lesson/[lessonId]" as const, params: { lessonId: activeLesson?.id ?? firstLesson?.id ?? "" } };
-
-  return (
-    <View style={styles.moduleItem}>
-      <Row>
-        <Badge tone={moduleStatus === "completed" ? "green" : moduleStatus === "mission_ready" ? "amber" : "blue"}>
-          {moduleStatus.replace("_", " ")}
-        </Badge>
-        <Badge tone="green">{completedLessons}/{lessons.length} lessons</Badge>
-        <Badge tone="amber">{completedMissions}/{missions.length} missions</Badge>
-      </Row>
-
-      <SectionTitle>{moduleItem.title}</SectionTitle>
-      <BodyText>{moduleItem.summary}</BodyText>
-
-      {firstLesson ? (
-        <SubPanel accessibilityLabel={`Continue card for ${moduleItem.title}`}>
-          <Row>
-            <Badge tone="blue">Next up</Badge>
-            {activeLesson ? <Badge tone="teal">{activeLesson.estimatedMinutes} min</Badge> : <Badge tone="amber">Build gate</Badge>}
-          </Row>
-          <SectionTitle>{activeLesson ? activeLesson.title : "Build missions ready"}</SectionTitle>
-          <MutedText>
-            {activeLesson
-              ? `You are here. Finish this lesson to make ${moduleItem.title} easier to use in a real project.`
-              : "Lessons are complete. Turn the module into project evidence with Build."}
-          </MutedText>
-          <Link href={moduleHref} asChild>
-            <ButtonShell accessibilityHint={`Opens the next action for ${moduleItem.title}.`} tone={moduleStatus === "mission_ready" ? "amber" : "blue"}>
-              {moduleCtaLabel}
-            </ButtonShell>
-          </Link>
-        </SubPanel>
-      ) : null}
-
-      <View style={styles.progressGrid}>
-        <ProgressBar label={`${moduleItem.title} lessons`} value={lessonProgress} />
-        {missions.length > 0 ? <ProgressBar label={`${moduleItem.title} missions`} tone="amber" value={missionProgress} /> : null}
-      </View>
-
-      <SectionTitle>Arc progress</SectionTitle>
-      {arcs.map((arc) => (
-        <ArcRoadmap
-          activeLessonId={activeLesson?.id}
-          arc={arc}
-          expanded={expandedArcIds.includes(arc.id)}
-          key={arc.id}
-          lessons={lessons}
-          onToggle={() => toggleArc(arc.id)}
-          progress={progress}
-        />
-      ))}
-
-      {missions.length > 0 ? (
-        <View style={styles.missionSection}>
-          <SectionTitle>Build</SectionTitle>
-          <BodyText>Build missions turn this module into work you can show, explain, and verify.</BodyText>
-          {missions.map((mission, missionIndex) => (
-            <MissionCard key={mission.id} lessons={lessons} mission={mission} missionIndex={missionIndex} progress={progress} />
-          ))}
-        </View>
-      ) : null}
-
-      {nextModule ? (
-        <SubPanel>
-          <Row>
-            <Badge tone="ink">Next module</Badge>
-          </Row>
-          <SectionTitle>{nextModule.title}</SectionTitle>
-          <MutedText>{nextModule.summary}</MutedText>
-        </SubPanel>
-      ) : null}
-    </View>
-  );
-}
-
-interface ArcRoadmapProps {
-  activeLessonId?: string;
-  arc: LessonArc;
-  expanded: boolean;
-  lessons: Lesson[];
-  onToggle: () => void;
-  progress: ReturnType<typeof useProgress>["progress"];
-}
-
-function ArcRoadmap({ activeLessonId, arc, expanded, lessons, onToggle, progress }: ArcRoadmapProps): ReactElement {
-  const arcLessons = arc.lessonIndexes
-    .map((lessonIndex) => lessons[lessonIndex])
-    .filter((lesson): lesson is Lesson => Boolean(lesson));
-  const completedCount = arcLessons.filter((lesson) => progress.completedLessonIds.includes(lesson.id)).length;
-  const containsActiveLesson = arcLessons.some((lesson) => lesson.id === activeLessonId);
-
-  return (
-    <View style={[styles.arcBlock, containsActiveLesson ? styles.arcBlockCurrent : null]}>
-      <Row>
-        <Badge tone={completedCount === arcLessons.length ? "green" : containsActiveLesson ? "blue" : "teal"}>
-          {containsActiveLesson ? "you are here" : `${completedCount}/${arcLessons.length}`}
-        </Badge>
-        <Badge tone="teal">{formatEstimatedMinutes(arcLessons)}</Badge>
-      </Row>
-      <SectionTitle>{arc.title}</SectionTitle>
-      {arc.missionHint ? <MutedText>{arc.missionHint}</MutedText> : null}
-      <ButtonShell
-        accessibilityHint={expanded ? `Collapses ${arc.title}.` : `Expands ${arc.title}.`}
-        accessibilityState={{ expanded }}
-        onPress={onToggle}
-        size="compact"
-        tone="ink"
-        variant="tertiary"
-      >
-        {expanded ? "Hide lessons" : `Show ${arcLessons.length} lessons`}
-      </ButtonShell>
-      {expanded ? (
-        <View style={styles.lessonList}>
-          {arcLessons.map((lesson) => {
-            const status = getLessonStatus(lesson, lessons, progress);
-            const position = lessons.findIndex((candidate) => candidate.id === lesson.id) + 1;
-
-            return (
-              <LessonCard
-                activeLessonId={activeLessonId}
-                key={lesson.id}
-                lesson={lesson}
-                position={position}
-                status={status}
-              />
-            );
-          })}
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-interface LessonCardProps {
-  activeLessonId?: string;
-  lesson: Lesson;
-  position: number;
-  status: LessonStatus;
-}
-
-function LessonCard({ activeLessonId, lesson, position, status }: LessonCardProps): ReactElement {
-  const cta = getLessonCtaRule(status);
-  const isActive = lesson.id === activeLessonId || status === "current";
-  const ctaVariant = isActive || status === "completed" ? cta.variant : "secondary";
-
-  return (
-    <View style={[
-      styles.roadmapItem,
-      isActive ? styles.roadmapItemCurrent : null,
-      status === "completed" ? styles.roadmapItemComplete : null
-    ]}>
-      <Row>
-        <Badge tone={lessonBadgeTone(status)}>{lessonBadgeText(status, position)}</Badge>
-        <Badge tone="teal">{lesson.estimatedMinutes} min</Badge>
-        <Badge tone="amber">{lesson.workshop.language}</Badge>
-      </Row>
-      <SectionTitle>{lesson.title}</SectionTitle>
-      <MutedText>{lesson.summary}</MutedText>
-      <MutedText>Build: {lesson.workshop.miniProject.title}</MutedText>
-      <MutedText>After practice: {lesson.workshop.miniProject.expectedEvidence}</MutedText>
-      <Link href={{ pathname: "/lesson/[lessonId]", params: { lessonId: lesson.id } }} asChild>
-        <ButtonShell
-          accessibilityHint={`Opens ${lesson.title}.`}
-          size={isActive ? "full" : "compact"}
-          tone={cta.tone}
-          variant={ctaVariant}
-        >
-          {isActive ? cta.label : cta.label}
-        </ButtonShell>
-      </Link>
-    </View>
-  );
-}
-
-interface MissionCardProps {
-  lessons: Lesson[];
-  mission: ProjectMission;
-  missionIndex: number;
-  progress: ReturnType<typeof useProgress>["progress"];
-}
-
-function MissionCard({ lessons, mission, missionIndex, progress }: MissionCardProps): ReactElement {
-  const readiness = getMissionReadiness(mission, lessons, progress);
-  const completed = readiness.status === "completed";
-  const primaryMissionAction = readiness.status === "ready" || readiness.status === "in_progress";
-
-  return (
-    <View style={[
-      styles.roadmapItem,
-      primaryMissionAction ? styles.missionReady : null,
-      completed ? styles.roadmapItemComplete : null
-    ]}>
-      <Row>
-        <Badge tone={completed ? "green" : missionBadgeTone(readiness.status)}>
-          {completed ? "done" : `mission ${missionIndex + 1}`}
-        </Badge>
-        <Badge tone="teal">{mission.difficulty}</Badge>
-        <Badge tone={missionBadgeTone(readiness.status)}>{missionStatusText(readiness.status)}</Badge>
-      </Row>
-      <SectionTitle>{mission.title}</SectionTitle>
-      <MutedText>{mission.brief}</MutedText>
-      <MutedText>{readiness.dependencyText}</MutedText>
-      <MutedText>Artifacts: {mission.expectedArtifacts.slice(0, 3).join(", ")}</MutedText>
-      <Link href={{ pathname: "/mission/[missionId]", params: { missionId: mission.id } }} asChild>
-        <ButtonShell
-          accessibilityHint={`Opens ${mission.title}.`}
-          size={primaryMissionAction ? "full" : "compact"}
-          tone={completed ? "ink" : "amber"}
-          variant={primaryMissionAction ? "primary" : "secondary"}
-        >
-          {completed ? "Review mission" : primaryMissionAction ? "Open mission" : "Preview mission"}
-        </ButtonShell>
-      </Link>
-    </View>
-  );
-}
-
-function lessonBadgeText(status: LessonStatus, position: number): string {
-  if (status === "completed") {
-    return "complete";
-  }
-
-  if (status === "current") {
-    return `current ${position}`;
-  }
-
-  if (status === "in_progress") {
-    return "continue";
-  }
-
-  if (status === "locked") {
-    return "Not earned yet";
-  }
-
-  return `lesson ${position}`;
-}
-
-function lessonBadgeTone(status: LessonStatus): "blue" | "teal" | "amber" | "rose" | "green" | "ink" {
-  if (status === "completed") {
-    return "green";
-  }
-
-  if (status === "current" || status === "in_progress") {
-    return "blue";
-  }
-
-  if (status === "locked") {
-    return "ink";
-  }
-
-  return "teal";
-}
-
-function missionBadgeTone(status: MissionStatus): "blue" | "teal" | "amber" | "rose" | "green" | "ink" {
-  if (status === "completed") {
-    return "green";
-  }
-
-  if (status === "ready" || status === "in_progress") {
-    return "amber";
-  }
-
-  return "ink";
-}
-
-function missionStatusText(status: MissionStatus): string {
-  if (status === "locked") {
-    return "Not earned yet";
-  }
-
-  return status.replace("_", " ");
 }
 
 function unlockBadgeTone(label: FutureUnlockLabel): "blue" | "teal" | "amber" | "rose" | "green" | "ink" {
@@ -452,58 +387,141 @@ function unlockBadgeTone(label: FutureUnlockLabel): "blue" | "teal" | "amber" | 
 }
 
 const styles = StyleSheet.create({
-  moduleItem: {
-    borderColor: colors.border,
-    borderTopWidth: 1,
-    gap: spacing.md,
-    paddingTop: spacing.md
-  },
-  progressGrid: {
-    gap: spacing.sm
-  },
-  arcBlock: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: spacing.sm,
-    padding: spacing.md
-  },
-  arcBlockCurrent: {
-    borderColor: colors.blue,
-    borderWidth: 2
-  },
-  lessonList: {
-    gap: spacing.sm
-  },
-  roadmapItem: {
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: spacing.sm,
-    padding: spacing.md
-  },
-  roadmapItemCurrent: {
-    backgroundColor: semanticColors.lessonSoft,
-    borderColor: semanticColors.lessonPrimary,
-    borderLeftWidth: 5,
-    borderWidth: 2
-  },
-  roadmapItemComplete: {
-    backgroundColor: semanticColors.successSoft,
-    borderColor: semanticColors.success
-  },
-  missionReady: {
-    backgroundColor: semanticColors.missionSoft,
-    borderColor: semanticColors.missionPrimary,
-    borderLeftWidth: 5,
-    borderWidth: 2
-  },
-  missionSection: {
-    gap: spacing.sm
-  },
   unlockGrid: {
-    gap: spacing.sm
+    gap: spacing.sm,
+    marginTop: spacing.md
+  },
+  futureTitle: {
+    marginTop: spacing.md
+  },
+  trackSummary: {
+    marginBottom: spacing.md
+  },
+  nodeListContainer: {
+    gap: spacing.xs,
+    marginVertical: spacing.sm
+  },
+  timelineNode: {
+    flexDirection: "row",
+    minHeight: 100,
+    position: "relative"
+  },
+  lineConnector: {
+    width: 2,
+    backgroundColor: colors.border,
+    position: "absolute",
+    left: 11,
+    top: 24,
+    bottom: -16,
+    zIndex: 1
+  },
+  circleNode: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+    backgroundColor: colors.surface
+  },
+  circleCompleted: {
+    borderColor: semanticColors.success,
+    backgroundColor: semanticColors.success
+  },
+  circleCurrent: {
+    borderColor: colors.blue,
+    backgroundColor: colors.surface
+  },
+  circleLocked: {
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted
+  },
+  circlePlacedOut: {
+    borderColor: colors.border,
+    borderStyle: "dashed",
+    backgroundColor: colors.surfaceMuted
+  },
+  circleText: {
+    color: colors.surface,
+    fontSize: 12,
+    fontWeight: "bold",
+    lineHeight: 14
+  },
+  circleTextPlacedOut: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "bold",
+    lineHeight: 14
+  },
+  nodeContent: {
+    flex: 1,
+    marginLeft: 16,
+    gap: spacing.xs,
+    paddingBottom: spacing.md
+  },
+  nodeTitleText: {
+    fontSize: 15,
+    marginVertical: 2
+  },
+  overlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.md,
+    zIndex: 999
+  },
+  modalPanel: {
+    width: "100%",
+    maxHeight: "85%",
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    elevation: 5,
+    shadowColor: colors.ink,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: radius.md
+  },
+  modalCenter: {
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.md
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center"
+  },
+  modalBody: {
+    textAlign: "center",
+    color: colors.text,
+    lineHeight: 20,
+    marginBottom: spacing.md
+  },
+  modalQuestionTitle: {
+    fontSize: 16,
+    marginVertical: spacing.sm,
+    color: colors.text
+  },
+  choicesList: {
+    gap: spacing.xs,
+    marginVertical: spacing.sm
+  },
+  choiceButton: {
+    width: "100%",
+    alignItems: "flex-start"
+  },
+  submitButton: {
+    marginTop: spacing.sm
+  },
+  cancelButton: {
+    marginTop: spacing.xs,
+    alignSelf: "center"
+  },
+  fastTrackButton: {
+    alignSelf: "flex-start",
+    marginBottom: spacing.sm
   }
 });

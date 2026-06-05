@@ -11,6 +11,7 @@ import {
   getModuleStatus
 } from "@/domain/learning-path";
 import { createInitialProgress, recordCodeRunAttempt, setLessonCompletion } from "@/domain/progress";
+import { getPathNodes } from "@/domain/role-routing";
 
 const pythonModule = contentPack.modules.find((moduleItem) => moduleItem.id === "module-python-core")!;
 const pythonLessons = getLessonsForModule(contentPack, pythonModule.id);
@@ -56,7 +57,7 @@ describe("learning path state model", () => {
     const initialProgress = createInitialProgress();
 
     expect(getLessonStatus(pythonLessons[0], pythonLessons, initialProgress)).toBe("current");
-    expect(getLessonStatus(pythonLessons[1], pythonLessons, initialProgress)).toBe("upcoming");
+    expect(getLessonStatus(pythonLessons[1], pythonLessons, initialProgress)).toBe("locked");
 
     const afterFirstLesson = setLessonCompletion(initialProgress, pythonLessons[0].id, true);
     expect(getLessonStatus(pythonLessons[0], pythonLessons, afterFirstLesson)).toBe("completed");
@@ -107,5 +108,29 @@ describe("learning path state model", () => {
     expect(readiness.status).toBe("locked");
     expect(readiness.dependencyText).toContain("Lessons 1-12");
     expect(readiness.supportedLessonIds).toHaveLength(12);
+  });
+
+  it("marks placed-out lessons with status 'placed-out' in getPathNodes and doesn't block progression", () => {
+    const progress = {
+      ...createInitialProgress(),
+      placedOutLessonIds: [pythonLessons[0].id]
+    };
+    
+    const nodes = getPathNodes(contentPack, "track-python", progress);
+    
+    // The first node (placed out) should have status 'placed-out'
+    const firstNode = nodes.find(n => n.id === pythonLessons[0].id);
+    expect(firstNode).toBeDefined();
+    expect(firstNode?.status).toBe("placed-out");
+
+    // The second node should be 'current', not 'locked', because placed-out lessons are non-blocking
+    const secondNode = nodes.find(n => n.id === pythonLessons[1].id);
+    expect(secondNode).toBeDefined();
+    expect(secondNode?.status).toBe("current");
+
+    // The third node should be 'locked'
+    const thirdNode = nodes.find(n => n.id === pythonLessons[2].id);
+    expect(thirdNode).toBeDefined();
+    expect(thirdNode?.status).toBe("locked");
   });
 });

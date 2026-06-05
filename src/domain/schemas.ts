@@ -327,6 +327,7 @@ export const evidenceItemSchema = z.object({
 export const userProfileSchema = z.object({
   roleTargetId: nonEmptyString,
   onboardingCompletedAt: z.string().optional(),
+  dashboardTourDismissed: z.boolean().optional(),
   createdAt: nonEmptyString,
   updatedAt: nonEmptyString
 });

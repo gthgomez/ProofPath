@@ -1,19 +1,20 @@
 import { Redirect, useLocalSearchParams } from "expo-router";
 import type { ReactElement } from "react";
-import { useState } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { contentPack } from "@/content/seed";
 import { findLesson } from "@/domain/content";
 import { formatTerminalTranscript } from "@/domain/code-run";
-import { getMissionsForRole } from "@/domain/role-routing";
+import { getMissionsForRole, isGitTrackCompleted } from "@/domain/role-routing";
+import { getMissionProofChecklist } from "@/domain/progress";
 import type { EvidenceTestStatus, EvidenceType, ReadmeStatus } from "@/domain/types";
-import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle } from "@/ui/primitives";
+import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
 import { colors, radius, spacing } from "@/ui/theme";
 
 export default function EvidenceLogScreen(): ReactElement {
-  const { missionId } = useLocalSearchParams<{ missionId?: string }>();
+  const { missionId, lessonId, prefill } = useLocalSearchParams<{ missionId?: string; lessonId?: string; prefill?: string }>();
   const { addEvidence, error, isSaving, progress, roleTarget } = useProgress();
   const { isCheckingOnboarding, needsOnboarding } = useOnboardingGate();
   const [title, setTitle] = useState("");
@@ -27,16 +28,53 @@ export default function EvidenceLogScreen(): ReactElement {
   const [verifierOutput, setVerifierOutput] = useState("");
   const [reflection, setReflection] = useState("");
   const [showProofDetails, setShowProofDetails] = useState(false);
+  const [manualDeveloperMode, setManualDeveloperMode] = useState(false);
+  const isGitDone = isGitTrackCompleted(contentPack, progress);
+  const developerModeActive = isGitDone || manualDeveloperMode;
   const roleMissions = getMissionsForRole(contentPack, roleTarget.id);
   const [linkedMissionId, setLinkedMissionId] = useState<string | undefined>(() => (
     roleMissions.some((mission) => mission.id === missionId) ? missionId : roleMissions[0]?.id
   ));
+  const [linkedLessonId, setLinkedLessonId] = useState<string | undefined>(lessonId);
+
+  useEffect(() => {
+    if (prefill === "codelab" && lessonId) {
+      const lessonObj = findLesson(contentPack, lessonId);
+      if (lessonObj) {
+        const attempt = progress.codeRunAttempts.find(
+          (att) => att.lessonId === lessonId && att.runMode === "run_checks" && att.passed
+        );
+        if (attempt) {
+          setTitle(`${lessonObj.title} proof`);
+          setBody(`Automatically verified Code Lab proof for ${lessonObj.title}.`);
+          setVerifierOutput(attempt.stdout + (attempt.stderr ? "\n" + attempt.stderr : ""));
+          setTestStatus("passing");
+          setLinkedLessonId(lessonId);
+          setManualDeveloperMode(true);
+          setShowProofDetails(true);
+          
+          const moduleItem = contentPack.modules.find((m) => m.id === lessonObj.moduleId);
+          if (moduleItem?.trackId) {
+            const mission = contentPack.projectMissions.find((m) => m.trackId === moduleItem.trackId);
+            if (mission) {
+              setLinkedMissionId(mission.id);
+            }
+          }
+        }
+      }
+    }
+  }, [lessonId, prefill, progress.codeRunAttempts]);
+
   const linkedMission = roleMissions.find((mission) => mission.id === linkedMissionId);
-  const linkedLesson = linkedMission ? contentPack.modules
-    .filter((moduleItem) => moduleItem.trackId === linkedMission.trackId)
-    .flatMap((moduleItem) => moduleItem.lessonIds)
-    .map((lessonId) => findLesson(contentPack, lessonId))
-    .find((lesson) => Boolean(lesson)) : undefined;
+  const linkedLesson = linkedLessonId 
+    ? findLesson(contentPack, linkedLessonId)
+    : linkedMission ? contentPack.modules
+        .filter((moduleItem) => moduleItem.trackId === linkedMission.trackId)
+        .flatMap((moduleItem) => moduleItem.lessonIds)
+        .map((lId) => findLesson(contentPack, lId))
+        .find((lesson) => Boolean(lesson)) 
+      : undefined;
+
   const linkedSkillIds = Array.from(new Set([
     ...(linkedMission?.skillIds ?? []),
     ...(linkedLesson?.skillIds ?? [])
@@ -156,20 +194,50 @@ export default function EvidenceLogScreen(): ReactElement {
             ))}
           </Row>
         ) : null}
-        {linkedMission ? <MutedText>Linked mission: {linkedMission.title}</MutedText> : <MutedText>Select a mission before saving portfolio evidence.</MutedText>}
-        {linkedSkillIds.length > 0 ? <MutedText>Skills: {linkedSkillIds.length}</MutedText> : null}
-        {linkedMissionRequirements.length > 0 ? (
-          <Row>
-            {linkedMissionRequirements.map((requirement) => (
-              <Badge key={requirement} tone="rose">{requirement}</Badge>
-            ))}
-          </Row>
-        ) : null}
+        {linkedMission ? (
+          <View>
+            <MutedText>Linked mission: {linkedMission.title}</MutedText>
+            {linkedSkillIds.length > 0 ? <MutedText>Skills: {linkedSkillIds.length}</MutedText> : null}
+            <SubPanel style={{ marginVertical: spacing.xs }}>
+              <SectionTitle>Mission Evidence Checklist</SectionTitle>
+              <MutedText style={{ fontSize: 13, marginBottom: spacing.xs }}>
+                Requirements needed to complete the mission:
+              </MutedText>
+              {getMissionProofChecklist(progress, linkedMission).map((item) => {
+                let draftMet = false;
+                if (item.id === "repo-url" && repoUrl.trim().length > 0) draftMet = true;
+                if (item.id === "commit-hash" && commitHash.trim().length > 0) draftMet = true;
+                if (item.id === "passing-verifier" && verifierOutput.trim().length > 0 && testStatus === "passing") draftMet = true;
+                if (item.id === "readme-status" && readmeStatus !== "missing" && (linkedMission.evidenceRequirements.readmeStatus === "basic" || readmeStatus === "complete")) draftMet = true;
+                if (item.id === "artifact-or-deployment" && (artifactUri.trim().length > 0 || deploymentUrl.trim().length > 0)) draftMet = true;
+                if (item.id === "reflection" && (reflection.trim().length > 0 || body.trim().length >= 120)) draftMet = true;
+
+                const isMet = item.complete || draftMet;
+
+                return (
+                  <Row key={item.id} style={{ marginVertical: 2, alignItems: "center" }}>
+                    <View style={{ marginRight: 8 }}>
+                      <Badge tone={isMet ? "green" : "rose"}>
+                        {isMet ? "✓" : "✗"}
+                      </Badge>
+                    </View>
+                    <Text style={{ fontSize: 13, color: isMet ? colors.text : colors.muted }}>
+                      {item.label} {item.required ? "(Required)" : ""} {item.complete ? "(Saved)" : draftMet ? "(In Draft)" : "(Missing)"}
+                    </Text>
+                  </Row>
+                );
+              })}
+            </SubPanel>
+          </View>
+        ) : (
+          <MutedText>Select a mission before saving portfolio evidence.</MutedText>
+        )}
         <ButtonShell
           accessibilityHint="Prefills the evidence form with this mission's expected evidence fields."
           disabled={!linkedMission}
           onPress={applyMissionProofTemplate}
           tone="teal"
+          style={{ marginVertical: spacing.xs }}
         >
           Use evidence template
         </ButtonShell>
@@ -192,78 +260,119 @@ export default function EvidenceLogScreen(): ReactElement {
           style={[styles.input, styles.noteInput]}
           value={body}
         />
-        <TextInput
-          accessibilityHint="Required when test status is passing."
-          accessibilityLabel="Check output"
-          multiline
-          onChangeText={setVerifierOutput}
-          placeholder="Check output or exact command"
-          placeholderTextColor={colors.muted}
-          style={[styles.input, styles.noteInput]}
-          value={verifierOutput}
-        />
-        <ButtonShell
-          accessibilityHint={showProofDetails ? "Hides repo, commit, README, artifact, deployment, and reflection fields." : "Shows optional evidence detail fields."}
-          accessibilityState={{ expanded: showProofDetails }}
-          onPress={() => setShowProofDetails((current) => !current)}
-          tone="ink"
-          variant="secondary"
-        >
-          {showProofDetails ? "Hide evidence details" : "Add repo, README, artifact, or reflection"}
-        </ButtonShell>
-        {showProofDetails ? (
+        {developerModeActive ? (
+          <>
+            <TextInput
+              accessibilityHint="Required when test status is passing."
+              accessibilityLabel="Check output"
+              multiline
+              onChangeText={setVerifierOutput}
+              placeholder="Check output or exact command"
+              placeholderTextColor={colors.muted}
+              style={[styles.input, styles.noteInput]}
+              value={verifierOutput}
+            />
+            <ButtonShell
+              accessibilityHint={showProofDetails ? "Hides repo, commit, README, artifact, deployment, and reflection fields." : "Shows optional evidence detail fields."}
+              accessibilityState={{ expanded: showProofDetails }}
+              onPress={() => setShowProofDetails((current) => !current)}
+              tone="ink"
+              variant="secondary"
+            >
+              {showProofDetails ? "Hide evidence details" : "Add repo, README, artifact, or reflection"}
+            </ButtonShell>
+            {showProofDetails ? (
+              <View style={styles.detailFields}>
+                <TextInput
+                  accessibilityHint="Optional. Must start with http or https."
+                  accessibilityLabel="Repository URL"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  onChangeText={setRepoUrl}
+                  placeholder="Repo URL"
+                  placeholderTextColor={colors.muted}
+                  style={styles.input}
+                  value={repoUrl}
+                />
+                <TextInput
+                  accessibilityHint="Optional. Seven to forty hexadecimal characters."
+                  accessibilityLabel="Commit hash"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={setCommitHash}
+                  placeholder="Commit hash"
+                  placeholderTextColor={colors.muted}
+                  style={styles.input}
+                  value={commitHash}
+                />
+                <Row>
+                  {(["unknown", "not-run", "passing", "failing"] as const).map((status) => (
+                    <ButtonShell
+                      accessibilityHint={`Marks test status as ${status}.`}
+                      accessibilityLabel={`Test status ${status}`}
+                      key={status}
+                      onPress={() => setTestStatus(status)}
+                      selected={testStatus === status}
+                      tone={testStatus === status ? "ink" : status === "passing" ? "green" : status === "failing" ? "rose" : "blue"}
+                    >
+                      {status}
+                    </ButtonShell>
+                  ))}
+                </Row>
+                <Row>
+                  {(["missing", "basic", "complete"] as const).map((status) => (
+                    <ButtonShell
+                      accessibilityHint={`Marks README status as ${status}.`}
+                      accessibilityLabel={`README status ${status}`}
+                      key={status}
+                      onPress={() => setReadmeStatus(status)}
+                      selected={readmeStatus === status}
+                      tone={readmeStatus === status ? "ink" : status === "complete" ? "green" : "amber"}
+                    >
+                      README {status}
+                    </ButtonShell>
+                  ))}
+                </Row>
+                <TextInput
+                  accessibilityHint="Optional. Link to a screenshot, demo, or artifact."
+                  accessibilityLabel="Artifact link"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  onChangeText={setArtifactUri}
+                  placeholder="Screenshot, demo, or artifact link"
+                  placeholderTextColor={colors.muted}
+                  style={styles.input}
+                  value={artifactUri}
+                />
+                <TextInput
+                  accessibilityHint="Optional. Link to a deployed demo or release."
+                  accessibilityLabel="Deployment link"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  onChangeText={setDeploymentUrl}
+                  placeholder="Deployment link"
+                  placeholderTextColor={colors.muted}
+                  style={styles.input}
+                  value={deploymentUrl}
+                />
+                <TextInput
+                  accessibilityHint="Optional. Explain what this evidence confirms."
+                  accessibilityLabel="Evidence reflection"
+                  multiline
+                  onChangeText={setReflection}
+                  placeholder="Reflection: what this confirms and what remains"
+                  placeholderTextColor={colors.muted}
+                  style={[styles.input, styles.noteInput]}
+                  value={reflection}
+                />
+              </View>
+            ) : null}
+          </>
+        ) : (
           <View style={styles.detailFields}>
-            <TextInput
-              accessibilityHint="Optional. Must start with http or https."
-              accessibilityLabel="Repository URL"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              onChangeText={setRepoUrl}
-              placeholder="Repo URL"
-              placeholderTextColor={colors.muted}
-              style={styles.input}
-              value={repoUrl}
-            />
-            <TextInput
-              accessibilityHint="Optional. Seven to forty hexadecimal characters."
-              accessibilityLabel="Commit hash"
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={setCommitHash}
-              placeholder="Commit hash"
-              placeholderTextColor={colors.muted}
-              style={styles.input}
-              value={commitHash}
-            />
-            <Row>
-              {(["unknown", "not-run", "passing", "failing"] as const).map((status) => (
-                <ButtonShell
-                  accessibilityHint={`Marks test status as ${status}.`}
-                  accessibilityLabel={`Test status ${status}`}
-                  key={status}
-                  onPress={() => setTestStatus(status)}
-                  selected={testStatus === status}
-                  tone={testStatus === status ? "ink" : status === "passing" ? "green" : status === "failing" ? "rose" : "blue"}
-                >
-                  {status}
-                </ButtonShell>
-              ))}
-            </Row>
-            <Row>
-              {(["missing", "basic", "complete"] as const).map((status) => (
-                <ButtonShell
-                  accessibilityHint={`Marks README status as ${status}.`}
-                  accessibilityLabel={`README status ${status}`}
-                  key={status}
-                  onPress={() => setReadmeStatus(status)}
-                  selected={readmeStatus === status}
-                  tone={readmeStatus === status ? "ink" : status === "complete" ? "green" : "amber"}
-                >
-                  README {status}
-                </ButtonShell>
-              ))}
-            </Row>
             <TextInput
               accessibilityHint="Optional. Link to a screenshot, demo, or artifact."
               accessibilityLabel="Artifact link"
@@ -276,30 +385,16 @@ export default function EvidenceLogScreen(): ReactElement {
               style={styles.input}
               value={artifactUri}
             />
-            <TextInput
-              accessibilityHint="Optional. Link to a deployed demo or release."
-              accessibilityLabel="Deployment link"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              onChangeText={setDeploymentUrl}
-              placeholder="Deployment link"
-              placeholderTextColor={colors.muted}
-              style={styles.input}
-              value={deploymentUrl}
-            />
-            <TextInput
-              accessibilityHint="Optional. Explain what this evidence confirms."
-              accessibilityLabel="Evidence reflection"
-              multiline
-              onChangeText={setReflection}
-              placeholder="Reflection: what this confirms and what remains"
-              placeholderTextColor={colors.muted}
-              style={[styles.input, styles.noteInput]}
-              value={reflection}
-            />
+            <ButtonShell
+              accessibilityHint="Unlocks Git repo links, commit hashes, and check verification outputs."
+              onPress={() => setManualDeveloperMode(true)}
+              tone="teal"
+              variant="secondary"
+            >
+              Enable Desktop Developer Mode (unlocks Git fields)
+            </ButtonShell>
           </View>
-        ) : null}
+        )}
         {error ? <MutedText accessibilityLiveRegion="polite">{error}</MutedText> : null}
         <ButtonShell
           accessibilityHint={canSubmit ? "Saves this evidence to local SQLite." : "Enter a title and note before saving."}

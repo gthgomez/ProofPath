@@ -27,6 +27,7 @@ interface LegacyRow {
 interface ProfileRow {
   role_target_id: string;
   onboarding_completed_at: string | null;
+  dashboard_tour_dismissed?: number;
   created_at: string;
   updated_at: string;
 }
@@ -339,6 +340,7 @@ class FakeSQLiteDatabase {
       this.profile = {
         role_target_id: params[1] as string,
         onboarding_completed_at: params[2] as string | null,
+        dashboard_tour_dismissed: params[5] as number | undefined,
         created_at: params[3] as string,
         updated_at: params[4] as string
       };
@@ -683,7 +685,7 @@ describe("progress-store", () => {
     await migrateProgressDb(fakeDb as unknown as SQLiteDatabase);
 
     const schemaSql = fakeDb.executedSql.join("\n");
-    expect(fakeDb.version).toBe(9);
+    expect(fakeDb.version).toBe(10);
     expect(schemaSql).toContain("CREATE TABLE IF NOT EXISTS user_profile");
     expect(schemaSql).toContain("CREATE TABLE IF NOT EXISTS evidence_items");
     expect(schemaSql).toContain("CREATE TABLE IF NOT EXISTS review_items");
@@ -712,7 +714,7 @@ describe("progress-store", () => {
     await migrateProgressDb(fakeDb as unknown as SQLiteDatabase);
     const loadedProgress = await loadProgress(fakeDb as unknown as SQLiteDatabase);
 
-    expect(fakeDb.version).toBe(9);
+    expect(fakeDb.version).toBe(10);
     expect(fakeDb.completedLessons.map((row) => row.entity_id)).toEqual(["lesson-python-functions"]);
     expect(fakeDb.completedLessonMiniProjects.map((row) => row.entity_id)).toEqual(["lesson-python-functions"]);
     expect(fakeDb.completedQuizzes.map((row) => row.entity_id)).toEqual(["quiz-python-functions"]);
@@ -769,5 +771,25 @@ describe("progress-store", () => {
     expect(reset.completedLessonIds).toEqual([]);
     expect(reset.completedLessonMiniProjectIds).toEqual([]);
     expect((await loadProgress(db)).completedLessonIds).toEqual([]);
+  });
+
+  it("saves and loads dashboard_tour_dismissed status", async () => {
+    const db = createDb();
+    const initialProgress = createInitialProgress("2026-05-04T16:45:00.000Z");
+    expect(initialProgress.profile.dashboardTourDismissed).toBe(false);
+
+    const updatedProgress = {
+      ...initialProgress,
+      profile: {
+        ...initialProgress.profile,
+        dashboardTourDismissed: true
+      }
+    };
+
+    await migrateProgressDb(db);
+    await saveProgress(db, updatedProgress);
+
+    const loaded = await loadProgress(db);
+    expect(loaded.profile.dashboardTourDismissed).toBe(true);
   });
 });

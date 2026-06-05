@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { contentPack } from "@/content/seed";
 import { runNativePythonProof } from "@/sandbox/native-python-proof-runner";
-import { runLessonSandbox } from "@/sandbox/runner";
+import { preloadSandbox, runLessonSandbox } from "@/sandbox/runner";
 
 describe("lesson sandbox runner", () => {
   it("runs TypeScript-style lesson code through the local runner", async () => {
@@ -105,5 +105,29 @@ describe("lesson sandbox runner", () => {
     expect(result.runtimeMs).toBeLessThan(1000);
     expect(result.testResults[0]?.message).toContain("Change minutes from 0 to the number 30");
     expect(result.stderr).not.toContain("timed out");
+  });
+
+  it("allows safe background preloading of sandbox runtime environments", () => {
+    expect(() => preloadSandbox("python")).not.toThrow();
+    expect(() => preloadSandbox("sql")).not.toThrow();
+    expect(() => preloadSandbox("javascript")).not.toThrow();
+    expect(() => preloadSandbox("python")).not.toThrow();
+    expect(() => preloadSandbox("sql")).not.toThrow();
+  });
+
+  it("fails unsupported Python control flow gracefully instead of throwing unhandled exceptions", () => {
+    const lesson = contentPack.lessons.find((candidate) => candidate.id === "lesson-python-values")!;
+    const spec = lesson.workshop.miniProject.runnerSpec;
+    
+    expect(() => {
+      const result = runNativePythonProof(
+        spec,
+        lesson.id,
+        "if True:\n  minutes = 30",
+        "2026-05-07T20:37:00.000Z"
+      );
+      expect(result.passed).toBe(false);
+      expect(result.stderr).toContain("Unsupported Python feature in the native offline verifier");
+    }).not.toThrow();
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { contentPack } from "@/content/seed";
 import { addEvidenceItem, createInitialProgress, setLessonCompletion, setMissionCompletion, setRoleTarget } from "@/domain/progress";
 import { calculateReadinessScore } from "@/domain/readiness";
-import { evaluatePathProofGate, getContentForRole, getFutureUnlocksForRole, getMissionsForRole, getNextLessonForRole, getNextMissionForRole, getRoleTarget, getRoleTrackOnboardingSummary, getTracksForRole, isOnboardingComplete } from "@/domain/role-routing";
+import { evaluatePathProofGate, getContentForRole, getFutureUnlocksForRole, getMissionsForRole, getNextLessonForRole, getNextMissionForRole, getRoleTarget, getRoleTrackOnboardingSummary, getTracksForRole, isOnboardingComplete, isGitTrackCompleted } from "@/domain/role-routing";
 
 const NOW = "2026-05-04T16:50:00.000Z";
 
@@ -10,7 +10,7 @@ describe("role routing", () => {
   it("uses Software Foundations as the default path", () => {
     const progress = createInitialProgress(NOW);
 
-    expect(getRoleTarget(progress.profile.roleTargetId).title).toBe("Software Foundations");
+    expect(getRoleTarget(progress.profile.roleTargetId).title).toBe("Intern Generalist");
     expect(getTracksForRole(contentPack, progress.profile.roleTargetId).map((track) => track.id)).toContain("track-python");
     expect(isOnboardingComplete(progress.profile)).toBe(false);
   });
@@ -121,5 +121,25 @@ describe("role routing", () => {
       "track-cloud-platform-basics",
       "Roadmap"
     ]);
+  });
+
+  it("determines whether the Git track is completed", () => {
+    const progress = createInitialProgress(NOW);
+    
+    // Initial status should be false
+    expect(isGitTrackCompleted(contentPack, progress)).toBe(false);
+
+    // Complete all lessons in the Git track
+    const gitModules = contentPack.modules.filter((m) => m.trackId === "track-git");
+    const gitLessons = gitModules.flatMap((m) => m.lessonIds);
+    expect(gitLessons.length).toBeGreaterThan(0);
+
+    let completedProgress = progress;
+    for (const lessonId of gitLessons) {
+      completedProgress = setLessonCompletion(completedProgress, lessonId, true, NOW);
+    }
+
+    // Now it should return true
+    expect(isGitTrackCompleted(contentPack, completedProgress)).toBe(true);
   });
 });

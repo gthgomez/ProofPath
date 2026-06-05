@@ -28,6 +28,8 @@ type SqlJsModule = {
 
 let pyodideRuntime: unknown | null = null;
 let sqlRuntime: SqlJsModule | null = null;
+let pyodidePromise: Promise<any> | null = null;
+let sqlPromise: Promise<SqlJsModule> | null = null;
 const PYODIDE_INDEX_URL = "/sandbox-assets/pyodide/";
 const SQLJS_DIST_URL = "/sandbox-assets/sql.js/";
 
@@ -42,14 +44,23 @@ declare global {
   }
 }
 
-const importRuntimeModuleWithFunction = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<unknown>;
-
 async function importRuntimeModule(specifier: string): Promise<unknown> {
   if (globalThis.__careerforgeImportRuntimeModuleForTests) {
     return globalThis.__careerforgeImportRuntimeModuleForTests(specifier);
   }
 
-  return importRuntimeModuleWithFunction(specifier);
+  const isHermes = typeof globalThis !== "undefined" && (globalThis as any).HermesInternal !== undefined;
+  const isReactNative = typeof navigator !== "undefined" && navigator.product === "ReactNative";
+  if (isHermes || isReactNative) {
+    throw new Error("Dynamic import is not supported in Hermes/ReactNative environment.");
+  }
+
+  try {
+    const importFn = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<unknown>;
+    return importFn(specifier);
+  } catch (error) {
+    throw new Error(`Dynamic import is not supported in this environment: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function normalizeOutput(value: unknown): string {
@@ -320,29 +331,37 @@ async function getPyodide(): Promise<any> {
     return pyodideRuntime;
   }
 
-  if (typeof window !== "undefined" && typeof document !== "undefined") {
-    if (!window.loadPyodide) {
-      await new Promise<void>((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = `${PYODIDE_INDEX_URL}pyodide.js`;
-        script.async = true;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Unable to load Pyodide runtime."));
-        document.head.appendChild(script);
-      });
-    }
-
-    if (!window.loadPyodide) {
-      throw new Error("Pyodide runtime loaded without loadPyodide.");
-    }
-
-    pyodideRuntime = await window.loadPyodide({ indexURL: PYODIDE_INDEX_URL });
-    return pyodideRuntime;
+  if (pyodidePromise) {
+    return pyodidePromise;
   }
 
-  const pyodide = await importRuntimeModule("pyodide") as { loadPyodide: () => Promise<unknown> };
-  pyodideRuntime = await pyodide.loadPyodide();
-  return pyodideRuntime;
+  pyodidePromise = (async () => {
+    if (typeof window !== "undefined" && typeof document !== "undefined") {
+      if (!window.loadPyodide) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = `${PYODIDE_INDEX_URL}pyodide.js`;
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error("Unable to load Pyodide runtime."));
+          document.head.appendChild(script);
+        });
+      }
+
+      if (!window.loadPyodide) {
+        throw new Error("Pyodide runtime loaded without loadPyodide.");
+      }
+
+      pyodideRuntime = await window.loadPyodide({ indexURL: PYODIDE_INDEX_URL });
+      return pyodideRuntime;
+    }
+
+    const pyodide = await importRuntimeModule("pyodide") as { loadPyodide: () => Promise<unknown> };
+    pyodideRuntime = await pyodide.loadPyodide();
+    return pyodideRuntime;
+  })();
+
+  return pyodidePromise;
 }
 
 async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
@@ -405,35 +424,43 @@ async function getSqlJs(): Promise<SqlJsModule> {
     return sqlRuntime;
   }
 
-  if (typeof window !== "undefined" && typeof document !== "undefined") {
-    if (!window.initSqlJs) {
-      await new Promise<void>((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = sameOriginAssetUrl(`${SQLJS_DIST_URL}sql-wasm.js`);
-        script.async = true;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Unable to load sql.js runtime."));
-        document.head.appendChild(script);
+  if (sqlPromise) {
+    return sqlPromise;
+  }
+
+  sqlPromise = (async () => {
+    if (typeof window !== "undefined" && typeof document !== "undefined") {
+      if (!window.initSqlJs) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = sameOriginAssetUrl(`${SQLJS_DIST_URL}sql-wasm.js`);
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error("Unable to load sql.js runtime."));
+          document.head.appendChild(script);
+        });
+      }
+
+      if (!window.initSqlJs) {
+        throw new Error("sql.js runtime loaded without initSqlJs.");
+      }
+
+      sqlRuntime = await window.initSqlJs({
+        locateFile: (file) => sameOriginAssetUrl(`${SQLJS_DIST_URL}${file}`)
       });
+      return sqlRuntime;
     }
 
-    if (!window.initSqlJs) {
-      throw new Error("sql.js runtime loaded without initSqlJs.");
-    }
-
-    sqlRuntime = await window.initSqlJs({
+    const initSqlJs = ((await importRuntimeModule("sql.js")) as {
+      default: (config?: { locateFile?: (file: string) => string }) => Promise<SqlJsModule>;
+    }).default;
+    sqlRuntime = await initSqlJs({
       locateFile: (file) => sameOriginAssetUrl(`${SQLJS_DIST_URL}${file}`)
     });
     return sqlRuntime;
-  }
+  })();
 
-  const initSqlJs = ((await importRuntimeModule("sql.js")) as {
-    default: (config?: { locateFile?: (file: string) => string }) => Promise<SqlJsModule>;
-  }).default;
-  sqlRuntime = await initSqlJs({
-    locateFile: (file) => sameOriginAssetUrl(`${SQLJS_DIST_URL}${file}`)
-  });
-  return sqlRuntime;
+  return sqlPromise;
 }
 
 async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
@@ -660,4 +687,66 @@ export async function runLessonSandbox(
       createdAt: now
     });
   }
+}
+
+export function preloadSandbox(language: string): void {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return;
+  }
+  if (language === "python") {
+    void getPyodide().catch((err) => {
+      console.warn("Failed to preload Pyodide sandbox:", err);
+    });
+  } else if (language === "sql") {
+    void getSqlJs().catch((err) => {
+      console.warn("Failed to preload sql.js sandbox:", err);
+    });
+  }
+}
+
+export function getSandboxCapabilityLabel(language: string): {
+  label: string;
+  note: string;
+} {
+  const isHermes = typeof globalThis !== "undefined" && (globalThis as any).HermesInternal !== undefined;
+  const isReactNative = typeof navigator !== "undefined" && navigator.product === "ReactNative";
+  
+  if (language === "javascript") {
+    return {
+      label: "JavaScript: V8 sandbox",
+      note: "Full ES2023 support."
+    };
+  }
+
+  if (language === "typescript") {
+    return {
+      label: "TypeScript: V8 sandbox",
+      note: "Types stripped at runtime."
+    };
+  }
+
+  if (language === "python") {
+    if (isHermes || isReactNative) {
+      return {
+        label: "Python: QuickJS fallback",
+        note: "Limited sandbox — standard library imports are not available."
+      };
+    }
+    return {
+      label: "Python: Pyodide WASM",
+      note: "Sandboxed Python in the browser."
+    };
+  }
+
+  if (language === "sql") {
+    return {
+      label: "SQL: SQLite WASM",
+      note: "In-memory database."
+    };
+  }
+
+  return {
+    label: "Sandboxed environment",
+    note: "Safe local code execution."
+  };
 }

@@ -119,8 +119,17 @@ export function calculateReadinessScore(content: ContentPack, progress: UserProg
     return linkedLessonIsRelevant && linkedMissionIsRelevant;
   });
 
-  const lessonCompletion = percentage(countKnownCompleted(progress.completedLessonIds, lessonIds), content.lessons.length);
-  const quizPerformance = percentage(countKnownCompleted(progress.completedQuizIds, quizIds), content.quizzes.length);
+  const completedOrPlacedOutLessons = Array.from(new Set([
+    ...progress.completedLessonIds,
+    ...(progress.placedOutLessonIds || [])
+  ]));
+  const completedOrPlacedOutQuizzes = Array.from(new Set([
+    ...progress.completedQuizIds,
+    ...(progress.placedOutQuizIds || [])
+  ]));
+
+  const lessonCompletion = percentage(countKnownCompleted(completedOrPlacedOutLessons, lessonIds), content.lessons.length);
+  const quizPerformance = percentage(countKnownCompleted(completedOrPlacedOutQuizzes, quizIds), content.quizzes.length);
   const projectCompletion = percentage(countKnownCompleted(progress.completedProjectMissionIds, missionIds), content.projectMissions.length);
 
   const evidenceHygiene = clampScore(relevantEvidence.reduce((total, item) => total + evidenceQuality(item), 0));

@@ -8,6 +8,26 @@ import {
 import type { CodeRunAttempt, CodeRunTestResult, LessonRunnerSpec, LessonRunnerTest } from "@/domain/types";
 import { buildProblemDiagnostics } from "@/sandbox/diagnostics";
 
+/**
+ * --- LEARNER SANDBOX BOUNDARIES & DEFENSIVE GUARDRAILS ---
+ *
+ * PURPOSE:
+ * This native Python runner is a lightweight, regex-based offline fallback mechanism.
+ * It is NOT a full Python interpreter, nor is it a hardened, adversarial secure runtime.
+ * It is a local practice runner and beginner proof verifier meant to process simple variable
+ * assignments and assertion-style test blocks when offline.
+ *
+ * BEHAVIOR FOR UNSUPPORTED SYNTAX:
+ * Any standard Python control flow (such as `if`, `for`, `def`, `while`, etc.) or complex statements
+ * will fail to pass the regex parsing checks. Instead of throwing unhandled crashes or validation
+ * exceptions, it catches these lines and returns a descriptive, user-friendly diagnostic failure
+ * (e.g. "Unsupported Python feature in the native offline verifier").
+ *
+ * RUNTIME PREFERENCE:
+ * Intermediate and advanced Python lessons requiring control flows, functions, or external library calls
+ * MUST prefer a more capable runtime environment (like Pyodide/Webview) when available.
+ */
+
 type PythonValue = string | number | boolean | null;
 type PythonScope = Record<string, PythonValue>;
 
