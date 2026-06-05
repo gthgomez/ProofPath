@@ -6,6 +6,9 @@ import { contentPack } from "@/content/seed";
 import {
   addEvidenceItem,
   createInitialProgress,
+  dismissDashboardTour,
+  fastTrackLessons,
+  placementSkip,
   generateWeeklyReport,
   recordCodeRunAttempt,
   recordReview,
@@ -54,6 +57,8 @@ interface ProgressContextValue {
   addEvidence: (input: EvidenceInput) => boolean;
   generateWeeklyCareerReport: () => void;
   resetLocalProgress: () => Promise<void>;
+  dismissTour: () => void;
+  placement: (lessonIds: string[], quizIds: string[]) => void;
 }
 
 const ProgressContext = createContext<ProgressContextValue | null>(null);
@@ -171,6 +176,12 @@ function SQLiteProgressProvider({ children }: PropsWithChildren): ReactElement {
       generateWeeklyCareerReport: () => {
         updateProgress((currentProgress) => generateWeeklyReport(currentProgress, roleScopedContent));
       },
+      dismissTour: () => {
+        updateProgress((currentProgress) => dismissDashboardTour(currentProgress));
+      },
+      placement: (lessonIds, quizIds) => {
+        updateProgress((currentProgress) => placementSkip(currentProgress, lessonIds, quizIds));
+      },
       resetLocalProgress: async () => {
         setIsSaving(true);
         try {
@@ -229,6 +240,8 @@ function createInitialProgressFromStored(storedProgress: Partial<UserProgress>):
     completedLessonIds: storedProgress.completedLessonIds ?? [],
     completedLessonMiniProjectIds: storedProgress.completedLessonMiniProjectIds ?? [],
     completedQuizIds: storedProgress.completedQuizIds ?? [],
+    placedOutLessonIds: storedProgress.placedOutLessonIds ?? [],
+    placedOutQuizIds: storedProgress.placedOutQuizIds ?? [],
     completedProjectMissionIds: storedProgress.completedProjectMissionIds ?? [],
     completedProjectMissionDeliverableIds: storedProgress.completedProjectMissionDeliverableIds ?? [],
     completedProjectMissionPhaseIds: storedProgress.completedProjectMissionPhaseIds ?? [],
@@ -315,6 +328,12 @@ function WebProgressProvider({ children }: PropsWithChildren): ReactElement {
       },
       generateWeeklyCareerReport: () => {
         updateProgress((currentProgress) => generateWeeklyReport(currentProgress, roleScopedContent));
+      },
+      dismissTour: () => {
+        updateProgress((currentProgress) => dismissDashboardTour(currentProgress));
+      },
+      placement: (lessonIds, quizIds) => {
+        updateProgress((currentProgress) => placementSkip(currentProgress, lessonIds, quizIds));
       },
       resetLocalProgress: async () => {
         const initialProgress = createInitialProgress();

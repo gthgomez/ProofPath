@@ -4,11 +4,11 @@ This folder contains current product documentation, supporting research, sandbox
 
 ## Current Product Truth
 
-- [career-paths-current-curriculum-2026.md](./career-paths-current-curriculum-2026.md) - canonical current summary for active `path-*` IDs, shared core, selectable paths, unlock sequence, and curriculum gaps.
+- [career-paths-current-curriculum-2026.md](./career-paths-current-curriculum-2026.md) - canonical current summary for active `path-*` IDs, shared core, selectable paths, implemented proof gates, unlock labels, and curriculum gaps.
 - [career-paths-status-and-plan-2026.md](./career-paths-status-and-plan-2026.md) - maintainer view for path routing, track membership, and phase planning. Superseded where it still describes the old role-ID era.
 - [career-paths-future-roadmap-2026.md](./career-paths-future-roadmap-2026.md) - research-led roadmap behind the `path-*` replacement while lessons are still movable.
-- [career-paths-architecture-2026.md](./career-paths-architecture-2026.md) - product architecture for gates, shared core skills, role display naming, and phase-2 unlocks. Doc-only until implemented.
-- [python-roadmap-2026-05-07.md](./python-roadmap-2026-05-07.md) - current Python learning spine and lesson template.
+- [career-paths-architecture-2026.md](./career-paths-architecture-2026.md) - product architecture for gates, shared core skills, role display naming, and phase-2 unlocks. Some gate mechanics are now implemented; verify against the current curriculum summary before treating older architecture notes as current.
+- [python-roadmap-2026-05-07.md](./python-roadmap-2026-05-07.md) - current Python learning spine, reusable depth standard, and lesson template for future track ports.
 
 ## Research And Critique Inputs
 

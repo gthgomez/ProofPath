@@ -5,6 +5,8 @@ import {
   addEvidenceItem,
   createInitialProgress,
   ensureProgressProfile,
+  fastTrackLessons,
+  placementSkip,
   getMissionSupportedLessonIds,
   reconcileDerivedProgress,
   recordCodeRunAttempt,
@@ -305,7 +307,7 @@ describe("progress actions", () => {
       title: "Tests",
       body: "Proof",
       testStatus: "passing"
-    })).toContain("verifier output");
+    })).toContain("check output");
   });
 
   it("records recall review events and advances due dates", () => {
@@ -317,5 +319,58 @@ describe("progress actions", () => {
     expect(reviewed.reviewItems[0]?.repetitions).toBe(1);
     expect(reviewed.reviewItems[0]?.dueAt).toBe("2026-05-06T16:40:00.000Z");
     expect(reviewed.reviewEvents[0]?.rating).toBe("good");
+  });
+
+  it("completes lessons, mini-projects, and quizzes via fastTrackLessons", () => {
+    const progress = createInitialProgress(NOW);
+    const targetLessons = ["lesson-python-values", "lesson-python-collections"];
+    const targetQuizzes = ["quiz-python-values", "quiz-python-collections"];
+
+    const updated = fastTrackLessons(progress, targetLessons, targetQuizzes, NOW);
+
+    expect(updated.completedLessonIds).toContain("lesson-python-values");
+    expect(updated.completedLessonIds).toContain("lesson-python-collections");
+    expect(updated.completedLessonMiniProjectIds).toContain("lesson-python-values");
+    expect(updated.completedLessonMiniProjectIds).toContain("lesson-python-collections");
+    expect(updated.completedQuizIds).toContain("quiz-python-values");
+    expect(updated.completedQuizIds).toContain("quiz-python-collections");
+  });
+
+  it("skips lessons and quizzes via placementSkip without completion or review items", () => {
+    const progress = createInitialProgress(NOW);
+    const targetLessons = ["lesson-python-values", "lesson-python-collections"];
+    const targetQuizzes = ["quiz-python-values", "quiz-python-collections"];
+
+    const updated = placementSkip(progress, targetLessons, targetQuizzes, NOW);
+
+    expect(updated.placedOutLessonIds).toContain("lesson-python-values");
+    expect(updated.placedOutLessonIds).toContain("lesson-python-collections");
+    expect(updated.placedOutQuizIds).toContain("quiz-python-values");
+    expect(updated.placedOutQuizIds).toContain("quiz-python-collections");
+
+    // Must NOT grant actual completion
+    expect(updated.completedLessonIds).not.toContain("lesson-python-values");
+    expect(updated.completedLessonMiniProjectIds).not.toContain("lesson-python-values");
+    expect(updated.completedQuizIds).not.toContain("quiz-python-values");
+
+    // Must NOT create review items
+    expect(updated.reviewItems).toEqual([]);
+  });
+
+  it("ensures legacy progress payloads are hydrated with empty placement fields", () => {
+    const legacyPayload = {
+      completedLessonIds: ["lesson-python-values"],
+      completedQuizIds: ["quiz-python-values"],
+      completedProjectMissionIds: [],
+      evidenceItems: [],
+      weeklyPlanTaskIds: [],
+      updatedAt: NOW
+    } as any;
+
+    const hydrated = ensureProgressProfile(legacyPayload, NOW);
+
+    expect(hydrated.placedOutLessonIds).toEqual([]);
+    expect(hydrated.placedOutQuizIds).toEqual([]);
+    expect(hydrated.completedLessonIds).toContain("lesson-python-values");
   });
 });

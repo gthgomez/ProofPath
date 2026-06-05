@@ -119,8 +119,17 @@ export function calculateReadinessScore(content: ContentPack, progress: UserProg
     return linkedLessonIsRelevant && linkedMissionIsRelevant;
   });
 
-  const lessonCompletion = percentage(countKnownCompleted(progress.completedLessonIds, lessonIds), content.lessons.length);
-  const quizPerformance = percentage(countKnownCompleted(progress.completedQuizIds, quizIds), content.quizzes.length);
+  const completedOrPlacedOutLessons = Array.from(new Set([
+    ...progress.completedLessonIds,
+    ...(progress.placedOutLessonIds || [])
+  ]));
+  const completedOrPlacedOutQuizzes = Array.from(new Set([
+    ...progress.completedQuizIds,
+    ...(progress.placedOutQuizIds || [])
+  ]));
+
+  const lessonCompletion = percentage(countKnownCompleted(completedOrPlacedOutLessons, lessonIds), content.lessons.length);
+  const quizPerformance = percentage(countKnownCompleted(completedOrPlacedOutQuizzes, quizIds), content.quizzes.length);
   const projectCompletion = percentage(countKnownCompleted(progress.completedProjectMissionIds, missionIds), content.projectMissions.length);
 
   const evidenceHygiene = clampScore(relevantEvidence.reduce((total, item) => total + evidenceQuality(item), 0));
@@ -151,17 +160,17 @@ export function calculateReadinessScore(content: ContentPack, progress: UserProg
   const blockingProofRequirement = projectCompletion === 0
     ? "Complete one project mission before readiness can move beyond the building range."
     : evidenceHygiene === 0
-      ? "Attach repo or verifier-backed evidence to prove completed work."
+      ? "Attach repo or check-backed evidence for completed work."
       : reviewCadence === 0
         ? "Log one recall review to keep completed work fresh."
-        : "Keep deepening proof quality with stronger artifacts and reflections.";
+        : "Keep deepening evidence quality with stronger artifacts and reflections.";
   const nextAction = nextOpenMission
     ? `Work next on ${nextOpenMission.title}: ${nextOpenMission.acceptanceCriteria[0]}.`
     : weakestArea === "evidenceHygiene"
-      ? "Improve one evidence item with repo URL, verifier output, README status, and reflection."
+      ? "Improve one evidence item with repo URL, check output, README status, and reflection."
       : weakestArea === "reviewCadence"
         ? "Review one completed lesson, quiz, or mission."
-        : "Complete the next workshop lesson and attach proof to a mission.";
+        : "Complete the next workshop lesson and attach evidence to a mission.";
   const explanation = [
     `Projects carry 40% of readiness; current project completion is ${projectCompletion}%.`,
     `Evidence quality carries 30%; current evidence hygiene is ${evidenceHygiene}%.`,

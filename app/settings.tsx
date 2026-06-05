@@ -104,11 +104,11 @@ export default function SettingsScreen(): ReactElement {
 
 function describeCareerTarget(roleTargetId: string): string {
   if (roleTargetId === PATH_BACKEND_API_DATA_ID) {
-    return "Best if you want APIs, SQL, data models, and backend proof to lead before AI, analytics, cloud, or ML unlocks.";
+    return "Best if you want APIs, SQL, data models, and backend projects to lead before AI, analytics, cloud, or ML unlocks.";
   }
 
   if (roleTargetId === PATH_SECURE_SOFTWARE_APPSEC_ID) {
-    return "Best if you want secure coding, secrets discipline, threat notes, dependency hygiene, and AppSec proof to shape the path.";
+    return "Best if you want secure coding, secrets discipline, threat notes, dependency hygiene, and AppSec evidence to shape the path.";
   }
 
   if (roleTargetId === PATH_AI_PRODUCT_ENGINEERING_ID) {

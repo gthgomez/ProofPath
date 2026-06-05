@@ -36,7 +36,7 @@ export const pythonCoreLessonArcs: LessonArc[] = [
     id: "clean-validate-data",
     title: "Clean and Validate Data",
     lessonIndexes: [5, 6, 7, 8, 9],
-    missionHint: "Prepare parser and rejected-row proof."
+    missionHint: "Prepare parser and rejected-row checks."
   },
   {
     id: "real-cli",
@@ -46,15 +46,178 @@ export const pythonCoreLessonArcs: LessonArc[] = [
   },
   {
     id: "package-proof",
-    title: "Package as Proof",
+    title: "Package for Review",
     lessonIndexes: [15, 16],
-    missionHint: "Package evidence and pass the review gate."
+    missionHint: "Package your work and pass the project review."
   }
 ];
+
+const moduleLessonArcs: Record<string, LessonArc[]> = {
+  "module-python-professional": [
+    {
+      id: "python-professional-structure",
+      title: "Structure and Models",
+      lessonIndexes: [0, 1, 2],
+      missionHint: "Turn scripts into package-shaped code with typed data and JSON output."
+    },
+    {
+      id: "python-professional-operations",
+      title: "Errors, Config, and Quality",
+      lessonIndexes: [3, 4, 5, 6, 7, 8],
+      missionHint: "Add logging, metadata, installability, config, and repeatable checks."
+    },
+    {
+      id: "python-professional-review",
+      title: "Professional Review Gate",
+      lessonIndexes: [9],
+      missionHint: "Confirm the package is maintainable before integration depth."
+    }
+  ],
+  "module-python-integration": [
+    {
+      id: "python-integration-boundaries",
+      title: "Validation and Services",
+      lessonIndexes: [0, 1],
+      missionHint: "Harden input boundaries and service state."
+    },
+    {
+      id: "python-integration-data-api",
+      title: "Persistence and APIs",
+      lessonIndexes: [2, 3],
+      missionHint: "Connect SQLite repositories and safe API clients."
+    },
+    {
+      id: "python-integration-capstone",
+      title: "Integration Review",
+      lessonIndexes: [4, 5],
+      missionHint: "Stitch layers together, inspect failure paths, and choose one improvement."
+    }
+  ],
+  "module-typescript-core": [
+    {
+      id: "typescript-contracts",
+      title: "Type Contracts",
+      lessonIndexes: [0, 1],
+      missionHint: "Model data and validate external payloads before UI work."
+    },
+    {
+      id: "typescript-state",
+      title: "State Changes",
+      lessonIndexes: [2],
+      missionHint: "Connect typed events to the progress board."
+    }
+  ],
+  "module-sql-core": [
+    {
+      id: "sql-query-questions",
+      title: "Product Questions",
+      lessonIndexes: [0],
+      missionHint: "Use joins to find missing evidence."
+    },
+    {
+      id: "sql-data-integrity",
+      title: "Data Integrity",
+      lessonIndexes: [1],
+      missionHint: "Protect app data before reporting on it."
+    }
+  ],
+  "module-secure-software-core": [
+    {
+      id: "security-risk-boundaries",
+      title: "Risk and Boundaries",
+      lessonIndexes: [0, 1, 2],
+      missionHint: "Name threats, secrets, auth boundaries, and ownership checks first."
+    },
+    {
+      id: "security-input-output",
+      title: "Input and Output Safety",
+      lessonIndexes: [3, 4],
+      missionHint: "Reject bad input and encode user-controlled output."
+    },
+    {
+      id: "security-release-hygiene",
+      title: "Release Hygiene",
+      lessonIndexes: [5],
+      missionHint: "Review dependencies and logs before release."
+    }
+  ],
+  "module-ai-apps": [
+    {
+      id: "ai-app-boundaries",
+      title: "AI Boundaries",
+      lessonIndexes: [0],
+      missionHint: "Keep secrets and privileged actions server-side."
+    },
+    {
+      id: "ai-grounding",
+      title: "Grounded Answers",
+      lessonIndexes: [1],
+      missionHint: "Separate retrieval, answer drafting, and citation checks."
+    }
+  ],
+  "module-cloud-platform-core": [
+    {
+      id: "cloud-config",
+      title: "Config Safety",
+      lessonIndexes: [0],
+      missionHint: "Document config without leaking secrets."
+    },
+    {
+      id: "cloud-release-ops",
+      title: "Release and Ops",
+      lessonIndexes: [1, 2, 3],
+      missionHint: "Gate deploys, drill rollback, and watch logs."
+    }
+  ],
+  "module-data-systems-core": [
+    {
+      id: "data-quality-contracts",
+      title: "Quality Contracts",
+      lessonIndexes: [0, 1, 2],
+      missionHint: "Define trusted rows, fixtures, and rejected-row reasons."
+    },
+    {
+      id: "data-lineage",
+      title: "Lineage",
+      lessonIndexes: [3],
+      missionHint: "Explain where report rows came from."
+    },
+    {
+      id: "data-reports",
+      title: "Reproducible Reports",
+      lessonIndexes: [4],
+      missionHint: "Make reports rerunnable instead of screenshot-only."
+    }
+  ],
+  "module-ml-core": [
+    {
+      id: "ml-metrics-context",
+      title: "Metrics Context",
+      lessonIndexes: [0],
+      missionHint: "Read scores with split, sample size, and limits."
+    },
+    {
+      id: "ml-error-patterns",
+      title: "Error Patterns",
+      lessonIndexes: [1],
+      missionHint: "Use confusion matrices to find model failure modes."
+    }
+  ]
+};
 
 export function getLessonArcs(moduleItem: Module, lessons: Lesson[]): LessonArc[] {
   if (moduleItem.id === "module-python-core" && lessons.length >= 17) {
     return pythonCoreLessonArcs;
+  }
+
+  const configuredArcs = moduleLessonArcs[moduleItem.id];
+  if (configuredArcs) {
+    return configuredArcs
+      .map((arc) => ({
+        ...arc,
+        lessonIndexes: arc.lessonIndexes.filter((lessonIndex) => lessonIndex < lessons.length)
+      }))
+      .filter((arc) => arc.lessonIndexes.length > 0);
   }
 
   return [{
@@ -81,7 +244,7 @@ export function getLessonStatus(lesson: Lesson, lessons: Lesson[], progress: Use
     return "in_progress";
   }
 
-  return getNextLessonId(lessons, progress) === lesson.id ? "current" : "upcoming";
+  return getNextLessonId(lessons, progress) === lesson.id ? "current" : "locked";
 }
 
 export function getModuleStatus(lessons: Lesson[], missions: ProjectMission[], progress: UserProgress): ModuleStatus {
@@ -141,7 +304,7 @@ export function getMissionReadiness(mission: ProjectMission, lessons: Lesson[], 
   if (progress.completedProjectMissionIds.includes(mission.id)) {
     return {
       status: "completed",
-      dependencyText: "Portfolio proof complete.",
+      dependencyText: "Portfolio evidence complete.",
       supportedLessonIds
     };
   }

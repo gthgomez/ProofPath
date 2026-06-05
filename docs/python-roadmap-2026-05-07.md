@@ -10,6 +10,23 @@ The Python path should feel like one long apprenticeship, not a shelf of unrelat
 - How will I prove it works?
 - How does it prepare me for the next project?
 
+## Python Depth Standard
+
+**Critique of the proposed standard:** the ladder/reps/checks/recall/project/review shape is the right spine because it turns lessons into inspectable skill growth instead of passive reading. The risk is weight: applying the full pattern to every tiny mobile lesson would make early lessons feel like paperwork. The missing hardening was a measurable selector for serious lessons, required failure cases, compact mobile-sized reps, module arcs, and tests that fail when depth is only prose.
+
+**Hardened implementation standard:** a Python depth lesson is a serious applied, portfolio, capstone, or review lesson selected by validation. Each selected lesson must include:
+
+- Concept ladder: objective, mental model, worked example, common mistakes, misconception check, guided exercise, and project connection.
+- Practice reps: at least 3 reps covering new data, a failure or negative case, and a project-shaped variation.
+- Code Lab check: at least 1 visible check and at least 1 hidden/negative check; network remains disabled.
+- Recall layer: explain, debug, and transfer cards with specific prompts and answer hints.
+- Project slice: a small artifact, exact check output, expected evidence, and one limitation or reflection.
+- Review gate: architecture/structure summary, command evidence, failure/risk inspection, and one improvement decision.
+
+Current enforcement lives in `scripts/validate-content.ts` and `tests/content-integrity.test.ts`. Python Professional and Python Integration arcs live in `src/domain/learning-path.ts`, so the Learn screen shows depth as staged arcs rather than one generic module list.
+
+**Porting rule for future tracks:** TypeScript, SQL, Security, AI, Cloud, and Data should not copy Python syntax, but they should copy the depth shape: compact reps, visible plus negative checks, recall cards, project artifact, exact check output, and a review gate before a learner treats the module as portfolio-ready.
+
 ## Current Python Spine
 
 The current path now starts with an absolute beginner ramp before moving into the original project-depth lessons:

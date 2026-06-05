@@ -56,6 +56,15 @@ describe("content pack", () => {
       expect(lesson.workshop.miniProject.deliverables.length).toBeGreaterThanOrEqual(3);
       expect(lesson.workshop.miniProject.verifierCommand.length).toBeGreaterThan(0);
       expect(lesson.workshop.miniProject.expectedEvidence.length).toBeGreaterThanOrEqual(60);
+      expect(lesson.workshop.recallCards.map((card) => card.type).sort()).toEqual(["debug", "explain", "transfer"]);
+      expect(new Set(lesson.workshop.recallCards.map((card) => card.id)).size).toBe(lesson.workshop.recallCards.length);
+      expect(lesson.workshop.recallCards.every((card) => card.prompt.length >= 50 && card.answerHint.length >= 20)).toBe(true);
+      expect(lesson.workshop.misconceptionChecks.length).toBeGreaterThanOrEqual(1);
+      expect(lesson.workshop.misconceptionChecks.every((check) => (
+        check.mistake.length > 0
+        && check.repair.length >= 40
+        && check.checkPrompt.length >= 50
+      ))).toBe(true);
       expect(lesson.workshop.miniProject.tester.requiredOutputIncludes.length).toBeGreaterThan(0);
       expect(lesson.workshop.miniProject.tester.forbiddenOutputIncludes).toContain("traceback");
       expect(lesson.workshop.miniProject.runnerSpec.allowNetwork).toBe(false);
@@ -85,6 +94,83 @@ describe("content pack", () => {
       const lesson = contentPack.lessons.find((candidate) => candidate.id === lessonId);
       expect(lesson?.workshop.codeShape).toBeTruthy();
       expect(lesson?.workshop.codeShape).toContain("=");
+    }
+  });
+
+  it("adds repeated practice to selected non-Python depth lessons", () => {
+    const depthLessonIds = [
+      "lesson-typescript-contracts",
+      "lesson-typescript-runtime-validation",
+      "lesson-sql-joins",
+      "lesson-security-secrets-auth",
+      "lesson-security-access-control-lab",
+      "lesson-security-injection-output-encoding",
+      "lesson-ai-retrieval-grounding",
+      "lesson-cloud-ci-deploy-checks",
+      "lesson-cloud-rollback-drill",
+      "lesson-data-contracts-fixtures",
+      "lesson-data-rejected-row-proof",
+      "lesson-ml-confusion-matrix"
+    ];
+
+    for (const lessonId of depthLessonIds) {
+      const lesson = contentPack.lessons.find((candidate) => candidate.id === lessonId);
+
+      expect(lesson?.workshop.practiceReps?.length).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("embodies the Python depth standard in selected depth lessons", () => {
+    const pythonDepthLessonIds = [
+      "lesson-python-parser-tests",
+      "lesson-python-cli-arguments",
+      "lesson-python-rejected-row-report",
+      "lesson-python-core-review",
+      "lesson-python-project-structure",
+      "lesson-python-dataclass-models",
+      "lesson-python-json-reports",
+      "lesson-python-logging-errors",
+      "lesson-python-pytest-ci",
+      "lesson-python-pyproject-metadata",
+      "lesson-python-installable-cli",
+      "lesson-python-config-files",
+      "lesson-python-ci-precommit",
+      "lesson-python-professional-review",
+      "lesson-python-regex-validation",
+      "lesson-python-oop-service",
+      "lesson-python-sqlite-persistence",
+      "lesson-python-api-client",
+      "lesson-python-integration-capstone",
+      "lesson-python-integration-review"
+    ];
+    const failureTerms = ["fail", "failure", "invalid", "reject", "error", "timeout", "status", "rollback", "risk", "bad shape", "bad input"];
+
+    for (const lessonId of pythonDepthLessonIds) {
+      const lesson = contentPack.lessons.find((candidate) => candidate.id === lessonId);
+      const lessonText = JSON.stringify(lesson).toLowerCase();
+
+      expect(lesson?.workshop.practiceReps?.length).toBeGreaterThanOrEqual(3);
+      expect(lesson?.workshop.miniProject.runnerSpec.visibleTests.length).toBeGreaterThanOrEqual(1);
+      expect(lesson?.workshop.miniProject.runnerSpec.hiddenTests.length).toBeGreaterThanOrEqual(1);
+      expect(failureTerms.some((term) => lessonText.includes(term))).toBe(true);
+    }
+  });
+
+  it("keeps Python review gates tied to evidence and judgment", () => {
+    const reviewLessonIds = [
+      "lesson-python-core-review",
+      "lesson-python-professional-review",
+      "lesson-python-integration-review"
+    ];
+
+    for (const lessonId of reviewLessonIds) {
+      const lesson = contentPack.lessons.find((candidate) => candidate.id === lessonId);
+      const lessonText = JSON.stringify(lesson).toLowerCase();
+
+      expect(lessonText).toMatch(/architecture|structure|layers|matrix/);
+      expect(lessonText).toMatch(/command|pytest|study-tracker|sqlite/);
+      expect(lessonText).toMatch(/failure|risk|invalid|reject|error/);
+      expect(lessonText).toContain("improvement");
     }
   });
 });

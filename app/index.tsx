@@ -5,17 +5,17 @@ import { StyleSheet, Text, View } from "react-native";
 import { contentPack } from "@/content/seed";
 import { getReviewCards, type ReviewCard } from "@/domain/review-queue";
 import type { UserProgress } from "@/domain/types";
-import { getContentForRole } from "@/domain/role-routing";
-import { getNextLessonForRole, getNextMissionForRole } from "@/domain/role-routing";
-import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle } from "@/ui/primitives";
+import { getContentForRole, getNextLessonForRole, getNextMissionForRole, getTracksForRole, getPathNodes } from "@/domain/role-routing";
+import { getModulesForTrack, getLessonsForModule } from "@/domain/content";
+import { Badge, BodyText, ButtonShell, MutedText, Panel, SubPanel, Row, Screen, SectionTitle } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
-import { colors, radius, spacing } from "@/ui/theme";
+import { colors, radius, semanticColors, spacing } from "@/ui/theme";
 import { useProgress } from "@/state/progress-provider";
 
 export default function DashboardScreen(): ReactElement {
-  const [showBrowseAreas, setShowBrowseAreas] = useState(false);
-  const { error, isSaving, progress, readiness, roleTarget } = useProgress();
+  const { error, isSaving, progress, readiness, roleTarget, dismissTour } = useProgress();
   const { isCheckingOnboarding, needsOnboarding } = useOnboardingGate();
+  const [showBrowseAreas, setShowBrowseAreas] = useState(false);
   const roleContent = getContentForRole(contentPack, roleTarget.id);
   const nextLesson = getNextLessonForRole(contentPack, progress);
   const nextMission = getNextMissionForRole(contentPack, progress);
@@ -29,6 +29,19 @@ export default function DashboardScreen(): ReactElement {
     ? progress.completedProjectMissionIds.includes(nextMission.id)
       || progress.evidenceItems.some((item) => item.linkedProjectMissionId === nextMission.id)
     : false;
+
+  const tracks = getTracksForRole(contentPack, roleTarget.id);
+  const activeTrack = tracks.find((track) => {
+    const modules = getModulesForTrack(contentPack, track.id);
+    const trackLessons = modules.flatMap((m) => getLessonsForModule(contentPack, m.id));
+    return trackLessons.some((l) => !progress.completedLessonIds.includes(l.id));
+  }) ?? tracks[0];
+
+  const pathNodes = activeTrack ? getPathNodes(contentPack, activeTrack.id, progress) : [];
+  const currentUnfinishedIndex = pathNodes.findIndex((node) => node.status !== "completed");
+  const nextOnPathNodes = currentUnfinishedIndex >= 0
+    ? pathNodes.slice(currentUnfinishedIndex, currentUnfinishedIndex + 3)
+    : pathNodes.slice(-3);
 
   if (isCheckingOnboarding) {
     return (
@@ -54,6 +67,39 @@ export default function DashboardScreen(): ReactElement {
         </Panel>
       ) : null}
 
+      {!progress.profile.dashboardTourDismissed ? (
+        <Panel accessibilityLabel="Welcome onboarding tour">
+          <Row>
+            <Badge tone="blue">Welcome to CareerForge</Badge>
+          </Row>
+          <SectionTitle>Your Career Prep Cockpit</SectionTitle>
+          <BodyText>Here is how the cockpit sections work together to build your readiness score:</BodyText>
+          <SubPanel>
+            <SectionTitle>📅 Today</SectionTitle>
+            <MutedText>Your daily 3-step action plan to keep momentum.</MutedText>
+          </SubPanel>
+          <SubPanel>
+            <SectionTitle>📚 Learn</SectionTitle>
+            <MutedText>Browse the full visual roadmap, track concepts, and lesson nodes.</MutedText>
+          </SubPanel>
+          <SubPanel>
+            <SectionTitle>🛠️ Build</SectionTitle>
+            <MutedText>Applied project missions that prove you can write and verify code.</MutedText>
+          </SubPanel>
+          <SubPanel>
+            <SectionTitle>💼 Portfolio</SectionTitle>
+            <MutedText>Accumulate repo links, test outputs, screenshots, and reflections.</MutedText>
+          </SubPanel>
+          <ButtonShell
+            accessibilityHint="Dismisses this welcome onboarding tour permanently."
+            onPress={dismissTour}
+            tone="blue"
+          >
+            Got it, dismiss
+          </ButtonShell>
+        </Panel>
+      ) : null}
+
       <Panel accessibilityLabel="Today dashboard">
         <Row>
           <Badge tone="rose">{roleTarget.title}</Badge>
@@ -62,7 +108,7 @@ export default function DashboardScreen(): ReactElement {
           {isSaving ? <Badge tone="amber">saving</Badge> : null}
         </Row>
         <SectionTitle>Today's 3-step plan</SectionTitle>
-        <BodyText>CareerForge turns practice into job proof. Start with Learn, Build, and Portfolio; use Browse all areas when you need the full map.</BodyText>
+        <BodyText>CareerForge turns practice into work you can explain. Start with Learn, Build, and Portfolio; use Browse all areas when you need the full map.</BodyText>
 
         {nextLesson ? (
           <TodayTask
@@ -77,7 +123,7 @@ export default function DashboardScreen(): ReactElement {
           <TodayTask
             actionLabel="Open path"
             badge="Learn"
-            detail="Lessons are complete for this career path. Use review or proof work to keep momentum."
+            detail="Lessons are complete for this career path. Use review or portfolio work to keep momentum."
             href="/path"
             tone="green"
             title="Lessons complete"
@@ -86,7 +132,7 @@ export default function DashboardScreen(): ReactElement {
 
         {nextMission ? (
           <TodayTask
-            actionLabel={missionHasWork ? "Add proof" : "Open build"}
+            actionLabel={missionHasWork ? "Add evidence" : "Open build"}
             badge="Build"
             detail={missionHasWork ? "Turn the current mission work into evidence while it is fresh." : nextMission.brief}
             href={missionHasWork ? { pathname: "/evidence" as const, params: { missionId: nextMission.id } } : { pathname: "/mission/[missionId]" as const, params: { missionId: nextMission.id } }}
@@ -124,6 +170,18 @@ export default function DashboardScreen(): ReactElement {
           />
         )}
         <View style={styles.readinessStrip}>
+          {readiness.breakdown.projectCompletion === 0 || readiness.breakdown.evidenceHygiene === 0 ? (
+            <View style={styles.capWarning} accessibilityLiveRegion="polite">
+              <Row>
+                <Badge tone="rose">readiness cap active</Badge>
+              </Row>
+              <Text style={styles.warningText}>
+                {readiness.breakdown.projectCompletion === 0
+                  ? "You are in Learning Mode. Project proof unlocks after Git Basics. For now, save a reflection or screenshot on your dashboard."
+                  : "Keep building your portfolio. Save a reflection or repo link on your completed work to increase your readiness score."}
+              </Text>
+            </View>
+          ) : null}
           <MutedText>{readiness.nextAction}</MutedText>
           <View style={styles.metricsGrid}>
             <MetricTile label="days with portfolio work" value={proofStreak > 0 ? `${proofStreak}` : "0"} />
@@ -137,6 +195,53 @@ export default function DashboardScreen(): ReactElement {
           </Link>
         </View>
       </Panel>
+
+      {nextOnPathNodes.length > 0 ? (
+        <Panel accessibilityLabel="Next on Path Roadmap">
+          <SectionTitle>Next on path: {activeTrack?.title}</SectionTitle>
+          <View style={styles.nodeListContainer}>
+            {nextOnPathNodes.map((node, index) => {
+              const isLast = index === nextOnPathNodes.length - 1;
+              const isCompleted = node.status === "completed";
+              const isCurrent = node.status === "current";
+              const isLocked = node.status === "locked" || node.status === "upcoming";
+
+              return (
+                <View key={node.id} style={styles.timelineNode}>
+                  {!isLast ? <View style={styles.lineConnector} /> : null}
+                  <View style={[
+                    styles.circleNode,
+                    isCompleted ? styles.circleCompleted : isCurrent ? styles.circleCurrent : styles.circleLocked
+                  ]}>
+                    {isCompleted ? <Text style={styles.circleText}>✓</Text> : null}
+                  </View>
+                  <View style={styles.nodeContent}>
+                    <Row>
+                      <Badge tone={isCompleted ? "green" : isCurrent ? "blue" : "ink"}>
+                        {node.type}
+                      </Badge>
+                      {node.estimatedMinutes ? (
+                        <Badge tone="teal">{node.estimatedMinutes} min</Badge>
+                      ) : null}
+                    </Row>
+                    <Text style={[
+                      styles.nodeTitle,
+                      isCurrent ? styles.textCurrent : isLocked ? styles.textLocked : null
+                    ]}>
+                      {node.title}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+          <Link href="/path" asChild>
+            <ButtonShell accessibilityHint="Opens the Learn tab to browse your full career roadmap." tone="blue" variant="secondary">
+              Open full roadmap
+            </ButtonShell>
+          </Link>
+        </Panel>
+      ) : null}
 
       <Panel accessibilityLabel="Browse all areas">
         <SectionTitle>Browse all areas</SectionTitle>
@@ -161,14 +266,14 @@ export default function DashboardScreen(): ReactElement {
             />
             <RouteCard
               actionLabel="Open"
-              detail="Portfolio missions that turn lessons into interview-ready proof."
+              detail="Portfolio missions that turn lessons into interview-ready work."
               href="/projects"
               label="Build"
               tone="amber"
             />
             <RouteCard
               actionLabel="Open"
-              detail="Saved repo links, verifier output, screenshots, notes, and reflections."
+              detail="Saved repo links, check output, screenshots, notes, and reflections."
               href="/evidence"
               label="Portfolio"
               tone="green"
@@ -288,6 +393,20 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     paddingTop: spacing.sm
   },
+  capWarning: {
+    backgroundColor: colors.roseSoft,
+    borderColor: colors.roseMuted,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    padding: spacing.sm,
+    marginBottom: spacing.xs,
+    gap: spacing.xs
+  },
+  warningText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.roseStrong
+  },
   todayTask: {
     alignItems: "center",
     backgroundColor: colors.surfaceMuted,
@@ -333,5 +452,68 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 25
+  },
+  nodeListContainer: {
+    gap: spacing.xs,
+    marginVertical: spacing.sm
+  },
+  timelineNode: {
+    flexDirection: "row",
+    minHeight: 56,
+    position: "relative"
+  },
+  lineConnector: {
+    width: 2,
+    backgroundColor: colors.border,
+    position: "absolute",
+    left: 11,
+    top: 24,
+    bottom: -8,
+    zIndex: 1
+  },
+  circleNode: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+    backgroundColor: colors.surface
+  },
+  circleCompleted: {
+    borderColor: semanticColors.success,
+    backgroundColor: semanticColors.success
+  },
+  circleCurrent: {
+    borderColor: colors.blue,
+    backgroundColor: colors.surface
+  },
+  circleLocked: {
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted
+  },
+  circleText: {
+    color: colors.surface,
+    fontSize: 12,
+    fontWeight: "bold",
+    lineHeight: 14
+  },
+  nodeContent: {
+    flex: 1,
+    marginLeft: 16,
+    gap: spacing.xs,
+    paddingBottom: spacing.sm
+  },
+  nodeTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "600"
+  },
+  textCurrent: {
+    color: colors.blue
+  },
+  textLocked: {
+    color: colors.muted
   }
 });

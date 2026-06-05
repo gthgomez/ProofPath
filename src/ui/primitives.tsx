@@ -173,19 +173,19 @@ function BottomNavigation({ pathname }: { pathname: string }): ReactElement {
 }
 
 type PanelProps = PropsWithChildren<Pick<ViewProps,
-  "accessibilityHint" | "accessibilityLabel" | "accessibilityLiveRegion" | "accessibilityRole" | "accessibilityState"
+  "accessibilityHint" | "accessibilityLabel" | "accessibilityLiveRegion" | "accessibilityRole" | "accessibilityState" | "style"
 >>;
 
-export function Panel({ children, ...accessibilityProps }: PanelProps): ReactElement {
-  return <View style={styles.panel} {...accessibilityProps}>{children}</View>;
+export function Panel({ children, style, ...accessibilityProps }: PanelProps): ReactElement {
+  return <View style={[styles.panel, style]} {...accessibilityProps}>{children}</View>;
 }
 
-export function SubPanel({ children, ...accessibilityProps }: PanelProps): ReactElement {
-  return <View style={styles.subPanel} {...accessibilityProps}>{children}</View>;
+export function SubPanel({ children, style, ...accessibilityProps }: PanelProps): ReactElement {
+  return <View style={[styles.subPanel, style]} {...accessibilityProps}>{children}</View>;
 }
 
-export function Row({ children }: PropsWithChildren): ReactElement {
-  return <View style={styles.row}>{children}</View>;
+export function Row({ children, style }: PropsWithChildren<{ style?: ViewProps["style"] }>): ReactElement {
+  return <View style={[styles.row, style]}>{children}</View>;
 }
 
 export function SectionTitle({ children, ...textProps }: PropsWithChildren<TextProps>): ReactElement {

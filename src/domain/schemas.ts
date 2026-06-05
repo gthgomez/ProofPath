@@ -163,6 +163,17 @@ export const lessonWorkshopSchema = z.object({
   coreConcept: nonEmptyString,
   workedExample: nonEmptyString,
   commonMistakes: z.array(nonEmptyString).min(1),
+  misconceptionChecks: z.array(z.object({
+    mistake: nonEmptyString,
+    repair: nonEmptyString,
+    checkPrompt: nonEmptyString
+  })).min(1),
+  recallCards: z.array(z.object({
+    id: nonEmptyString,
+    type: z.enum(["explain", "debug", "transfer"]),
+    prompt: nonEmptyString,
+    answerHint: nonEmptyString
+  })).min(3),
   guidedExercise: nonEmptyString,
   missionConnection: nonEmptyString,
   reflectionPrompt: nonEmptyString
@@ -316,6 +327,7 @@ export const evidenceItemSchema = z.object({
 export const userProfileSchema = z.object({
   roleTargetId: nonEmptyString,
   onboardingCompletedAt: z.string().optional(),
+  dashboardTourDismissed: z.boolean().optional(),
   createdAt: nonEmptyString,
   updatedAt: nonEmptyString
 });

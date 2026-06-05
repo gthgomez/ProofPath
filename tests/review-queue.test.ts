@@ -18,6 +18,8 @@ describe("review queue", () => {
     expect(cards).toHaveLength(1);
     expect(cards[0]?.title).toBe("Functions That Earn Their Name");
     expect(cards[0]?.isDue).toBe(true);
+    expect(cards[0]?.recallPrompt.toLowerCase()).toContain("write one small python function");
+    expect(cards[0]?.answerHint).toContain("function");
   });
 
   it("hides stale persisted review items when the target is no longer completed", () => {
@@ -41,6 +43,7 @@ describe("review queue", () => {
     expect(reviewed.reviewItems[0]?.repetitions).toBe(1);
     expect(repeated.reviewItems[0]?.lapses).toBe(1);
     expect(card?.repairPrompt).toContain("Repair task");
+    expect(card?.recallPrompt).toContain("Name one mistake");
     expect(card?.isDue).toBe(true);
   });
 

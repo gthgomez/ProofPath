@@ -72,6 +72,7 @@ export default function ReviewQueueScreen(): ReactElement {
           </Row>
           <SectionTitle>{card.title}</SectionTitle>
           <BodyText>{card.recallPrompt}</BodyText>
+          {card.answerHint ? <MutedText>After recall, compare against: {card.answerHint}</MutedText> : null}
           <MutedText>{card.repairPrompt}</MutedText>
           <Row>
           {reviewRatings.map(({ rating, label }) => (

@@ -18,7 +18,7 @@ import type {
   WeeklyReportSnapshot
 } from "@/domain/types";
 
-const DATABASE_VERSION = 9;
+const DATABASE_VERSION = 10;
 const PROGRESS_ROW_ID = "default";
 
 type TransactionalSQLiteDatabase = SQLiteDatabase & {
@@ -32,6 +32,7 @@ interface ProgressMetadataRow {
 interface UserProfileRow {
   role_target_id: string;
   onboarding_completed_at: string | null;
+  dashboard_tour_dismissed?: number;
   created_at: string;
   updated_at: string;
 }
@@ -538,6 +539,15 @@ async function createNormalizedSchema(db: SQLiteDatabase): Promise<void> {
       PRIMARY KEY (entity_type, entity_id)
     );
   `);
+}
+
+async function ensureUserProfileColumns(db: SQLiteDatabase): Promise<void> {
+  const rows = await db.getAllAsync<TableInfoRow>("PRAGMA table_info(user_profile)");
+  const existingColumns = new Set(rows.map((row) => row.name));
+
+  if (!existingColumns.has("dashboard_tour_dismissed")) {
+    await db.execAsync("ALTER TABLE user_profile ADD COLUMN dashboard_tour_dismissed INTEGER NOT NULL DEFAULT 0;");
+  }
 }
 
 async function ensureProjectMissionDepthColumns(db: SQLiteDatabase): Promise<void> {
@@ -1144,13 +1154,14 @@ async function saveNormalizedProgress(db: SQLiteDatabase, progress: UserProgress
     );
     await transactionDb.runAsync(
       `INSERT INTO user_profile (
-        id, role_target_id, onboarding_completed_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?)`,
+        id, role_target_id, onboarding_completed_at, created_at, updated_at, dashboard_tour_dismissed
+      ) VALUES (?, ?, ?, ?, ?, ?)`,
       PROGRESS_ROW_ID,
       parsedProgress.profile.roleTargetId,
       parsedProgress.profile.onboardingCompletedAt ?? null,
       parsedProgress.profile.createdAt,
-      parsedProgress.profile.updatedAt
+      parsedProgress.profile.updatedAt,
+      parsedProgress.profile.dashboardTourDismissed ? 1 : 0
     );
     await saveCompletionIds(transactionDb, "completed_lessons", "lesson_id", parsedProgress.completedLessonIds, parsedProgress.updatedAt);
     await saveCompletionIds(transactionDb, "completed_lesson_mini_projects", "lesson_id", parsedProgress.completedLessonMiniProjectIds, parsedProgress.updatedAt);
@@ -1195,7 +1206,7 @@ async function loadNormalizedProgress(db: SQLiteDatabase): Promise<UserProgress 
     PROGRESS_ROW_ID
   );
   const profile = await db.getFirstAsync<UserProfileRow>(
-    `SELECT role_target_id, onboarding_completed_at, created_at, updated_at
+      `SELECT role_target_id, onboarding_completed_at, created_at, updated_at, dashboard_tour_dismissed
      FROM user_profile WHERE id = ?`,
     PROGRESS_ROW_ID
   );
@@ -1282,6 +1293,7 @@ async function loadNormalizedProgress(db: SQLiteDatabase): Promise<UserProgress 
     profile: {
       roleTargetId: profile.role_target_id,
       onboardingCompletedAt: optionalString(profile.onboarding_completed_at),
+      dashboardTourDismissed: Boolean(profile.dashboard_tour_dismissed),
       createdAt: profile.created_at,
       updatedAt: profile.updated_at
     },
@@ -1391,6 +1403,7 @@ export async function migrateProgressDb(db: SQLiteDatabase): Promise<void> {
   await createNormalizedSchema(db);
   await ensureProjectMissionDepthColumns(db);
   await ensureWeeklyReportPortfolioColumns(db);
+  await ensureUserProfileColumns(db);
   await ensureLessonWorkshopColumns(db);
   await ensureCodeRunAttemptColumns(db);
   await ensureEvidenceProofColumn(db);

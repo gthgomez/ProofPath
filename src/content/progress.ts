@@ -19,6 +19,8 @@ export const demoProgress: UserProgress = {
   completedQuizIds: [
     "quiz-python-values"
   ],
+  placedOutLessonIds: [],
+  placedOutQuizIds: [],
   completedProjectMissionIds: [
     "mission-portfolio-readme"
   ],

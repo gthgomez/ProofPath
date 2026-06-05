@@ -1,6 +1,8 @@
-import { DEFAULT_ROLE_TARGET_ID, legacyCareerPathIdMap, roleTargets } from "@/content/roles";
+import { DEFAULT_ROLE_TARGET_ID, legacyCareerPathIdMap, pathProofGates, roleTargets, type CareerUnlock, type PathProofGate } from "@/content/roles";
 import { findLesson, getLessonsForModule, getModulesForTrack } from "@/domain/content";
+import { getMissionProofChecklist, missionEvidenceMeetsRequirements, type MissionProofChecklistItem } from "@/domain/progress";
 import type { ContentPack, Lesson, Module, ProjectMission, RoleTarget, UserProfile, UserProgress } from "@/domain/types";
+import { getLessonStatus, getMissionReadiness } from "@/domain/learning-path";
 
 export function getRoleTarget(roleTargetId?: string): RoleTarget {
   const normalizedRoleTargetId = roleTargetId ? legacyCareerPathIdMap[roleTargetId] ?? roleTargetId : roleTargetId;
@@ -112,4 +114,177 @@ export function getRoleTrackOnboardingSummary(content: ContentPack, roleTargetId
       .filter((track) => !includedTrackIds.has(track.id))
       .map((track) => track.title)
   };
+}
+
+export type FutureUnlockLabel = "Roadmap" | "Locked specialization" | "Coming later";
+
+export interface PathProofMissionStatus {
+  missionId: string;
+  title: string;
+  complete: boolean;
+  checklist: MissionProofChecklistItem[];
+}
+
+export interface PathProofGateStatus {
+  gate: PathProofGate;
+  complete: boolean;
+  completedMissionCount: number;
+  requiredMissionCount: number;
+  missions: PathProofMissionStatus[];
+}
+
+export interface FutureUnlockStatus extends CareerUnlock {
+  label: FutureUnlockLabel;
+  availableInContent: boolean;
+  gateComplete: boolean;
+}
+
+export function getPathProofGateForRole(roleTargetId: string): PathProofGate | undefined {
+  const roleTarget = getRoleTarget(roleTargetId);
+  return pathProofGates.find((gate) => gate.pathId === roleTarget.id);
+}
+
+export function evaluatePathProofGate(content: ContentPack, progress: UserProgress, roleTargetId = progress.profile.roleTargetId): PathProofGateStatus | undefined {
+  const gate = getPathProofGateForRole(roleTargetId);
+
+  if (!gate) {
+    return undefined;
+  }
+
+  const missions = gate.requiredMissionIds.map((missionId) => {
+    const mission = content.projectMissions.find((candidate) => candidate.id === missionId);
+    const checklist = mission ? getMissionProofChecklist(progress, mission) : [];
+    const complete = mission
+      ? progress.completedProjectMissionIds.includes(mission.id) && missionEvidenceMeetsRequirements(progress, mission)
+      : false;
+
+    return {
+      missionId,
+      title: mission?.title ?? missionId,
+      complete,
+      checklist
+    };
+  });
+  const completedMissionCount = missions.filter((mission) => mission.complete).length;
+
+  return {
+    gate,
+    complete: missions.length > 0 && completedMissionCount === missions.length,
+    completedMissionCount,
+    requiredMissionCount: missions.length,
+    missions
+  };
+}
+
+export function getFutureUnlocksForRole(content: ContentPack, progress: UserProgress, roleTargetId = progress.profile.roleTargetId): FutureUnlockStatus[] {
+  const gateStatus = evaluatePathProofGate(content, progress, roleTargetId);
+
+  if (!gateStatus) {
+    return [];
+  }
+
+  return gateStatus.gate.unlocks.map((unlock) => {
+    const availableInContent = unlock.kind === "path"
+      ? roleTargets.some((roleTarget) => roleTarget.id === unlock.id)
+      : content.tracks.some((track) => track.id === unlock.id);
+    const label: FutureUnlockLabel = availableInContent
+      ? gateStatus.complete
+        ? "Roadmap"
+        : "Locked specialization"
+      : "Coming later";
+
+    return {
+      ...unlock,
+      label,
+      availableInContent,
+      gateComplete: gateStatus.complete
+    };
+  });
+}
+
+export function isGitTrackCompleted(content: ContentPack, progress: UserProgress): boolean {
+  const gitModules = content.modules.filter((m) => m.trackId === "track-git");
+  const gitLessons = gitModules.flatMap((m) => {
+    return m.lessonIds.map((id) => content.lessons.find((l) => l.id === id)).filter(Boolean);
+  });
+  if (gitLessons.length === 0) {
+    return false;
+  }
+  return gitLessons.every((l) => progress.completedLessonIds.includes(l!.id));
+}
+
+export interface PathNode {
+  id: string;
+  title: string;
+  type: "lesson" | "mission";
+  status: "completed" | "current" | "upcoming" | "locked" | "placed-out";
+  estimatedMinutes?: number;
+  difficulty?: string;
+  language?: string;
+}
+
+export function getPathNodes(content: ContentPack, trackId: string, progress: UserProgress): PathNode[] {
+  const modules = getModulesForTrack(content, trackId);
+  const nodes: PathNode[] = [];
+
+  for (const moduleItem of modules) {
+    const lessons = getLessonsForModule(content, moduleItem.id);
+    for (const lesson of lessons) {
+      nodes.push({
+        id: lesson.id,
+        title: lesson.title,
+        type: "lesson",
+        status: (() => {
+          const lStatus = getLessonStatus(lesson, lessons, progress);
+          return lStatus === "in_progress" ? "current" : lStatus;
+        })(),
+        estimatedMinutes: lesson.estimatedMinutes,
+        difficulty: lesson.difficulty,
+        language: lesson.workshop.language
+      });
+    }
+
+    const missions = moduleItem.projectMissionIds
+      .map((missionId) => content.projectMissions.find((m) => m.id === missionId))
+      .filter((m): m is ProjectMission => Boolean(m));
+    for (const mission of missions) {
+      const readiness = getMissionReadiness(mission, lessons, progress);
+      const status: PathNode["status"] =
+        readiness.status === "completed"
+          ? "completed"
+          : readiness.status === "ready" || readiness.status === "in_progress"
+            ? "current"
+            : "locked";
+      nodes.push({
+        id: mission.id,
+        title: mission.title,
+        type: "mission",
+        status,
+        difficulty: mission.difficulty
+      });
+    }
+  }
+
+  // Sequential Locking Post-processing:
+  let foundFirstUncompleted = false;
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    const isCompleted = node.type === "lesson"
+      ? progress.completedLessonIds.includes(node.id)
+      : progress.completedProjectMissionIds.includes(node.id);
+    const isPlacedOut = node.type === "lesson" && (progress.placedOutLessonIds || []).includes(node.id);
+
+    if (isCompleted) {
+      node.status = "completed";
+    } else if (isPlacedOut) {
+      node.status = "placed-out";
+    } else if (!foundFirstUncompleted) {
+      node.status = "current";
+      foundFirstUncompleted = true;
+    } else {
+      node.status = "locked";
+    }
+  }
+
+  return nodes;
 }

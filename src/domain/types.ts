@@ -145,9 +145,26 @@ export interface LessonWorkshop {
   coreConcept: string;
   workedExample: string;
   commonMistakes: string[];
+  misconceptionChecks: LessonMisconceptionCheck[];
+  recallCards: LessonRecallCard[];
   guidedExercise: string;
   missionConnection: string;
   reflectionPrompt: string;
+}
+
+export type LessonRecallCardType = "explain" | "debug" | "transfer";
+
+export interface LessonRecallCard {
+  id: string;
+  type: LessonRecallCardType;
+  prompt: string;
+  answerHint: string;
+}
+
+export interface LessonMisconceptionCheck {
+  mistake: string;
+  repair: string;
+  checkPrompt: string;
 }
 
 export interface LessonPracticeBlock {
@@ -331,6 +348,7 @@ export interface ProofArtifact {
 export interface UserProfile {
   roleTargetId: string;
   onboardingCompletedAt?: string;
+  dashboardTourDismissed?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -383,6 +401,8 @@ export interface UserProgress {
   completedLessonIds: string[];
   completedLessonMiniProjectIds: string[];
   completedQuizIds: string[];
+  placedOutLessonIds: string[];
+  placedOutQuizIds: string[];
   completedProjectMissionIds: string[];
   completedProjectMissionDeliverableIds: string[];
   completedProjectMissionPhaseIds: string[];

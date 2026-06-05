@@ -63,7 +63,7 @@ export default function WeeklyPlanScreen(): ReactElement {
         <Panel key={report.id}>
           <Row>
             <Badge tone="teal">{report.readinessScore}% ready</Badge>
-            <Badge tone="green">{report.passingEvidenceCount} proof</Badge>
+            <Badge tone="green">{report.passingEvidenceCount} evidence</Badge>
             <MutedText>{report.weekStart}</MutedText>
           </Row>
           <SectionTitle>{report.summary}</SectionTitle>
@@ -104,7 +104,7 @@ export default function WeeklyPlanScreen(): ReactElement {
             <MutedText>
               {complete
                 ? "This task completed automatically from linked work."
-                : "No manual checkbox. Open the linked activity and complete its proof gate."}
+                : "No manual checkbox. Open the linked activity and complete its required check."}
             </MutedText>
             <Link href={href} asChild>
               <ButtonShell

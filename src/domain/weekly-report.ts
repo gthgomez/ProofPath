@@ -48,15 +48,15 @@ export function createWeeklyReportSnapshot(content: ContentPack, progress: UserP
   const completedMissionTitles = completedMissions.map((mission) => mission.title);
   const portfolioBullets = completedMissions.slice(0, 4).map((mission) => {
     const missionEvidence = passingEvidence.find((item) => item.linkedProjectMissionId === mission.id);
-    const proof = missionEvidence?.repoUrl ? `repo ${missionEvidence.repoUrl}` : "verifier-backed evidence";
-    return `Built ${mission.title}; proved ${mission.skillIds.length} skills with ${proof}.`;
+    const proof = missionEvidence?.repoUrl ? `repo ${missionEvidence.repoUrl}` : "check-backed evidence";
+    return `Built ${mission.title}; showed ${mission.skillIds.length} skills with ${proof}.`;
   });
   const projectGaps = content.projectMissions
     .filter((mission) => !progress.completedProjectMissionIds.includes(mission.id))
     .slice(0, 3)
     .map((mission) => `${mission.title}: ${mission.acceptanceCriteria[0]}`);
   const portfolioSummary = completedMissionTitles.length > 0
-    ? `Portfolio proof this week centers on ${completedMissionTitles.join(", ")}.`
+    ? `Portfolio evidence this week centers on ${completedMissionTitles.join(", ")}.`
     : "No completed project mission is portfolio-ready yet.";
 
   if (lessonsCompleted > 0) {
@@ -64,7 +64,7 @@ export function createWeeklyReportSnapshot(content: ContentPack, progress: UserP
   }
 
   if (passingEvidence.length > 0) {
-    wins.push(`${passingEvidence.length} passing proof items recorded.`);
+    wins.push(`${passingEvidence.length} passing evidence items recorded.`);
   }
 
   if (reviewEvents.length > 0) {
@@ -81,8 +81,8 @@ export function createWeeklyReportSnapshot(content: ContentPack, progress: UserP
   }
 
   if (passingEvidence.length === 0) {
-    risks.push("No passing verifier-backed evidence is attached to this career path.");
-    nextActions.push("Attach one repo or verifier output with passing test status.");
+    risks.push("No passing check-backed evidence is attached to this career path.");
+    nextActions.push("Attach one repo or check output with passing test status.");
   }
 
   if (reviewEvents.length === 0) {
@@ -93,7 +93,7 @@ export function createWeeklyReportSnapshot(content: ContentPack, progress: UserP
   }
 
   if (nextActions.length === 0) {
-    nextActions.push("Keep the loop: complete one mission, add verifier-backed evidence, then review it.");
+    nextActions.push("Keep the loop: complete one mission, add check-backed evidence, then review it.");
   }
 
   const snapshot: WeeklyReportSnapshot = {
@@ -108,7 +108,7 @@ export function createWeeklyReportSnapshot(content: ContentPack, progress: UserP
     evidenceCount: evidence.length,
     passingEvidenceCount: passingEvidence.length,
     reviewEventsCount: reviewEvents.length,
-    summary: `${readiness.score}% ready with ${passingEvidence.length} passing proof item${passingEvidence.length === 1 ? "" : "s"}.`,
+    summary: `${readiness.score}% ready with ${passingEvidence.length} passing evidence item${passingEvidence.length === 1 ? "" : "s"}.`,
     wins: wins.length > 0 ? wins : ["Started the week with a clear career path."],
     risks,
     nextActions: nextActions.slice(0, 3),
