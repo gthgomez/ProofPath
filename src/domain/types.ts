@@ -128,6 +128,8 @@ export interface Lesson {
   desktopTask: string;
   evidencePrompt: string;
   workshop: LessonWorkshop;
+  curriculum?: CurriculumMetadata;
+  depth?: LessonDepth;
 }
 
 export interface LessonWorkshop {
@@ -248,6 +250,7 @@ export interface QuizQuestion {
   choices: string[];
   correctChoiceIndex: number;
   explanation: string;
+  conceptIds?: string[];
 }
 
 export interface Quiz {
@@ -284,6 +287,7 @@ export interface ProjectMission {
   portfolioSummaryPrompt: string;
   evidenceRequirements: MissionEvidenceRequirements;
   skillIds: string[];
+  curriculum?: MissionCurriculumMetadata;
 }
 
 export interface ProjectMissionPhase {
@@ -459,4 +463,158 @@ export interface ReadinessScore {
   weakestArea: keyof ReadinessBreakdown;
   blockingProofRequirement: string;
   explanation: string[];
+}
+
+export type ProofOutput =
+  | "code_snapshot"
+  | "terminal_stdout"
+  | "terminal_stderr"
+  | "auto_code_run"
+  | "assertion_output"
+  | "test_output"
+  | "local_file"
+  | "csv_sample"
+  | "json_sample"
+  | "sqlite_schema"
+  | "api_fixture"
+  | "git_commit"
+  | "github_repo_url"
+  | "readme"
+  | "ci_run"
+  | "design_note"
+  | "reflection";
+
+export type RunnerCapabilityId =
+  | "runner.run_file"
+  | "runner.run_checks"
+  | "runner.hidden_checks"
+  | "runner.python.beginner_native_subset"
+  | "runner.python.pyodide"
+  | "runner.sql.sqlite_memory"
+  | "runner.no_network"
+  | "runner.no_filesystem_write"
+  | "runner.visible_terminal_transcript";
+
+export type LessonKind = "concept_only" | "simulated_terminal" | "run_file" | "debug_repair" | "proof_pack";
+
+export interface CurriculumMetadata {
+  level: number;
+  sequence: number;
+  version: string;
+  lessonKind?: LessonKind;
+  intentionalFailure?: boolean;
+
+  teaches: string[];
+  requires: string[];
+  reinforces?: string[];
+
+  usesButDoesNotTeach?: string[];
+  visibleCodeConcepts?: string[];
+  quizConcepts?: string[];
+
+  proofOutputs?: ProofOutput[];
+  runnerCapabilities?: RunnerCapabilityId[];
+
+  replacesLessonIds?: string[];
+  replacedByLessonIds?: string[];
+  deprecated?: boolean;
+  preserveProgress?: boolean;
+  showInActivePath?: boolean;
+  showInReviewQueue?: boolean;
+  legacyEvidenceOnly?: boolean;
+}
+
+export type MissionType =
+  | "local_micro"
+  | "terminal_output"
+  | "tested_function"
+  | "file_processing"
+  | "cli"
+  | "github_evidence"
+  | "sqlite_api"
+  | "production_capstone";
+
+export interface MissionCurriculumMetadata {
+  level: number;
+  missionType: MissionType;
+
+  requires: string[];
+  supportedLessonIds: string[];
+
+  requiredLessonIds?: string[];
+  requiredTrackIds?: string[];
+
+  proofOutputs: ProofOutput[];
+  runnerCapabilities?: RunnerCapabilityId[];
+
+  requiresGitHubEvidence?: boolean;
+  capstoneDependencyMissionIds?: string[];
+}
+
+export type LessonDepthStage =
+  | "learn"
+  | "practice"
+  | "code_lab"
+  | "checkpoint"
+  | "evidence"
+  | "review";
+
+export interface ConceptCapsule {
+  conceptId: string;
+  definition: string;
+  mentalModel: string;
+  syntaxShape?: string;
+  tinyExample: string;
+  commonMistake: string;
+  repairHint: string;
+  usedIn: LessonDepthStage[];
+}
+
+export interface CodeWalkthroughNote {
+  id: string;
+  label: string;
+  codeFragment: string;
+  conceptIds: string[];
+  explanation: string;
+  learnerShouldBeAbleToSay: string;
+}
+
+export interface GuidedEditStep {
+  id: string;
+  instruction: string;
+  conceptIds: string[];
+  targetCodeFragment?: string;
+  expectedObservation: string;
+  wrongTurnHint: string;
+}
+
+export interface ErrorClinicItem {
+  id: string;
+  conceptIds: string[];
+  brokenExample: string;
+  symptom: string;
+  likelyCause: string;
+  fixStrategy: string;
+}
+
+export interface CodeLabBridge {
+  story: string;
+  usesConcepts: string[];
+  verifierOnlyConcepts?: string[];
+  learnerOwns: string[];
+  checkerOwns: string[];
+  runExpectation: string;
+}
+
+export interface LessonDepth {
+  primaryConceptId: string;
+  secondaryConceptIds: string[];
+  maxNewConcepts: number;
+  conceptCapsules: ConceptCapsule[];
+  codeWalkthrough: CodeWalkthroughNote[];
+  guidedEdits: GuidedEditStep[];
+  errorClinic: ErrorClinicItem[];
+  codeLabBridge: CodeLabBridge;
+  understandingProofPrompt: string;
+  exitTicket: string[];
 }

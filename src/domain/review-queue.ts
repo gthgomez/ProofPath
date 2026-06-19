@@ -1,6 +1,7 @@
 import { findLesson, findMission } from "./content";
 import { isReviewDue } from "./review";
 import type { ContentPack, ReviewItem, UserProgress } from "./types";
+import { getProofCompletedLessonIds } from "./progress";
 
 export interface ReviewCard {
   item: ReviewItem;
@@ -87,7 +88,7 @@ function repairPromptForItem(content: ContentPack, item: ReviewItem): string {
 
 function isReviewTargetCompleted(progress: UserProgress, item: ReviewItem): boolean {
   if (item.targetType === "lesson") {
-    return progress.completedLessonIds.includes(item.targetId);
+    return getProofCompletedLessonIds(progress).includes(item.targetId);
   }
 
   if (item.targetType === "quiz") {

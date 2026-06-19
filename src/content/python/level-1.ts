@@ -1,0 +1,1188 @@
+import type { Lesson, Quiz } from "@/domain/types";
+import { proofLesson, checkpointQuiz } from "./shared";
+
+// ---------------------------------------------------------------------------
+// Practice rep pools
+// ---------------------------------------------------------------------------
+
+const literalsPracticeReps = [
+  {
+    starterCode: "# Which line below stores a whole number?\n# a) count = \"5\"\n# b) count = 5\n# c) count = 5.0\ncount = 5\nprint(\"Type check result is below\")\nprint(type(count))",
+    expectedOutput: "Type check result is below\n<class 'int'>",
+    checkYourAnswer: "type() returns the data type. An integer has no quotes and no decimal. The string '5' looks like a number but behaves like text."
+  },
+  {
+    starterCode: "active = True\nprint(\"Active type is below\")\nprint(type(active))\nprint(\"Active value is below\")\nprint(active)",
+    expectedOutput: "Active type is below\n<class 'bool'>\nActive value is below\nTrue",
+    checkYourAnswer: "True and False must be capitalised and have no quotes. Lowercase true or 'True' in quotes will not work the same way."
+  }
+];
+
+const assignmentPracticeReps = [
+  {
+    starterCode: "topic = \"git\"\nminutes = 15\ncompleted = False\nprint(\"Topic name is\")\nprint(topic)\nprint(\"Minutes count is\")\nprint(minutes)\nprint(\"Completed status is\")\nprint(completed)",
+    expectedOutput: "Topic name is\ngit\nMinutes count is\n15\nCompleted status is\nFalse",
+    checkYourAnswer: "Each variable holds one value. Notice topic is text (quotes), minutes is a number (no quotes), and completed is a boolean (capital T or F, no quotes)."
+  },
+  {
+    starterCode: "track = \"backend\"\nlesson_count = 2\nready = False\nprint(\"Track name is\")\nprint(track)\nprint(\"Lesson count is\")\nprint(lesson_count)\nprint(\"Ready status is\")\nprint(ready)",
+    expectedOutput: "Track name is\nbackend\nLesson count is\n2\nReady status is\nFalse",
+    checkYourAnswer: "The names on the left describe the values on the right. A good variable name is a tiny label for the data it holds."
+  }
+];
+
+const printValuesPracticeReps = [
+  {
+    starterCode: "language = \"Python\"\nversion = 3\nprint(\"Language value is\")\nprint(language)\nprint(\"Version value is\")\nprint(version)",
+    expectedOutput: "Language value is\nPython\nVersion value is\n3",
+    checkYourAnswer: "print(language) sends the value stored in language to the terminal. Without print nothing is visible."
+  },
+  {
+    starterCode: "score = 100\npassed = True\nprint(\"Score value is\")\nprint(score)\nprint(\"Passed value is\")\nprint(passed)",
+    expectedOutput: "Score value is\n100\nPassed value is\nTrue",
+    checkYourAnswer: "Printing a boolean shows True or False. This is different from printing the string 'True'."
+  }
+];
+
+const numbersPracticeReps = [
+  {
+    starterCode: "sessions = 3\nminutes_each = 20\ntotal = sessions * minutes_each\nprint(\"Total calculated sum is\")\nprint(total)",
+    expectedOutput: "Total calculated sum is\n60",
+    checkYourAnswer: "Multiplication uses *. The result is a new integer, not a string. If total was 0 the right-hand side didn't run."
+  },
+  {
+    starterCode: "total = 75\ndone = 2\nremaining = total - done\nprint(\"Remaining lessons count is\")\nprint(remaining)",
+    expectedOutput: "Remaining lessons count is\n73",
+    checkYourAnswer: "Subtraction with - produces a new value stored in remaining. Variables on both sides of - are looked up first."
+  }
+];
+
+const stringsPracticeReps = [
+  {
+    starterCode: "greeting = \"Hello\"\nname = \"learner\"\nmessage = greeting + \" \" + name\nprint(\"Formatted joined message is\")\nprint(message)",
+    expectedOutput: "Formatted joined message is\nHello learner",
+    checkYourAnswer: "+ joins two strings. The space in the middle is itself a tiny string literal. Without it the words run together."
+  },
+  {
+    starterCode: "raw = \"  Python  \"\nclean = raw.strip()\nprint(\"Stripped clean value is\")\nprint(clean)",
+    expectedOutput: "Stripped clean value is\nPython",
+    checkYourAnswer: ".strip() removes leading and trailing spaces. The original raw stays unchanged; strip returns a new value."
+  }
+];
+
+const fstringsPracticeReps = [
+  {
+    starterCode: "topic = \"python\"\nminutes = 30\nsummary = f\"{topic} session took {minutes} min\"\nprint(summary)",
+    expectedOutput: "python session took 30 min",
+    checkYourAnswer: "Each {} is replaced by the variable's value at runtime. The surrounding text is literal characters."
+  },
+  {
+    starterCode: "sessions = 4\ntotal_minutes = 90\nreport = f\"{sessions} sessions and {total_minutes} minutes\"\nprint(report)",
+    expectedOutput: "4 sessions and 90 minutes",
+    checkYourAnswer: "f-strings combine numbers and text without explicit conversion. 4 is still an int; the f-string handles the display."
+  }
+];
+
+const pythonValuePracticeReps = [
+  {
+    starterCode: "topic = \"git\"\nminutes = 15\ncompleted = False\nsummary = \"\"\nprint(summary)",
+    expectedOutput: "git: 15 minutes planned",
+    checkYourAnswer: "Use the variables instead of typing an unrelated sentence. If minutes later changes, the summary should be the only output that changes with it."
+  },
+  {
+    starterCode: "topic = \"python\"\nminutes = 30\ncompleted = True\nstatus = \"\"\nprint(status)",
+    expectedOutput: "python session complete: True",
+    checkYourAnswer: "The boolean should stay True, not the string \"True\". Ask yourself whether a later if statement could use the value directly."
+  },
+  {
+    starterCode: "track = \"backend\"\nlesson_count = 2\nready = False\nreport = \"\"\nprint(report)",
+    expectedOutput: "backend has 2 lessons ready=False",
+    checkYourAnswer: "This rep checks whether you can combine text, numbers, and booleans without losing the type of each original value."
+  }
+];
+
+// ---------------------------------------------------------------------------
+// Micro-lesson 1 — Python's Three Starter Types (concept_only)
+// ---------------------------------------------------------------------------
+
+const literalsLesson = proofLesson({
+  id: "lesson-python-literals",
+  moduleId: "module-python-core",
+  slug: "python-literals",
+  title: "Python's Three Starter Types",
+  summary: "Learn what strings, integers, and booleans look like before you name them.",
+  bodyMarkdown: "Python has three types you will use in every program: strings (text in quotes), integers (whole numbers without quotes), and booleans (True or False). Recognising which type a value is helps you predict what will happen when you combine or compare values.",
+  estimatedMinutes: 4,
+  difficulty: "foundation",
+  skillIds: ["skill-python-basics"],
+  quizId: "quiz-python-literals",
+  desktopTask: "Identify the type of five literal values in a short Python file.",
+  evidencePrompt: "Write down one string, one integer, and one boolean from memory, and state what makes each different.",
+  language: "Python",
+  tools: ["Python 3", "print output"],
+  synopsis: "You are seeing the raw material Python works with before any names are attached.",
+  prerequisites: ["No prior Python knowledge required.", "Be ready to view text outputs in the terminal."],
+  testingFocus: "Use type() to confirm each value has the expected type.",
+  objective: "Identify and distinguish strings, integers, and booleans by sight.",
+  whyItMatters: "Type confusion is the number one beginner error. Knowing the type before assigning prevents most of them.",
+  coreConcept: "A string is text surrounded by quotes. An integer is a whole number with no quotes. A boolean is exactly True or False with a capital first letter and no quotes.",
+  workedExample: "\"python\" is a string. 30 is an integer. False is a boolean. type(\"python\") confirms <class 'str'>.",
+  guidedExercise: "Call type() on three values and compare the output.",
+  missionConnection: "Every CLI Study Tracker value is one of these three types at the boundary.",
+  reflectionPrompt: "Which type is easiest to misidentify, and what visual cue tells you which one a value is?",
+  practiceStarter: "print(type(\"python\"))\nprint(type(30))\nprint(type(False))",
+  practiceExpected: "<class 'str'>\n<class 'int'>\n<class 'bool'>",
+  practiceCheck: "If any line says <class 'str'> when you expected int, check whether the value is wrapped in quotes.",
+  practiceReps: literalsPracticeReps,
+  miniTitle: "Identify literal types",
+  miniGoal: "Call type() on one string, one integer, and one boolean and read the output.",
+  miniSteps: ["Write three literal values", "Print type() of each", "Record what each type() line shows"],
+  miniDeliverables: ["Three type() calls", "Observed class output", "One sentence explaining why '30' is a string while 30 is an integer"],
+  verifierCommand: "python literals.py",
+  expectedEvidence: "Terminal output showing three distinct type check lines, plus a written note explaining string quotes.",
+  projectConnection: "Recognising types is the first step before the Study Tracker reads and validates CSV rows.",
+  requiredCodeIncludes: ["type"],
+  requiredOutputIncludes: ["str", "int", "bool"],
+  runnerLanguage: "python",
+  runnerStarterCode: "print(type(\"python\"))\nprint(type(30))\nprint(type(False))",
+  runnerTestCode: [
+    "assert type('python') is str, 'type check for python failed'",
+    "assert type(30) is int, 'type check for 30 failed'",
+    "assert type(False) is bool, 'type check for False failed'",
+    "print('str int bool passed')"
+  ].join("\n"),
+  hiddenTests: [
+    {
+      id: "types-are-distinct",
+      name: "All three types are distinct",
+      code: "assert str is not int, 'str should not equal int'\nassert int is not bool, 'int should not equal bool'\nassert str is not bool, 'str should not equal bool'"
+    }
+  ],
+  curriculum: {
+    level: 1,
+    sequence: 1,
+    version: "1.0.0",
+    lessonKind: "concept_only",
+    teaches: ["py.string", "py.integer", "py.boolean"],
+    requires: [],
+    visibleCodeConcepts: ["py.string", "py.integer", "py.boolean"],
+    quizConcepts: ["py.string", "py.integer", "py.boolean"],
+    usesButDoesNotTeach: ["py.assertion"],
+    proofOutputs: ["terminal_stdout"]
+  }
+});
+
+literalsLesson.depth = {
+  primaryConceptId: "py.string",
+  secondaryConceptIds: ["py.integer", "py.boolean"],
+  maxNewConcepts: 3,
+  conceptCapsules: [
+    {
+      conceptId: "py.string",
+      definition: "A sequence of characters enclosed in single or double quotes.",
+      mentalModel: "Think of a string as a piece of labelled tape: the text between the quotes is the printed characters on the tape.",
+      syntaxShape: '"text" or \'text\'',
+      tinyExample: '"python"',
+      commonMistake: "Forgetting closing quotes or mixing single and double quotes around one value.",
+      repairHint: "Every opening quote needs a matching closing quote of the same style.",
+      usedIn: ["learn", "practice"]
+    },
+    {
+      conceptId: "py.integer",
+      definition: "A whole number without a decimal point or quotes.",
+      mentalModel: "Think of an integer as a plain counter token: 30, not '30' or 30.0.",
+      syntaxShape: "123 or -5",
+      tinyExample: "30",
+      commonMistake: "Wrapping a number in quotes, which turns it into a string Python cannot add.",
+      repairHint: "Remove the quotes from numeric values you intend to use in arithmetic.",
+      usedIn: ["learn", "practice"]
+    },
+    {
+      conceptId: "py.boolean",
+      definition: "A two-state value that is either True or False.",
+      mentalModel: "Think of a boolean as a light switch: it is on (True) or off (False), nothing in between.",
+      syntaxShape: "True or False",
+      tinyExample: "False",
+      commonMistake: "Writing true in lowercase or putting it in quotes, both of which make Python treat it as something else.",
+      repairHint: "Always write True or False with a capital first letter and no quotes.",
+      usedIn: ["learn", "practice"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-lit-1",
+      label: "Check string type",
+      codeFragment: 'type("python")',
+      conceptIds: ["py.string"],
+      explanation: "Returns <class 'str'> confirming the value is a string.",
+      learnerShouldBeAbleToSay: '"python" is a string because it is wrapped in quotes'
+    },
+    {
+      id: "w-lit-2",
+      label: "Check integer type",
+      codeFragment: "type(30)",
+      conceptIds: ["py.integer"],
+      explanation: "Returns <class 'int'> confirming the value is a whole number.",
+      learnerShouldBeAbleToSay: "30 is an integer because it has no quotes and no decimal"
+    },
+    {
+      id: "w-lit-3",
+      label: "Check boolean type",
+      codeFragment: "type(False)",
+      conceptIds: ["py.boolean"],
+      explanation: "Returns <class 'bool'> confirming the value is a boolean.",
+      learnerShouldBeAbleToSay: "False is a boolean with a capital F and no quotes"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-lit-1",
+      instruction: "Change 30 to \"30\" and observe how the type changes.",
+      conceptIds: ["py.integer", "py.string"],
+      targetCodeFragment: "type(30)",
+      expectedObservation: "The output changes from <class 'int'> to <class 'str'>.",
+      wrongTurnHint: "Make only the one change, then run and compare the output."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-lit-1",
+      conceptIds: ["py.string"],
+      brokenExample: 'x = "hello',
+      symptom: "SyntaxError: EOL while scanning string literal",
+      likelyCause: "The opening quote has no matching closing quote.",
+      fixStrategy: 'Add the missing closing quote: x = "hello"'
+    },
+    {
+      id: "e-lit-2",
+      conceptIds: ["py.boolean"],
+      brokenExample: 'active = "True"',
+      symptom: "The boolean check fails because the value is a string, not a bool.",
+      likelyCause: "Putting quotes around True makes it the four-character string 'True', not the boolean.",
+      fixStrategy: "Remove the quotes: active = True"
+    }
+  ],
+  codeLabBridge: {
+    story: "Before the Study Tracker reads CSV rows it needs to know which fields are strings, which are integers, and which become booleans.",
+    usesConcepts: ["py.string", "py.integer", "py.boolean"],
+    learnerOwns: [],
+    checkerOwns: ["types-are-distinct"],
+    runExpectation: "prints str int bool passed"
+  },
+  understandingProofPrompt: "Without running Python, state the type of each value: 42, 'hello', True, \"3\". Explain one case where the type surprised you.",
+  exitTicket: [
+    "I can tell a string, integer, and boolean apart by looking at them.",
+    "I know quotes make a value a string even if it looks like a number."
+  ]
+};
+
+// ---------------------------------------------------------------------------
+// Micro-lesson 2 — Give Values a Name (run_file)
+// ---------------------------------------------------------------------------
+
+const assignmentLesson = proofLesson({
+  id: "lesson-python-assignment",
+  moduleId: "module-python-core",
+  slug: "python-assignment",
+  title: "Give Values a Name",
+  summary: "Use = to store a value under a name so your program can reuse it.",
+  bodyMarkdown: "The = sign in Python is not equality — it is assignment. It stores the value on the right under the name on the left. After name = value Python remembers the value every time you write that name.",
+  estimatedMinutes: 5,
+  difficulty: "foundation",
+  skillIds: ["skill-python-basics"],
+  quizId: "quiz-python-assignment",
+  desktopTask: "Create three variables for one study session and print each one.",
+  evidencePrompt: "Record the file path, output, and one reason why you chose each variable name.",
+  language: "Python",
+  tools: ["Python 3", "terminal", "print output"],
+  synopsis: "You are learning the single most important Python move: give a value a name you can use again.",
+  prerequisites: ["Know what strings, integers, and booleans are (previous lesson).", "Be ready to edit variables on the left and right of =."],
+  testingFocus: "The tests check that each variable exists and holds the right type.",
+  objective: "Assign a string, integer, and boolean to named variables.",
+  whyItMatters: "Without named variables, every calculation would need you to type the same value twice, making programs fragile and hard to read.",
+  coreConcept: "name = value stores the value under the name. The name goes left of =, the value goes right. Python raises NameError if you try to use a name you have not assigned yet.",
+  workedExample: "topic = 'python' stores the string python. minutes = 30 stores the integer 30. completed = False stores the boolean False.",
+  guidedExercise: "Write one variable for topic, one for minutes, and one for completed, then print each.",
+  missionConnection: "Every Study Tracker session starts as three named variables before it becomes a dictionary or file row.",
+  reflectionPrompt: "Which variable name would make the program hardest to read if you renamed it to x? Why?",
+  practiceStarter: "topic = \"python\"\nminutes = 0\ncompleted = False\n# Change minutes to 30, then print all three variables.\nprint(topic)\nprint(minutes)\nprint(completed)",
+  practiceExpected: "python\n30\nFalse",
+  practiceCheck: "If minutes prints 0, you forgot to change the assignment. The name on the left should stay the same; only the value on the right changes.",
+  practiceReps: assignmentPracticeReps,
+  miniTitle: "Name one study session",
+  miniGoal: "Store topic, minutes, and completed as named Python values and print each one.",
+  miniSteps: ["Assign topic as a string", "Assign minutes as an integer", "Assign completed as a boolean", "Print all three"],
+  miniDeliverables: ["Python file with three assignments", "Printed output showing all three values", "One reflection note on why variable names should be descriptive"],
+  verifierCommand: "python study_session.py",
+  expectedEvidence: "Terminal output showing the assigned values on three separate lines, plus a short name explanation.",
+  projectConnection: "These three variables become the foundation of the CLI Study Tracker session record.",
+  requiredCodeIncludes: ["topic", "minutes", "completed"],
+  requiredOutputIncludes: ["python", "30", "False"],
+  runnerLanguage: "python",
+  runnerStarterCode: "topic = \"python\"\nminutes = 0\ncompleted = False\n# Change minutes to 30, then print all three.\nprint(topic)\nprint(minutes)\nprint(completed)",
+  runnerTestCode: [
+    "assert topic == 'python', 'topic should be the string python'",
+    "assert minutes == 30, 'Change minutes to 30'",
+    "assert completed is False, 'completed should stay the boolean False'",
+    "assert isinstance(topic, str), 'topic must be a string'",
+    "assert isinstance(minutes, int), 'minutes must be an integer'",
+    "assert isinstance(completed, bool), 'completed must be a boolean'",
+    "print('passed')"
+  ].join("\n"),
+  hiddenTests: [
+    {
+      id: "assignment-types-correct",
+      name: "All three variables have the right types",
+      code: "assert isinstance(topic, str), 'topic must be string'\nassert isinstance(minutes, int), 'minutes must be integer'\nassert isinstance(completed, bool), 'completed must be boolean'"
+    }
+  ],
+  curriculum: {
+    level: 1,
+    sequence: 2,
+    version: "1.0.0",
+    lessonKind: "run_file",
+    teaches: ["py.variable.assignment"],
+    requires: ["py.string", "py.integer", "py.boolean"],
+    visibleCodeConcepts: ["py.variable.assignment", "py.string", "py.integer", "py.boolean"],
+    quizConcepts: ["py.variable.assignment"],
+    usesButDoesNotTeach: ["py.assertion"],
+    proofOutputs: ["terminal_stdout", "auto_code_run"]
+  }
+});
+
+assignmentLesson.depth = {
+  primaryConceptId: "py.variable.assignment",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
+  conceptCapsules: [
+    {
+      conceptId: "py.variable.assignment",
+      definition: "Storing a value under a name using the = operator.",
+      mentalModel: "Think of a variable as a labelled box: the name is the label and the value is what you put inside.",
+      syntaxShape: "name = value",
+      tinyExample: 'topic = "python"',
+      commonMistake: "Putting the value on the left: '\"python\" = topic' raises SyntaxError.",
+      repairHint: "The name always goes left of =, the value always goes right.",
+      usedIn: ["learn", "practice", "code_lab"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-asgn-1",
+      label: "Assign string",
+      codeFragment: 'topic = "python"',
+      conceptIds: ["py.variable.assignment", "py.string"],
+      explanation: "Stores the string 'python' under the name topic.",
+      learnerShouldBeAbleToSay: "topic now holds the string python"
+    },
+    {
+      id: "w-asgn-2",
+      label: "Assign integer",
+      codeFragment: "minutes = 30",
+      conceptIds: ["py.variable.assignment", "py.integer"],
+      explanation: "Stores the integer 30 under the name minutes.",
+      learnerShouldBeAbleToSay: "minutes holds the number 30, not the string '30'"
+    },
+    {
+      id: "w-asgn-3",
+      label: "Assign boolean",
+      codeFragment: "completed = False",
+      conceptIds: ["py.variable.assignment", "py.boolean"],
+      explanation: "Stores the boolean False under completed.",
+      learnerShouldBeAbleToSay: "completed is False meaning the session is not finished yet"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-asgn-1",
+      instruction: "Change minutes from 0 to 30 and re-run.",
+      conceptIds: ["py.variable.assignment"],
+      targetCodeFragment: "minutes = 0",
+      expectedObservation: "The printed output changes from 0 to 30.",
+      wrongTurnHint: "Only change the number on the right of =, leave the name minutes unchanged."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-asgn-1",
+      conceptIds: ["py.variable.assignment"],
+      brokenExample: '"python" = topic',
+      symptom: "SyntaxError: cannot assign to literal",
+      likelyCause: "The value and name are swapped. Python cannot store into a literal.",
+      fixStrategy: 'Swap: topic = "python"'
+    },
+    {
+      id: "e-asgn-2",
+      conceptIds: ["py.variable.assignment"],
+      brokenExample: "print(subject)",
+      symptom: "NameError: name 'subject' is not defined",
+      likelyCause: "You used a name that was never assigned.",
+      fixStrategy: "Assign subject = 'python' before printing it."
+    }
+  ],
+  codeLabBridge: {
+    story: "Assign the three session fields before the tracker combines them.",
+    usesConcepts: ["py.variable.assignment"],
+    learnerOwns: ["topic", "minutes", "completed"],
+    checkerOwns: ["assignment-types-correct"],
+    runExpectation: "prints passed"
+  },
+  understandingProofPrompt: "What error appears if you try to print a variable before assigning it?",
+  exitTicket: [
+    "I can assign a string, integer, and boolean to named variables.",
+    "I know the name goes left of = and the value goes right."
+  ]
+};
+
+// ---------------------------------------------------------------------------
+// Micro-lesson 3 — Print What You Named (run_file)
+// ---------------------------------------------------------------------------
+
+const printValuesLesson = proofLesson({
+  id: "lesson-python-print-values",
+  moduleId: "module-python-core",
+  slug: "python-print-values",
+  title: "Print What You Named",
+  summary: "Use print() to display the value stored in a variable.",
+  bodyMarkdown: "print() sends its argument to the terminal. When you pass a variable name, Python looks up the stored value and displays it. This is how you inspect your program while it runs.",
+  estimatedMinutes: 4,
+  difficulty: "foundation",
+  skillIds: ["skill-python-basics"],
+  quizId: "quiz-python-print-values",
+  desktopTask: "Assign two variables and print each one on its own line.",
+  evidencePrompt: "Record the exact terminal output and explain what changed when you updated one variable's value.",
+  language: "Python",
+  tools: ["Python 3", "terminal"],
+  synopsis: "You are learning how to make your program visible: every value you name can be printed.",
+  prerequisites: ["Know how to assign a variable (previous lesson).", "Know how running scripts produces output in the terminal."],
+  testingFocus: "The test confirms the output matches the stored values, not a hardcoded string.",
+  objective: "Use print() to display the value of a variable.",
+  whyItMatters: "print() is your first debugging tool. If the output is wrong, the variable holds the wrong value.",
+  coreConcept: "print(name) displays the value stored in name. Each print() call produces one output line. Printing nothing is how bugs hide.",
+  workedExample: "topic = 'python' then print(topic) displays python. Changing topic to 'git' and re-running makes print display git.",
+  guidedExercise: "Assign topic and minutes, change one value, run and observe the output change.",
+  missionConnection: "The Study Tracker uses print to show the session summary before it is written to a file.",
+  reflectionPrompt: "What happens if you call print(topic) before assigning topic? How does the error message help?",
+  practiceStarter: "topic = \"python\"\nminutes = 30\nprint(topic)\nprint(minutes)",
+  practiceExpected: "python\n30",
+  practiceCheck: "Each print should show the current variable value. If you see 0 instead of 30, check the assignment line.",
+  practiceReps: printValuesPracticeReps,
+  miniTitle: "Print session variables",
+  miniGoal: "Assign two variables and print each one to confirm the values are stored correctly.",
+  miniSteps: ["Assign topic and minutes", "Print both", "Change one value, re-run, observe the output change"],
+  miniDeliverables: ["Python file with print statements", "Two printed lines from variables", "Short description of the difference between print(variable) and print('string')"],
+  verifierCommand: "python print_values.py",
+  expectedEvidence: "Terminal output showing the topic and minutes variables printed on separate lines after execution.",
+  projectConnection: "Printing variables is how the Study Tracker reports a session before any file I/O.",
+  requiredCodeIncludes: ["print", "topic", "minutes"],
+  requiredOutputIncludes: ["python", "30"],
+  runnerLanguage: "python",
+  runnerStarterCode: "topic = \"python\"\nminutes = 30\nprint(topic)\nprint(minutes)",
+  runnerTestCode: [
+    "assert topic == 'python', 'topic should stay python'",
+    "assert minutes == 30, 'minutes should stay 30'",
+    "print('passed')"
+  ].join("\n"),
+  hiddenTests: [
+    {
+      id: "print-values-types-correct",
+      name: "Variables printed are correct types",
+      code: "assert isinstance(topic, str), 'topic must be string'\nassert isinstance(minutes, int), 'minutes must be integer'"
+    }
+  ],
+  curriculum: {
+    level: 1,
+    sequence: 3,
+    version: "1.0.0",
+    lessonKind: "run_file",
+    teaches: ["py.print.variable"],
+    requires: ["py.variable.assignment"],
+    visibleCodeConcepts: ["py.print.variable"],
+    quizConcepts: ["py.print.variable"],
+    usesButDoesNotTeach: ["py.assertion"],
+    proofOutputs: ["terminal_stdout"]
+  }
+});
+
+printValuesLesson.depth = {
+  primaryConceptId: "py.print.variable",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
+  conceptCapsules: [
+    {
+      conceptId: "py.print.variable",
+      definition: "Calling print() with a variable name to display its stored value in the terminal.",
+      mentalModel: "print() is a window into the variable: it shows you what is inside without changing it.",
+      syntaxShape: "print(variable_name)",
+      tinyExample: "print(topic)",
+      commonMistake: "Printing the string 'topic' instead of the variable topic — quotes make it literal text.",
+      repairHint: "Remove quotes inside print() when you want to display a variable, not the word itself.",
+      usedIn: ["learn", "practice", "code_lab"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-pv-1",
+      label: "Assign then print",
+      codeFragment: 'topic = "python"\nprint(topic)',
+      conceptIds: ["py.variable.assignment", "py.print.variable"],
+      explanation: "topic is assigned first, then print(topic) displays the stored value.",
+      learnerShouldBeAbleToSay: "print(topic) shows the value python, not the word topic"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-pv-1",
+      instruction: "Change topic to 'git' and observe the output change.",
+      conceptIds: ["py.print.variable"],
+      targetCodeFragment: 'topic = "python"',
+      expectedObservation: "The output changes from python to git.",
+      wrongTurnHint: "Change only the value on the right of the = sign."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-pv-1",
+      conceptIds: ["py.print.variable"],
+      brokenExample: 'print("topic")',
+      symptom: "Prints the literal word topic instead of the variable's value.",
+      likelyCause: "Quotes inside print() make everything a string literal.",
+      fixStrategy: "Remove the quotes: print(topic)"
+    }
+  ],
+  codeLabBridge: {
+    story: "Print each session variable so the user can inspect the data before it is processed.",
+    usesConcepts: ["py.print.variable"],
+    learnerOwns: ["topic", "minutes"],
+    checkerOwns: ["print-values-displayed"],
+    runExpectation: "prints passed"
+  },
+  understandingProofPrompt: "Without running code, what does print('minutes') display? What does print(minutes) display? Why are they different?",
+  exitTicket: [
+    "I can print a variable's value without quotes inside print().",
+    "I know print() does not change the variable."
+  ]
+};
+
+// ---------------------------------------------------------------------------
+// Micro-lesson 4 — Numbers and Arithmetic (run_file)
+// ---------------------------------------------------------------------------
+
+const numbersLesson = proofLesson({
+  id: "lesson-python-numbers",
+  moduleId: "module-python-core",
+  slug: "python-numbers",
+  title: "Numbers and Arithmetic",
+  summary: "Use +, -, *, and // to calculate with integers.",
+  bodyMarkdown: "Python can add, subtract, multiply, and divide integers. The result of integer arithmetic is another integer (// for floor division). Storing results in variables lets you reuse calculated totals.",
+  estimatedMinutes: 5,
+  difficulty: "foundation",
+  skillIds: ["skill-python-basics"],
+  quizId: "quiz-python-numbers",
+  desktopTask: "Calculate total study minutes from two sessions and print the result.",
+  evidencePrompt: "Record the calculation, the result, and explain what // does differently from /.",
+  language: "Python",
+  tools: ["Python 3", "terminal"],
+  synopsis: "You are learning Python arithmetic: how to combine numbers to produce a new result.",
+  prerequisites: ["Know how to assign an integer (lesson-python-assignment).", "Be ready to write basic math expressions."],
+  testingFocus: "The test checks that the computed total equals the sum of the inputs.",
+  objective: "Calculate a total using integer arithmetic and store the result.",
+  whyItMatters: "The Study Tracker adds minutes across sessions to produce weekly totals. Arithmetic is the core of that calculation.",
+  coreConcept: "Arithmetic operators work on integer variables. + adds, - subtracts, * multiplies, // divides and drops the remainder. The result is stored in a new variable.",
+  workedExample: "session_a = 30, session_b = 20, total = session_a + session_b produces 50.",
+  guidedExercise: "Add two session_minutes values and print the total.",
+  missionConnection: "The Study Tracker sums minutes across sessions using exactly this pattern.",
+  reflectionPrompt: "What would happen if you used / instead of // when you need a whole number result?",
+  practiceStarter: "session_a = 30\nsession_b = 20\ntotal = 0\n# Compute total as the sum of session_a and session_b.\nprint(total)",
+  practiceExpected: "50",
+  practiceCheck: "total should equal 50. If it is still 0, the arithmetic line is missing or not assigned to total.",
+  practiceReps: numbersPracticeReps,
+  miniTitle: "Sum two sessions",
+  miniGoal: "Add two study-minute values together and print the total.",
+  miniSteps: ["Assign two session minute values", "Calculate total with +", "Print total"],
+  miniDeliverables: ["Python file with arithmetic expression", "Correct total printed to the terminal", "Short comment explaining the difference between // and / division"],
+  verifierCommand: "python sum_sessions.py",
+  expectedEvidence: "Terminal output showing the correct sum of both study sessions printed after code execution.",
+  projectConnection: "This arithmetic is the foundation of the Study Tracker's weekly minute report.",
+  requiredCodeIncludes: ["session_a", "session_b", "total"],
+  requiredOutputIncludes: ["50"],
+  runnerLanguage: "python",
+  runnerStarterCode: "session_a = 30\nsession_b = 20\ntotal = 0\n# Compute total as the sum of session_a and session_b.\nprint(total)",
+  runnerTestCode: [
+    "assert session_a == 30, 'session_a should stay 30'",
+    "assert session_b == 20, 'session_b should stay 20'",
+    "assert total == session_a + session_b, 'total should be the sum of both sessions'",
+    "assert isinstance(total, int), 'total must be an integer'",
+    "print('passed')"
+  ].join("\n"),
+  hiddenTests: [
+    {
+      id: "arithmetic-total-correct",
+      name: "Total is computed from variables",
+      code: "assert total == 50, 'total should be 50'"
+    }
+  ],
+  curriculum: {
+    level: 1,
+    sequence: 4,
+    version: "1.0.0",
+    lessonKind: "run_file",
+    teaches: ["py.arithmetic"],
+    requires: ["py.variable.assignment", "py.integer"],
+    reinforces: ["py.integer"],
+    visibleCodeConcepts: ["py.arithmetic", "py.integer"],
+    quizConcepts: ["py.arithmetic"],
+    usesButDoesNotTeach: ["py.assertion"],
+    proofOutputs: ["terminal_stdout", "auto_code_run"]
+  }
+});
+
+numbersLesson.depth = {
+  primaryConceptId: "py.arithmetic",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
+  conceptCapsules: [
+    {
+      conceptId: "py.arithmetic",
+      definition: "Using +, -, *, // operators to compute a new integer from two integer values.",
+      mentalModel: "Think of arithmetic as asking Python to be a calculator: two values go in, one result comes out.",
+      syntaxShape: "result = left_value + right_value",
+      tinyExample: "total = session_a + session_b",
+      commonMistake: "Using / when you want a whole-number result — / returns a float like 50.0 instead of 50.",
+      repairHint: "Use // for integer division. Use + for addition and * for multiplication.",
+      usedIn: ["learn", "practice", "code_lab"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-num-1",
+      label: "Add two session totals",
+      codeFragment: "total = session_a + session_b",
+      conceptIds: ["py.arithmetic"],
+      explanation: "Python evaluates session_a + session_b, producing 50, and stores it in total.",
+      learnerShouldBeAbleToSay: "total is the result of adding both session values"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-num-1",
+      instruction: "Change session_b to 25 and predict the new total before running.",
+      conceptIds: ["py.arithmetic"],
+      targetCodeFragment: "session_b = 20",
+      expectedObservation: "The total becomes 55.",
+      wrongTurnHint: "Only change the value of session_b, then re-run and compare."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-num-1",
+      conceptIds: ["py.arithmetic"],
+      brokenExample: 'total = "30" + 20',
+      symptom: "TypeError: can only concatenate str (not 'int') to str",
+      likelyCause: "One value is a string and the other is an integer. + means different things for each.",
+      fixStrategy: "Remove quotes from the string value so both sides are integers."
+    }
+  ],
+  codeLabBridge: {
+    story: "The Study Tracker needs to sum all session minutes before writing the report.",
+    usesConcepts: ["py.arithmetic"],
+    learnerOwns: ["total"],
+    checkerOwns: ["arithmetic-total-correct"],
+    runExpectation: "prints passed"
+  },
+  understandingProofPrompt: "What is the difference between 7 / 2 and 7 // 2 in Python?",
+  exitTicket: [
+    "I can add two integer variables and store the result.",
+    "I know // produces a whole number and / may produce a decimal."
+  ]
+};
+
+// ---------------------------------------------------------------------------
+// Micro-lesson 5 — Text, Quotes, and Escape (run_file)
+// ---------------------------------------------------------------------------
+
+const stringsLesson = proofLesson({
+  id: "lesson-python-strings",
+  moduleId: "module-python-core",
+  slug: "python-strings",
+  title: "Text, Quotes, and String Operations",
+  summary: "Join, clean, and inspect strings using + and built-in methods.",
+  bodyMarkdown: "Strings have methods you can call with a dot: .strip() removes leading and trailing spaces, .lower() converts to lowercase, and len() counts characters. You can join two strings with +.",
+  estimatedMinutes: 5,
+  difficulty: "foundation",
+  skillIds: ["skill-python-basics"],
+  quizId: "quiz-python-strings",
+  desktopTask: "Clean a topic string and join it with a status word to produce a readable output.",
+  evidencePrompt: "Record the original string, the cleaned string, and what .strip() removed.",
+  language: "Python",
+  tools: ["Python 3", "terminal"],
+  synopsis: "You are learning how to work with text: join it, clean it, and measure it.",
+  prerequisites: ["Know how to assign a string variable (lesson-python-assignment).", "Understand how variables are lookup targets."],
+  testingFocus: "The test checks that the cleaned string matches the expected value exactly.",
+  objective: "Join strings and apply .strip() and .lower() to normalise input.",
+  whyItMatters: "Real CSV input contains inconsistent spacing and capitalisation. Cleaning strings before the tracker groups sessions prevents silent duplicates.",
+  coreConcept: "Strings are objects with methods. .strip() returns a new string with edge whitespace removed. .lower() returns a new lowercase string. + joins two strings end to end.",
+  workedExample: "'  Python  '.strip() returns 'Python'. '  Python  '.strip().lower() returns 'python'. 'hello' + ' ' + 'world' returns 'hello world'.",
+  guidedExercise: "Strip and lowercase a raw topic, then join it with ' session' to produce a clean label.",
+  missionConnection: "The Study Tracker normalises topics before grouping so 'Python' and '  python  ' count as the same topic.",
+  reflectionPrompt: "Why does calling .strip() first and then .lower() produce the same result as .lower() first and then .strip()?",
+  practiceStarter: "raw = \"  Python  \"\nclean = \"\"\n# Strip whitespace and convert to lowercase.\nprint(clean)",
+  practiceExpected: "python",
+  practiceCheck: "clean should be 'python' with no spaces and all lowercase. If it shows '  Python  ' the methods were not called.",
+  practiceReps: stringsPracticeReps,
+  miniTitle: "Clean a topic string",
+  miniGoal: "Strip and lowercase a raw topic string to produce a normalised value.",
+  miniSteps: ["Start with a string that has spaces or mixed capitalisation", "Apply .strip() then .lower()", "Print the result"],
+  miniDeliverables: ["Python file with strip and lower calls", "Cleaned terminal output", "One sentence explaining why normalising topics prevents duplicates"],
+  verifierCommand: "python clean_topic.py",
+  expectedEvidence: "Terminal output showing the lowercase, trimmed string, plus a short comment explaining the value of text normalisation.",
+  projectConnection: "Normalised topics are the foundation of the Study Tracker's grouping logic.",
+  requiredCodeIncludes: ["raw", "clean", "strip"],
+  requiredOutputIncludes: ["python"],
+  runnerLanguage: "python",
+  runnerStarterCode: "raw = \"  Python  \"\nclean = \"\"\n# Strip whitespace and convert to lowercase.\nprint(clean)",
+  runnerTestCode: [
+    "assert clean == 'python', 'clean should be lowercase python with no spaces'",
+    "print('passed')"
+  ].join("\n"),
+  hiddenTests: [
+    {
+      id: "string-clean-correct",
+      name: "Cleaned string has no whitespace and is lowercase",
+      code: "assert clean == clean.strip().lower(), 'clean should be stripped and lowercased'"
+    }
+  ],
+  curriculum: {
+    level: 1,
+    sequence: 5,
+    version: "1.0.0",
+    lessonKind: "run_file",
+    teaches: ["py.string.methods"],
+    requires: ["py.variable.assignment", "py.string"],
+    reinforces: ["py.string"],
+    visibleCodeConcepts: ["py.string.methods", "py.string"],
+    usesButDoesNotTeach: ["py.assertion"],
+    quizConcepts: ["py.string.methods"],
+    proofOutputs: ["terminal_stdout", "auto_code_run"]
+  }
+});
+
+stringsLesson.depth = {
+  primaryConceptId: "py.string.methods",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
+  conceptCapsules: [
+    {
+      conceptId: "py.string.methods",
+      definition: "Built-in functions you call on a string using dot notation to produce a modified or measured version.",
+      mentalModel: "Think of a string method as a filter machine: you put the original string in, the method does its work, and a new string comes out.",
+      syntaxShape: '"text".method() or variable.method()',
+      tinyExample: '"  Python  ".strip()',
+      commonMistake: "Forgetting that methods return a new string — the original variable is unchanged unless you reassign.",
+      repairHint: "Assign the result: clean = raw.strip() so the cleaned value is stored.",
+      usedIn: ["learn", "practice", "code_lab"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-str-1",
+      label: "Strip then lowercase",
+      codeFragment: 'clean = raw.strip().lower()',
+      conceptIds: ["py.string.methods"],
+      explanation: "strip() removes edge whitespace first, then lower() converts the result to lowercase. Both return new strings.",
+      learnerShouldBeAbleToSay: "Methods chain left to right, each working on the result of the previous"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-str-1",
+      instruction: "Add .lower() after .strip() to make the output fully lowercase.",
+      conceptIds: ["py.string.methods"],
+      targetCodeFragment: "clean = raw.strip()",
+      expectedObservation: "The output changes from 'Python' to 'python'.",
+      wrongTurnHint: "Chain .lower() directly onto the end of .strip(), with no space."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-str-1",
+      conceptIds: ["py.string.methods"],
+      brokenExample: "raw.strip()\nprint(raw)",
+      symptom: "raw still shows original value with spaces.",
+      likelyCause: "The result of strip() was discarded instead of being stored.",
+      fixStrategy: "Assign: clean = raw.strip() then print(clean)."
+    }
+  ],
+  codeLabBridge: {
+    story: "Normalise raw CSV topic strings before the tracker groups them.",
+    usesConcepts: ["py.string.methods"],
+    learnerOwns: ["clean"],
+    checkerOwns: ["string-clean-correct"],
+    runExpectation: "prints passed"
+  },
+  understandingProofPrompt: "What does 'PYTHON'.lower().strip() return, and does the order of method calls matter here?",
+  exitTicket: [
+    "I can apply .strip() and .lower() to clean a string.",
+    "I know methods return new strings and do not modify the original."
+  ]
+};
+
+// ---------------------------------------------------------------------------
+// Micro-lesson 6 — Build Output with f-strings (run_file)
+// ---------------------------------------------------------------------------
+
+const fstringsLesson = proofLesson({
+  id: "lesson-python-fstrings",
+  moduleId: "module-python-core",
+  slug: "python-fstrings",
+  title: "Build Output with f-strings",
+  summary: "Use f-strings to embed variable values directly inside a readable output string.",
+  bodyMarkdown: "An f-string starts with f before the opening quote. Inside the string, curly braces {} act as slots: Python replaces each slot with the variable's current value. You can combine text, numbers, and booleans in one line without manual conversion.",
+  estimatedMinutes: 6,
+  difficulty: "foundation",
+  skillIds: ["skill-python-basics"],
+  quizId: "quiz-python-fstrings",
+  desktopTask: "Build a study-session summary string using an f-string with topic, minutes, and completed.",
+  evidencePrompt: "Record the summary string and explain what each {} was replaced with.",
+  language: "Python",
+  tools: ["Python 3", "terminal"],
+  synopsis: "You are learning f-strings: the cleanest way to build readable output from variable values.",
+  prerequisites: ["Know how to assign strings and integers (lessons 2–5).", "Know how to use print() to output results."],
+  testingFocus: "The test checks that the output contains the variable values, not literal placeholder text.",
+  objective: "Use an f-string to build a multiline session summary.",
+  whyItMatters: "The Study Tracker's summary report is an f-string that combines topic, minutes, and status into one inspectable line per session.",
+  coreConcept: "f'{name}' evaluates to the string value of name at runtime. You can embed any variable type. \\n inside an f-string produces a newline.",
+  workedExample: 'topic = "python", minutes = 30. f"{topic}: {minutes} minutes" produces "python: 30 minutes".',
+  guidedExercise: "Create topic, minutes, and completed, then build a summary using an f-string with all three.",
+  missionConnection: "This is the exact format the Study Tracker uses when printing one session summary to the terminal.",
+  reflectionPrompt: "What is the difference between f'{minutes}' and '{minutes}'? Run both and describe what you see.",
+  practiceStarter: "topic = \"python\"\nminutes = 30\ncompleted = False\n\nsummary = \"\"\n# Build summary as: \"python\\n30\\nplanned\"\nprint(summary)",
+  practiceExpected: "python\n30\nplanned",
+  practiceCheck: "The f-string should embed topic and minutes. Replace the 'planned' word with the literal string planned rather than the boolean False directly.",
+  practiceReps: fstringsPracticeReps,
+  miniTitle: "Build a session summary",
+  miniGoal: "Create a multiline session summary using an f-string with topic, minutes, and a status word.",
+  miniSteps: ["Define topic, minutes, completed", "Build summary with an f-string", "Print summary"],
+  miniDeliverables: ["Python file using f-string summary", "Multiline output showing all values", "One sentence explaining why f-strings are preferred over concatenation"],
+  verifierCommand: "python session_summary.py",
+  expectedEvidence: "Terminal output showing topic, minutes, and planned on separate lines.",
+  projectConnection: "This is the template for the Study Tracker's per-session display.",
+  requiredCodeIncludes: ["topic", "minutes", "summary", "f\""],
+  requiredOutputIncludes: ["python", "30", "planned"],
+  runnerLanguage: "python",
+  runnerStarterCode: "topic = \"python\"\nminutes = 30\ncompleted = False\n\nsummary = \"\"\n# Build summary as: \"python\\n30\\nplanned\"\nprint(summary)",
+  runnerTestCode: [
+    "assert topic == 'python', 'topic should stay python'",
+    "assert minutes == 30, 'Change minutes to 30'",
+    "assert completed is False, 'completed should stay False'",
+    "assert isinstance(minutes, int), 'minutes must be an integer'",
+    "assert isinstance(completed, bool), 'completed must be a boolean'",
+    "assert summary == 'python\\n30\\nplanned', 'Build summary so it prints python, 30, and planned on separate lines.'",
+    "print('passed')"
+  ].join("\n"),
+  hiddenTests: [
+    {
+      id: "fstring-summary-correct",
+      name: "Summary embeds variable values",
+      code: "assert str(minutes) in summary, 'The summary should contain the minutes value.'"
+    }
+  ],
+  curriculum: {
+    level: 1,
+    sequence: 6,
+    version: "1.0.0",
+    lessonKind: "run_file",
+    teaches: ["py.f_string"],
+    requires: ["py.variable.assignment", "py.string", "py.print.variable"],
+    visibleCodeConcepts: ["py.f_string"],
+    quizConcepts: ["py.f_string"],
+    usesButDoesNotTeach: ["py.assertion"],
+    proofOutputs: ["terminal_stdout", "auto_code_run"]
+  }
+});
+
+fstringsLesson.depth = {
+  primaryConceptId: "py.f_string",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
+  conceptCapsules: [
+    {
+      conceptId: "py.f_string",
+      definition: "A string prefixed with f that embeds variable values inside {} placeholders at runtime.",
+      mentalModel: "Think of an f-string as a fill-in-the-blank sentence: {} marks the blanks and Python fills them with the current variable values.",
+      syntaxShape: 'f"text {variable} more text"',
+      tinyExample: 'f"{topic}: {minutes} min"',
+      commonMistake: "Forgetting the f prefix, which makes the braces literal characters instead of variable slots.",
+      repairHint: "Add f immediately before the opening quote: f\"{variable}\".",
+      usedIn: ["learn", "practice", "code_lab"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-fstr-1",
+      label: "Embed two variables",
+      codeFragment: 'summary = f"{topic}: {minutes} minutes"',
+      conceptIds: ["py.f_string"],
+      explanation: "Python replaces {topic} with the string python and {minutes} with the integer 30 at runtime.",
+      learnerShouldBeAbleToSay: "Each {} is a placeholder that holds a variable name"
+    },
+    {
+      id: "w-fstr-2",
+      label: "Use newline in f-string",
+      codeFragment: 'summary = f"{topic}\\n{minutes}\\nplanned"',
+      conceptIds: ["py.f_string"],
+      explanation: "\\n inside an f-string inserts a line break, putting each value on its own line.",
+      learnerShouldBeAbleToSay: "\\n moves the cursor to the next line"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-fstr-1",
+      instruction: "Change the f-string to put each value on its own line using \\n.",
+      conceptIds: ["py.f_string"],
+      targetCodeFragment: 'summary = ""',
+      expectedObservation: "The output shows three lines: python, 30, planned.",
+      wrongTurnHint: "Use f\"{topic}\\n{minutes}\\nplanned\" with \\n between each value."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-fstr-1",
+      conceptIds: ["py.f_string"],
+      brokenExample: 'summary = "{topic}: {minutes}"',
+      symptom: "Prints the literal text {topic}: {minutes} instead of variable values.",
+      likelyCause: "The f prefix is missing before the opening quote.",
+      fixStrategy: 'Add f before the quote: summary = f"{topic}: {minutes}"'
+    }
+  ],
+  codeLabBridge: {
+    story: "Build the session summary string that the Study Tracker will print and log.",
+    usesConcepts: ["py.f_string"],
+    learnerOwns: ["summary"],
+    checkerOwns: ["fstring-summary-correct"],
+    runExpectation: "prints passed"
+  },
+  understandingProofPrompt: "What is the difference between f\"{minutes}\" and str(minutes)? When would you prefer the f-string approach?",
+  exitTicket: [
+    "I can write an f-string that embeds two or more variables.",
+    "I know the f prefix is required and {} marks variable slots."
+  ]
+};
+
+// ---------------------------------------------------------------------------
+// Deprecated — original monolithic lesson (kept for progress resolution)
+// ---------------------------------------------------------------------------
+
+const deprecatedValuesLesson = proofLesson({
+  id: "lesson-python-values",
+  moduleId: "module-python-core",
+  slug: "python-values",
+  title: "Names, Values, and First Output (Deprecated)",
+  summary: "Original Level 1 lesson — replaced by six focused micro-lessons.",
+  bodyMarkdown: "This lesson has been split into focused micro-lessons. Learners who completed it are automatically placed out of the new sequence.",
+  estimatedMinutes: 7,
+  difficulty: "foundation",
+  skillIds: ["skill-python-basics", "skill-testing-debugging"],
+  quizId: "quiz-python-values",
+  desktopTask: "Create a tiny Python file that stores one study session as named values and prints a summary.",
+  evidencePrompt: "Record the file path, the final output, and which value you changed to make the output correct.",
+  language: "Python",
+  tools: ["Python 3", "terminal", "print output"],
+  synopsis: "You are learning the smallest useful Python move: give values clear names, then combine those values into output you can inspect.",
+  prerequisites: ["Know that Python code can run from a .py file.", "Be ready to edit one line and run the file again."],
+  testingFocus: "The tests check that topic, minutes, and completed exist with the required values, and that your printed summary matches the expected output. The final passed line is the check result, not another variable you need to create.",
+  objective: "Name simple Python values and combine them into one readable output string.",
+  whyItMatters: "Every later Python project depends on seeing data clearly before it is wrapped in functions, files, or tests.",
+  coreConcept: "A variable stores a value under a useful name. The name goes on the left of =, and the value goes on the right. Strings are text in quotes, integers are whole numbers without quotes, and booleans are True or False facts.",
+  workedExample: "topic = 'python' stores text, minutes = 30 stores a number, and completed = False stores a true-or-false fact. A summary can translate those raw values into the readable output python, 30, planned.",
+  guidedExercise: "Create three variables for one study session, change the starter minutes value to 30, then build one summary string from those values.",
+  missionConnection: "This is the first slice of the CLI Study Tracker: one session that a learner and a test can inspect.",
+  reflectionPrompt: "Which variable name made the program easier to read, and which value would you change to describe a different session?",
+  practiceStarter: "topic = \"python\"\nminutes = 0\ncompleted = False\n\n# Change minutes to 30.\n# Then build the required summary using the values above.\n# Hint: summary = f\"{topic}\\n{minutes}\\nplanned\"\nsummary = \"\"\nprint(summary)",
+  practiceExpected: "python\n30\nplanned\n\nVerifier then prints: passed",
+  practiceCheck: "Check three things: minutes should be the number 30, summary should not stay empty, and each required value should print on its own line.",
+  practiceReps: pythonValuePracticeReps,
+  miniTitle: "Build one study-session summary",
+  miniGoal: "Create the first study-tracker slice by storing one session as named Python values and printing a readable summary.",
+  miniSteps: ["Keep topic set to python", "Change minutes from 0 to the number 30", "Keep completed as the boolean False", "Build summary from the variables and print python, 30, and planned on separate lines"],
+  miniDeliverables: ["Python file with named values", "Printed summary output", "One note explaining why completed = False maps to the readable word planned"],
+  verifierCommand: "python study_session.py",
+  expectedEvidence: "Terminal output showing python, 30, planned, and the check's passed line plus a short note identifying the string, number, and boolean values.",
+  projectConnection: "This gives the CLI Study Tracker its first data point before sessions become lists and files.",
+  requiredCodeIncludes: ["topic", "minutes", "completed", "summary"],
+  requiredOutputIncludes: ["python", "30", "planned"],
+  runnerLanguage: "python",
+  runnerStarterCode: "topic = \"python\"\nminutes = 0\ncompleted = False\n\n# Change minutes to 30.\n# Then build the required summary using the values above.\n# Hint: summary = f\"{topic}\\n{minutes}\\nplanned\"\nsummary = \"\"\nprint(summary)",
+  runnerTestCode: [
+    "assert topic == 'python', 'topic should stay \"python\".'",
+    "assert minutes == 30, 'Change minutes from 0 to the number 30, not the string \"30\".'",
+    "assert completed is False, 'completed should stay the boolean False. That means the session is still planned.'",
+    "assert isinstance(minutes, int), 'minutes must be a number so later lessons can add study time.'",
+    "assert isinstance(completed, bool), 'completed must be a boolean, not the word \"planned\".'",
+    "assert summary == 'python\\n30\\nplanned', 'Build summary so it prints python, 30, and planned on separate lines.'",
+    "print('passed')"
+  ].join("\n"),
+  hiddenTests: [
+    {
+      id: "values-have-right-types",
+      name: "Values use beginner-friendly types",
+      code: "assert isinstance(topic, str), 'topic must be a string'\nassert isinstance(minutes, int), 'minutes must be an integer'\nassert isinstance(completed, bool), 'completed must be a boolean'\nassert str(minutes) in summary, 'The summary should contain the minutes value.'"
+    }
+  ],
+  curriculum: {
+    level: 1,
+    sequence: 99,
+    version: "1.0.0",
+    deprecated: true,
+    preserveProgress: true,
+    showInActivePath: false,
+    showInReviewQueue: false,
+    legacyEvidenceOnly: true,
+    lessonKind: "run_file",
+    teaches: ["py.variable.assignment", "py.print.variable", "py.f_string", "py.string", "py.integer", "py.boolean"],
+    requires: [],
+    usesButDoesNotTeach: ["py.assertion"],
+    replacedByLessonIds: [
+      "lesson-python-literals",
+      "lesson-python-assignment",
+      "lesson-python-print-values",
+      "lesson-python-numbers",
+      "lesson-python-strings",
+      "lesson-python-fstrings"
+    ]
+  },
+  codeShape: "name = value"
+});
+
+deprecatedValuesLesson.depth = {
+  primaryConceptId: "py.variable.assignment",
+  secondaryConceptIds: ["py.print.variable", "py.f_string"],
+  maxNewConcepts: 3,
+  conceptCapsules: [
+    {
+      conceptId: "py.variable.assignment",
+      definition: "Creating or updating a variable by writing name = value.",
+      mentalModel: "Think of a variable as a storage container with a label name on it, holding a single value inside.",
+      syntaxShape: "name = value",
+      tinyExample: 'topic = "python"',
+      commonMistake: "Putting the value on the left side of the equals sign.",
+      repairHint: "Ensure the variable name is always written first on the left of '='.",
+      usedIn: ["learn", "practice", "code_lab"]
+    }
+  ],
+  codeWalkthrough: [],
+  guidedEdits: [],
+  errorClinic: [],
+  codeLabBridge: {
+    story: "This lesson has been deprecated. See the six replacement micro-lessons.",
+    usesConcepts: ["py.variable.assignment"],
+    learnerOwns: [],
+    checkerOwns: [],
+    runExpectation: "prints passed"
+  },
+  understandingProofPrompt: "This lesson is deprecated. Complete lesson-python-fstrings instead.",
+  exitTicket: ["This lesson is deprecated."]
+};
+
+// ---------------------------------------------------------------------------
+// Exports
+// ---------------------------------------------------------------------------
+
+export const level1Lessons: Lesson[] = [
+  literalsLesson,
+  assignmentLesson,
+  printValuesLesson,
+  numbersLesson,
+  stringsLesson,
+  fstringsLesson
+];
+
+/** Kept in the content pack so old learner progress IDs still resolve. */
+export const deprecatedLevel1Lessons: Lesson[] = [
+  deprecatedValuesLesson
+];
+
+// ---------------------------------------------------------------------------
+// Quizzes — one per micro-lesson
+// ---------------------------------------------------------------------------
+
+export const level1Quizzes: Quiz[] = [
+  checkpointQuiz(
+    "quiz-python-literals",
+    "lesson-python-literals",
+    "Literal Types Checkpoint",
+    "Python's three starter types",
+    "Strings are text in quotes, integers are whole numbers without quotes, and booleans are exactly True or False.",
+    "Strings and integers are the same because both can hold numbers.",
+    "Booleans are strings that say 'true' or 'false'.",
+    "Each type has a distinct syntax. Quotes make something a string. No quotes and no decimal makes an integer. Capital T/F makes a boolean.",
+    ["py.string", "py.integer", "py.boolean"]
+  ),
+  checkpointQuiz(
+    "quiz-python-assignment",
+    "lesson-python-assignment",
+    "Variable Assignment Checkpoint",
+    "variable assignment",
+    "Write the variable name on the left of = and the value on the right.",
+    "Write the value on the left of = and the variable name on the right.",
+    "Use == to store a value in a variable.",
+    "name = value stores the value under the name. Reversing the sides causes SyntaxError.",
+    ["py.variable.assignment"]
+  ),
+  checkpointQuiz(
+    "quiz-python-print-values",
+    "lesson-python-print-values",
+    "Print Values Checkpoint",
+    "printing variable values",
+    "Call print(variable_name) without quotes to display the stored value.",
+    "Call print('variable_name') with quotes to display the stored value.",
+    "Variables print themselves automatically without needing print().",
+    "print(name) displays the value stored in name. Quotes inside print() make a string literal instead.",
+    ["py.print.variable"]
+  ),
+  checkpointQuiz(
+    "quiz-python-numbers",
+    "lesson-python-numbers",
+    "Arithmetic Checkpoint",
+    "integer arithmetic",
+    "Use +, -, *, and // to compute integer results stored in variables.",
+    "Use / for whole-number division to avoid decimal results.",
+    "Integer arithmetic requires explicit type conversion before computing.",
+    "Arithmetic operators compute a new value. // is floor division (drops the decimal). / may produce a float.",
+    ["py.arithmetic"]
+  ),
+  checkpointQuiz(
+    "quiz-python-strings",
+    "lesson-python-strings",
+    "String Methods Checkpoint",
+    "string methods",
+    "Call .strip() and .lower() to clean and normalise a string value.",
+    "Modify the original string in place using .strip() without reassigning.",
+    "String methods need an import statement before they can be called.",
+    "String methods return new strings. Assign the result to store the cleaned value.",
+    ["py.string.methods"]
+  ),
+  checkpointQuiz(
+    "quiz-python-fstrings",
+    "lesson-python-fstrings",
+    "f-string Checkpoint",
+    "f-string interpolation",
+    "Prefix the string with f and embed variable names inside {} to build readable output.",
+    "Use + to concatenate variables into strings when building output.",
+    "Use str() on every variable before including it in a string output.",
+    "f-strings embed variables at {} slots. The f prefix is required. Each {} is replaced at runtime with the variable's value.",
+    ["py.f_string"]
+  ),
+  // Deprecated quiz — kept so old quiz attempt IDs still resolve
+  checkpointQuiz(
+    "quiz-python-values",
+    "lesson-python-values",
+    "Variables and Formatting Checkpoint (Deprecated)",
+    "variables and text formatting",
+    "Assign variables and combine values into multiline strings using f-string syntax.",
+    "Build summaries using loose literal string inputs without saving them in variables.",
+    "Concatenate strings using mathematical division operators.",
+    "Variable assignments use name = value. F-strings allow value interpolation.",
+    ["py.variable.assignment", "py.f_string", "py.print.variable"]
+  )
+];

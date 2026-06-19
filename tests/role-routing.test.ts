@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { contentPack } from "@/content/seed";
-import { addEvidenceItem, createInitialProgress, setLessonCompletion, setMissionCompletion, setRoleTarget } from "@/domain/progress";
+import { addEvidenceItem, createInitialProgress, setLessonCompletion, setMissionCompletion, setRoleTarget, ensureProgressProfile } from "@/domain/progress";
 import { calculateReadinessScore } from "@/domain/readiness";
 import { evaluatePathProofGate, getContentForRole, getFutureUnlocksForRole, getMissionsForRole, getNextLessonForRole, getNextMissionForRole, getRoleTarget, getRoleTrackOnboardingSummary, getTracksForRole, isOnboardingComplete, isGitTrackCompleted } from "@/domain/role-routing";
 
@@ -37,8 +37,19 @@ describe("role routing", () => {
 
   it("selects the next unfinished lesson and mission inside the role path", () => {
     const progress = setRoleTarget(createInitialProgress(NOW), "path-software-foundations", true, NOW);
-    const withFirstLesson = setLessonCompletion(progress, "lesson-python-values", true, NOW);
-    const withFirstMission = { ...withFirstLesson, completedProjectMissionIds: ["mission-cli-study-tracker"] };
+    const lessonsToComplete = [
+      "lesson-python-zero-files-folders",
+      "lesson-python-zero-terminal",
+      "lesson-python-zero-first-script",
+      "lesson-python-zero-change-rerun",
+      "lesson-python-zero-first-error",
+      "lesson-python-values"
+    ];
+    let withFirstLesson = progress;
+    for (const lessonId of lessonsToComplete) {
+      withFirstLesson = setLessonCompletion(withFirstLesson, lessonId, true, NOW);
+    }
+    const withFirstMission = ensureProgressProfile({ ...withFirstLesson, completedProjectMissionIds: ["mission-cli-study-tracker"] });
 
     expect(getNextLessonForRole(contentPack, withFirstMission)?.id).toBe("lesson-python-collections");
     expect(getNextMissionForRole(contentPack, withFirstMission)?.id).toBe("mission-python-data-cleaner");

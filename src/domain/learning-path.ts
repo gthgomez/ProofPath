@@ -1,5 +1,5 @@
 import type { Lesson, Module, ProjectMission, UserProgress } from "@/domain/types";
-import { getMissionSupportedLessonIds, missionEvidenceMeetsRequirements } from "@/domain/progress";
+import { getMissionSupportedLessonIds, missionEvidenceMeetsRequirements, isLessonSatisfied } from "@/domain/progress";
 
 export type LessonStatus = "locked" | "upcoming" | "current" | "in_progress" | "completed";
 export type MissionStatus = "locked" | "ready" | "in_progress" | "completed";
@@ -228,11 +228,11 @@ export function getLessonArcs(moduleItem: Module, lessons: Lesson[]): LessonArc[
 }
 
 export function getNextLessonId(lessons: Lesson[], progress: UserProgress): string | undefined {
-  return lessons.find((lesson) => !progress.completedLessonIds.includes(lesson.id))?.id;
+  return lessons.find((lesson) => !isLessonSatisfied(progress, lesson.id))?.id;
 }
 
 export function getLessonStatus(lesson: Lesson, lessons: Lesson[], progress: UserProgress): LessonStatus {
-  if (progress.completedLessonIds.includes(lesson.id)) {
+  if (isLessonSatisfied(progress, lesson.id)) {
     return "completed";
   }
 
@@ -248,7 +248,7 @@ export function getLessonStatus(lesson: Lesson, lessons: Lesson[], progress: Use
 }
 
 export function getModuleStatus(lessons: Lesson[], missions: ProjectMission[], progress: UserProgress): ModuleStatus {
-  const completedLessons = lessons.filter((lesson) => progress.completedLessonIds.includes(lesson.id)).length;
+  const completedLessons = lessons.filter((lesson) => isLessonSatisfied(progress, lesson.id)).length;
   const completedMissions = missions.filter((mission) => progress.completedProjectMissionIds.includes(mission.id)).length;
 
   if (completedLessons === lessons.length && completedMissions === missions.length) {
@@ -297,7 +297,7 @@ export function getLessonCtaRule(status: LessonStatus): LessonCtaRule {
 
 export function getMissionReadiness(mission: ProjectMission, lessons: Lesson[], progress: UserProgress): MissionReadiness {
   const supportedLessonIds = getMissionSupportedLessonIds(mission, lessons);
-  const completedSupportedLessons = supportedLessonIds.filter((lessonId) => progress.completedLessonIds.includes(lessonId)).length;
+  const completedSupportedLessons = supportedLessonIds.filter((lessonId) => isLessonSatisfied(progress, lessonId)).length;
   const hasStarted = completedSupportedLessons > 0
     || progress.evidenceItems.some((item) => item.linkedProjectMissionId === mission.id);
 

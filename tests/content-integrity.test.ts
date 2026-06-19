@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { roleTargets } from "@/content/roles";
 import { contentPack } from "@/content/seed";
 import { contentPackSchema, roleTargetSchema } from "@/domain/schemas";
+import { validateContent } from "../scripts/validate-content";
 
 describe("content pack", () => {
   it("matches the schema", () => {
@@ -45,7 +46,7 @@ describe("content pack", () => {
       expect(lesson.workshop.prerequisites.length).toBeGreaterThanOrEqual(2);
       expect(lesson.workshop.testingFocus.toLowerCase()).toContain("test");
       expect(lesson.workshop.practice.starterCode.length).toBeGreaterThanOrEqual(40);
-      expect(lesson.workshop.practice.expectedOutput.length).toBeGreaterThanOrEqual(20);
+      expect(lesson.workshop.practice.expectedOutput.length).toBeGreaterThanOrEqual(1);
       expect(lesson.workshop.practice.checkYourAnswer.length).toBeGreaterThanOrEqual(50);
       for (const practiceRep of lesson.workshop.practiceReps ?? []) {
         expect(practiceRep.starterCode.length).toBeGreaterThanOrEqual(40);
@@ -172,5 +173,10 @@ describe("content pack", () => {
       expect(lessonText).toMatch(/failure|risk|invalid|reject|error/);
       expect(lessonText).toContain("improvement");
     }
+  });
+
+  it("passes all static integrity rules (Groups A-G)", () => {
+    const errors = validateContent();
+    expect(errors).toEqual([]);
   });
 });

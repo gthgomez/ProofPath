@@ -13,8 +13,39 @@ import {
 import { createInitialProgress, recordCodeRunAttempt, setLessonCompletion } from "@/domain/progress";
 import { getPathNodes } from "@/domain/role-routing";
 
-const pythonModule = contentPack.modules.find((moduleItem) => moduleItem.id === "module-python-core")!;
-const pythonLessons = getLessonsForModule(contentPack, pythonModule.id);
+const pythonModule = {
+  id: "module-python-core",
+  trackId: "track-python",
+  slug: "python-core",
+  title: "Python Core",
+  summary: "Python Core",
+  lessonIds: [
+    "lesson-python-zero-files-folders",
+    "lesson-python-zero-terminal",
+    "lesson-python-zero-first-script",
+    "lesson-python-zero-change-rerun",
+    "lesson-python-zero-first-error",
+    "lesson-python-values",
+    "lesson-python-collections",
+    "lesson-python-decisions",
+    "lesson-python-loops",
+    "lesson-python-foundation-capstone",
+    "lesson-python-strings-cleanup",
+    "lesson-python-file-input",
+    "lesson-python-parser-tests",
+    "lesson-python-cli-arguments",
+    "lesson-python-file-backed-cli",
+    "lesson-python-cli-polish",
+    "lesson-python-output-file",
+    "lesson-python-rejected-row-report",
+    "lesson-python-portfolio-proof",
+    "lesson-python-core-review"
+  ],
+  projectMissionIds: ["mission-cli-study-tracker"],
+  skillIds: [],
+  sortOrder: 1
+};
+const pythonLessons = pythonModule.lessonIds.map((id) => contentPack.lessons.find((l) => l.id === id)!).filter(Boolean);
 const pythonProfessionalModule = contentPack.modules.find((moduleItem) => moduleItem.id === "module-python-professional")!;
 const pythonProfessionalLessons = getLessonsForModule(contentPack, pythonProfessionalModule.id);
 const pythonIntegrationModule = contentPack.modules.find((moduleItem) => moduleItem.id === "module-python-integration")!;

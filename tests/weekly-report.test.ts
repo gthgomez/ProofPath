@@ -8,7 +8,7 @@ const NOW = "2026-05-04T19:00:00.000Z";
 
 function createEvidenceProgress() {
   const roleProgress = setRoleTarget(createInitialProgress(NOW), "path-software-foundations", true, NOW);
-  const withLesson = setLessonCompletion(roleProgress, "lesson-python-functions", true, NOW);
+  const withLesson = setLessonCompletion(roleProgress, "lesson-python-def-call", true, NOW);
   const mission = contentPack.projectMissions.find((candidate) => candidate.id === "mission-cli-study-tracker")!;
   const withDeliverables = mission.deliverables.reduce(
     (currentProgress, _deliverable, index) => setMissionDeliverableCompletion(currentProgress, mission.id, index, true, NOW),
@@ -29,7 +29,7 @@ function createEvidenceProgress() {
   }, "2026-05-05T19:05:00.000Z");
   const withMission = setMissionCompletion(withEvidence, mission, true, NOW);
 
-  return recordReview(withMission, "lesson", "lesson-python-functions", "good", "2026-05-05T19:00:00.000Z");
+  return recordReview(withMission, "lesson", "lesson-python-def-call", "good", "2026-05-05T19:00:00.000Z");
 }
 
 describe("weekly career reports", () => {

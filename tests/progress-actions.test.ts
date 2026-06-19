@@ -139,8 +139,8 @@ describe("progress actions", () => {
 
   it("requires scored quiz attempts before checkpoint completion", () => {
     const progress = createInitialProgress(NOW);
-    const failed = submitQuizAttempt(progress, pythonQuiz, [0, 0, 1], "2026-05-04T16:41:00.000Z");
-    const passed = submitQuizAttempt(failed, pythonQuiz, [1, 1, 0], "2026-05-04T16:42:00.000Z");
+    const failed = submitQuizAttempt(progress, pythonQuiz, pythonQuiz.questions.map(q => (q.correctChoiceIndex + 1) % 3), "2026-05-04T16:41:00.000Z");
+    const passed = submitQuizAttempt(failed, pythonQuiz, pythonQuiz.questions.map(q => q.correctChoiceIndex), "2026-05-04T16:42:00.000Z");
 
     expect(failed.completedQuizIds).toEqual([]);
     expect(failed.quizAttempts[0]?.score).toBe(0);
@@ -359,8 +359,8 @@ describe("progress actions", () => {
 
   it("ensures legacy progress payloads are hydrated with empty placement fields", () => {
     const legacyPayload = {
-      completedLessonIds: ["lesson-python-values"],
-      completedQuizIds: ["quiz-python-values"],
+      completedLessonIds: ["lesson-typescript-contracts"],
+      completedQuizIds: ["quiz-typescript-contracts"],
       completedProjectMissionIds: [],
       evidenceItems: [],
       weeklyPlanTaskIds: [],
@@ -371,6 +371,6 @@ describe("progress actions", () => {
 
     expect(hydrated.placedOutLessonIds).toEqual([]);
     expect(hydrated.placedOutQuizIds).toEqual([]);
-    expect(hydrated.completedLessonIds).toContain("lesson-python-values");
+    expect(hydrated.completedLessonIds).toContain("lesson-typescript-contracts");
   });
 });

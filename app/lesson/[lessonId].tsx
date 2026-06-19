@@ -1,10 +1,15 @@
 import { Link, Redirect, router, useLocalSearchParams } from "expo-router";
 import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { contentPack } from "@/content/seed";
 import { findLesson } from "@/domain/content";
 import { CodeLab } from "@/ui/code-lab";
+import { ConceptCapsuleList } from "@/ui/concept-capsule";
+import { CodeWalkthrough } from "@/ui/code-walkthrough";
+import { GuidedEditList } from "@/ui/guided-edit-list";
+import { ErrorClinic } from "@/ui/error-clinic";
+import { CodeLabBridge } from "@/ui/code-lab-bridge";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, ProgressBar, Row, Screen, SectionTitle, StickyActionBar, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
@@ -36,6 +41,7 @@ export default function LessonDetailScreen(): ReactElement {
   const [showFluencyReps, setShowFluencyReps] = useState(opensBeginnerPythonSupport);
   const [currentStep, setCurrentStep] = useState<LessonWorkflowStep>("understand");
   const [practiceOutputs, setPracticeOutputs] = useState<Record<string, { output: string; running: boolean }>>({});
+  const [practiceCodes, setPracticeCodes] = useState<Record<string, string>>({});
 
   const handleRunPractice = async (key: string, code: string) => {
     if (!lesson?.workshop.miniProject.runnerSpec) return;
@@ -78,6 +84,17 @@ export default function LessonDetailScreen(): ReactElement {
       preloadSandbox(lesson.workshop.miniProject.runnerSpec.language);
     }
   }, [lessonIdValue, opensBeginnerPythonSupport, lesson?.workshop.miniProject.runnerSpec.language]);
+
+  useEffect(() => {
+    if (!lesson) return;
+    const initialCodes: Record<string, string> = {
+      main: lesson.workshop.practice.starterCode,
+    };
+    lesson.workshop.practiceReps?.forEach((practiceRep, repIndex) => {
+      initialCodes[`rep-${repIndex}`] = practiceRep.starterCode;
+    });
+    setPracticeCodes(initialCodes);
+  }, [lesson]);
 
   if (isCheckingOnboarding) {
     return (
@@ -224,54 +241,60 @@ export default function LessonDetailScreen(): ReactElement {
       {/* Understand Step Content */}
       {currentStep === "understand" && (
         <Panel>
-          <SectionTitle>Before coding: goal</SectionTitle>
-          <BodyText>{lesson.workshop.miniProject.goal}</BodyText>
-          <SectionTitle>Plain-English version</SectionTitle>
-          <BodyText>{lesson.bodyMarkdown}</BodyText>
-          <SectionTitle>Tiny example</SectionTitle>
-          <MutedText style={styles.codeBlock}>{lesson.workshop.workedExample}</MutedText>
-          {lesson.workshop.codeShape ? (
-            <View style={styles.practiceBlock}>
-              <SectionTitle>What to type shape</SectionTitle>
-              <Text selectable style={styles.codeBlock}>{lesson.workshop.codeShape}</Text>
-            </View>
-          ) : null}
-          <SectionTitle>Why this lesson exists</SectionTitle>
-          <BodyText>{lesson.workshop.synopsis}</BodyText>
-          <SectionTitle>Before you start</SectionTitle>
-          <Row style={styles.badgeRow}>
-            {lesson.workshop.tools.map((tool) => (
-              <Badge key={tool} tone="teal">{tool}</Badge>
-            ))}
-          </Row>
-          
-          <SectionTitle>Concept notes</SectionTitle>
-          <BodyText>{lesson.workshop.objective}</BodyText>
-          <ButtonShell
-            accessibilityHint={showConceptNotes ? "Hides deeper explanation and prerequisites." : "Shows deeper explanation and prerequisites."}
-            accessibilityState={{ expanded: showConceptNotes }}
-            onPress={() => setShowConceptNotes((current) => !current)}
-            size="compact"
-            tone="ink"
-            variant="tertiary"
-          >
-            {showConceptNotes ? "Hide explanation" : "Show explanation"}
-          </ButtonShell>
-          {showConceptNotes ? (
-            <View style={styles.disclosureBlock}>
-              <SectionTitle>Why it matters</SectionTitle>
-              <BodyText>{lesson.workshop.whyItMatters}</BodyText>
-              <SectionTitle>Core concept</SectionTitle>
-              <BodyText>{lesson.workshop.coreConcept}</BodyText>
-              <SectionTitle>Guided exercise</SectionTitle>
-              <BodyText>{lesson.workshop.guidedExercise}</BodyText>
-              <MutedText>{lesson.workshop.missionConnection}</MutedText>
-              <SectionTitle>Prerequisites</SectionTitle>
-              {lesson.workshop.prerequisites.map((prerequisite) => (
-                <MutedText key={prerequisite}>• {prerequisite}</MutedText>
-              ))}
-            </View>
-          ) : null}
+          {lesson.depth ? (
+            <ConceptCapsuleList capsules={lesson.depth.conceptCapsules} />
+          ) : (
+            <>
+              <SectionTitle>Before coding: goal</SectionTitle>
+              <BodyText>{lesson.workshop.miniProject.goal}</BodyText>
+              <SectionTitle>Plain-English version</SectionTitle>
+              <BodyText>{lesson.bodyMarkdown}</BodyText>
+              <SectionTitle>Tiny example</SectionTitle>
+              <MutedText style={styles.codeBlock}>{lesson.workshop.workedExample}</MutedText>
+              {lesson.workshop.codeShape ? (
+                <View style={styles.practiceBlock}>
+                  <SectionTitle>What to type shape</SectionTitle>
+                  <Text selectable style={styles.codeBlock}>{lesson.workshop.codeShape}</Text>
+                </View>
+              ) : null}
+              <SectionTitle>Why this lesson exists</SectionTitle>
+              <BodyText>{lesson.workshop.synopsis}</BodyText>
+              <SectionTitle>Before you start</SectionTitle>
+              <Row style={styles.badgeRow}>
+                {lesson.workshop.tools.map((tool) => (
+                  <Badge key={tool} tone="teal">{tool}</Badge>
+                ))}
+              </Row>
+              
+              <SectionTitle>Concept notes</SectionTitle>
+              <BodyText>{lesson.workshop.objective}</BodyText>
+              <ButtonShell
+                accessibilityHint={showConceptNotes ? "Hides deeper explanation and prerequisites." : "Shows deeper explanation and prerequisites."}
+                accessibilityState={{ expanded: showConceptNotes }}
+                onPress={() => setShowConceptNotes((current) => !current)}
+                size="compact"
+                tone="ink"
+                variant="tertiary"
+              >
+                {showConceptNotes ? "Hide explanation" : "Show explanation"}
+              </ButtonShell>
+              {showConceptNotes ? (
+                <View style={styles.disclosureBlock}>
+                  <SectionTitle>Why it matters</SectionTitle>
+                  <BodyText>{lesson.workshop.whyItMatters}</BodyText>
+                  <SectionTitle>Core concept</SectionTitle>
+                  <BodyText>{lesson.workshop.coreConcept}</BodyText>
+                  <SectionTitle>Guided exercise</SectionTitle>
+                  <BodyText>{lesson.workshop.guidedExercise}</BodyText>
+                  <MutedText>{lesson.workshop.missionConnection}</MutedText>
+                  <SectionTitle>Prerequisites</SectionTitle>
+                  {lesson.workshop.prerequisites.map((prerequisite) => (
+                    <MutedText key={prerequisite}>• {prerequisite}</MutedText>
+                  ))}
+                </View>
+              ) : null}
+            </>
+          )}
 
           {/* Stepper Navigation */}
           <Row style={styles.navRow}>
@@ -298,119 +321,174 @@ export default function LessonDetailScreen(): ReactElement {
             <Badge tone="blue">Step 2</Badge>
             <Badge tone="green">practice first</Badge>
           </Row>
-          <SectionTitle>Try this first</SectionTitle>
-          <BodyText>Before editing, predict what the starter code prints. Then change one line at a time and compare the result with the expected output.</BodyText>
-          <View style={styles.practiceBlock}>
-            <SectionTitle>Starter code</SectionTitle>
-            <Text selectable style={styles.codeBlock}>{lesson.workshop.practice.starterCode}</Text>
-            
-            {/* Run example button */}
-            <ButtonShell
-              accessibilityHint="Runs the practice starter code in the sandbox."
-              disabled={practiceOutputs["main"]?.running}
-              onPress={() => handleRunPractice("main", lesson.workshop.practice.starterCode)}
-              size="compact"
-              tone="teal"
-              variant="secondary"
-              style={{ alignSelf: "flex-start", marginVertical: spacing.xs }}
-            >
-              {practiceOutputs["main"]?.running ? "Running..." : "▶ Run starter code"}
-            </ButtonShell>
-            {practiceOutputs["main"]?.output ? (
-              <View>
-                <SectionTitle>Starter output</SectionTitle>
-                <Text style={styles.codeBlock}>{practiceOutputs["main"].output}</Text>
+          {lesson.depth ? (
+            <>
+              <CodeWalkthrough notes={lesson.depth.codeWalkthrough} />
+              
+              <View style={styles.practiceBlock}>
+                <SectionTitle>Starter code</SectionTitle>
+                <TextInput
+                  multiline
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={[styles.codeBlock, styles.practiceInput]}
+                  value={practiceCodes["main"] ?? ""}
+                  onChangeText={(text) => setPracticeCodes((prev) => ({ ...prev, main: text }))}
+                />
+                
+                <ButtonShell
+                  accessibilityHint="Runs the practice starter code in the sandbox."
+                  disabled={practiceOutputs["main"]?.running}
+                  onPress={() => handleRunPractice("main", practiceCodes["main"] ?? lesson.workshop.practice.starterCode)}
+                  size="compact"
+                  tone="teal"
+                  variant="secondary"
+                  style={{ alignSelf: "flex-start", marginVertical: spacing.xs }}
+                >
+                  {practiceOutputs["main"]?.running ? "Running..." : "▶ Run starter code"}
+                </ButtonShell>
+                {practiceOutputs["main"]?.output ? (
+                  <View>
+                    <SectionTitle>Starter output</SectionTitle>
+                    <Text style={styles.codeBlock}>{practiceOutputs["main"].output}</Text>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
-          </View>
-          <View style={styles.practiceBlock}>
-            <SectionTitle>Expected output</SectionTitle>
-            <Text selectable style={styles.codeBlock}>{lesson.workshop.practice.expectedOutput}</Text>
-          </View>
-          <View style={styles.practiceBlock}>
-            <SectionTitle>Check your answer</SectionTitle>
-            <BodyText>{lesson.workshop.practice.checkYourAnswer}</BodyText>
-          </View>
-          
-          <ButtonShell
-            accessibilityHint={showCommonMistakes ? "Hides common beginner mistakes." : "Shows common beginner mistakes."}
-            accessibilityState={{ expanded: showCommonMistakes }}
-            onPress={() => setShowCommonMistakes((current) => !current)}
-            size="compact"
-            tone="ink"
-            variant="tertiary"
-          >
-            {showCommonMistakes ? "Hide common mistakes" : "Show common mistakes"}
-          </ButtonShell>
-          {showCommonMistakes ? (
-            <SubPanel>
-              <SectionTitle>Common mistakes</SectionTitle>
-              {lesson.workshop.commonMistakes.map((mistake) => (
-                <MutedText key={mistake}>• {mistake}</MutedText>
-              ))}
-            </SubPanel>
-          ) : null}
 
-          {lesson.workshop.practiceReps && lesson.workshop.practiceReps.length > 0 ? (
-            <SubPanel style={styles.repsPanel}>
-              <Row>
-                <Badge tone={fluencyRepTone}>{fluencyRepLabel}</Badge>
-              </Row>
-              <SectionTitle>Fluency reps</SectionTitle>
-              <BodyText>
-                {opensBeginnerPythonSupport
-                  ? "Do these small variations before the checkpoint so the syntax becomes familiar instead of one copied answer."
-                  : "Do these small variations when you want more confidence before the checkpoint."}
-              </BodyText>
+              <GuidedEditList steps={lesson.depth.guidedEdits} />
+              <ErrorClinic clinicItems={lesson.depth.errorClinic} />
+            </>
+          ) : (
+            <>
+              <SectionTitle>Try this first</SectionTitle>
+              <BodyText>Before editing, predict what the starter code prints. Then change one line at a time and compare the result with the expected output.</BodyText>
+              <View style={styles.practiceBlock}>
+                <SectionTitle>Starter code</SectionTitle>
+                <TextInput
+                  multiline
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={[styles.codeBlock, styles.practiceInput]}
+                  value={practiceCodes["main"] ?? ""}
+                  onChangeText={(text) => setPracticeCodes((prev) => ({ ...prev, main: text }))}
+                />
+                
+                {/* Run example button */}
+                <ButtonShell
+                  accessibilityHint="Runs the practice starter code in the sandbox."
+                  disabled={practiceOutputs["main"]?.running}
+                  onPress={() => handleRunPractice("main", practiceCodes["main"] ?? lesson.workshop.practice.starterCode)}
+                  size="compact"
+                  tone="teal"
+                  variant="secondary"
+                  style={{ alignSelf: "flex-start", marginVertical: spacing.xs }}
+                >
+                  {practiceOutputs["main"]?.running ? "Running..." : "▶ Run starter code"}
+                </ButtonShell>
+                {practiceOutputs["main"]?.output ? (
+                  <View>
+                    <SectionTitle>Starter output</SectionTitle>
+                    <Text style={styles.codeBlock}>{practiceOutputs["main"].output}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <View style={styles.practiceBlock}>
+                <SectionTitle>Expected output</SectionTitle>
+                <Text selectable style={styles.codeBlock}>{lesson.workshop.practice.expectedOutput}</Text>
+              </View>
+              <View style={styles.practiceBlock}>
+                <SectionTitle>Check your answer</SectionTitle>
+                <BodyText>{lesson.workshop.practice.checkYourAnswer}</BodyText>
+              </View>
+              
               <ButtonShell
-                accessibilityHint={showFluencyReps ? "Hides fluency reps." : "Shows fluency reps."}
-                accessibilityState={{ expanded: showFluencyReps }}
-                onPress={() => setShowFluencyReps((current) => !current)}
+                accessibilityHint={showCommonMistakes ? "Hides common beginner mistakes." : "Shows common beginner mistakes."}
+                accessibilityState={{ expanded: showCommonMistakes }}
+                onPress={() => setShowCommonMistakes((current) => !current)}
                 size="compact"
                 tone="ink"
                 variant="tertiary"
               >
-                {showFluencyReps ? "Hide reps" : `Show ${lesson.workshop.practiceReps.length} reps`}
+                {showCommonMistakes ? "Hide common mistakes" : "Show common mistakes"}
               </ButtonShell>
-              {showFluencyReps ? lesson.workshop.practiceReps.map((practiceRep, repIndex) => {
-                const repKey = `rep-${repIndex}`;
-                return (
-                  <View key={`${lesson.id}-practice-rep-${repIndex}`} style={styles.repBlock}>
-                    <Row>
-                      <Badge tone="teal">rep {repIndex + 1}</Badge>
-                      <Badge tone="blue">same idea, new data</Badge>
-                    </Row>
-                    <SectionTitle>Starter code</SectionTitle>
-                    <Text selectable style={styles.codeBlock}>{practiceRep.starterCode}</Text>
-                    
-                    {/* Run example button */}
-                    <ButtonShell
-                      accessibilityHint={`Runs fluency rep ${repIndex + 1} starter code in the sandbox.`}
-                      disabled={practiceOutputs[repKey]?.running}
-                      onPress={() => handleRunPractice(repKey, practiceRep.starterCode)}
-                      size="compact"
-                      tone="teal"
-                      variant="secondary"
-                      style={{ alignSelf: "flex-start", marginVertical: spacing.xs }}
-                    >
-                      {practiceOutputs[repKey]?.running ? "Running..." : `▶ Run rep ${repIndex + 1} code`}
-                    </ButtonShell>
-                    {practiceOutputs[repKey]?.output ? (
-                      <View>
-                        <SectionTitle>Rep output</SectionTitle>
-                        <Text style={styles.codeBlock}>{practiceOutputs[repKey].output}</Text>
+              {showCommonMistakes ? (
+                <SubPanel>
+                  <SectionTitle>Common mistakes</SectionTitle>
+                  {lesson.workshop.commonMistakes.map((mistake) => (
+                    <MutedText key={mistake}>• {mistake}</MutedText>
+                  ))}
+                </SubPanel>
+              ) : null}
+
+              {lesson.workshop.practiceReps && lesson.workshop.practiceReps.length > 0 ? (
+                <SubPanel style={styles.repsPanel}>
+                  <Row>
+                    <Badge tone={fluencyRepTone}>{fluencyRepLabel}</Badge>
+                  </Row>
+                  <SectionTitle>Fluency reps</SectionTitle>
+                  <BodyText>
+                    {opensBeginnerPythonSupport
+                      ? "Do these small variations before the checkpoint so the syntax becomes familiar instead of one copied answer."
+                      : "Do these small variations when you want more confidence before the checkpoint."}
+                  </BodyText>
+                  <ButtonShell
+                    accessibilityHint={showFluencyReps ? "Hides fluency reps." : "Shows fluency reps."}
+                    accessibilityState={{ expanded: showFluencyReps }}
+                    onPress={() => setShowFluencyReps((current) => !current)}
+                    size="compact"
+                    tone="ink"
+                    variant="tertiary"
+                  >
+                    {showFluencyReps ? "Hide reps" : `Show ${lesson.workshop.practiceReps.length} reps`}
+                  </ButtonShell>
+                  {showFluencyReps ? lesson.workshop.practiceReps.map((practiceRep, repIndex) => {
+                    const repKey = `rep-${repIndex}`;
+                    return (
+                      <View key={`${lesson.id}-practice-rep-${repIndex}`} style={styles.repBlock}>
+                        <Row>
+                          <Badge tone="teal">rep {repIndex + 1}</Badge>
+                          <Badge tone="blue">same idea, new data</Badge>
+                        </Row>
+                        <SectionTitle>Starter code</SectionTitle>
+                        <TextInput
+                          multiline
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          style={[styles.codeBlock, styles.practiceInput]}
+                          value={practiceCodes[repKey] ?? ""}
+                          onChangeText={(text) => setPracticeCodes((prev) => ({ ...prev, [repKey]: text }))}
+                        />
+                        
+                        {/* Run example button */}
+                        <ButtonShell
+                          accessibilityHint={`Runs fluency rep ${repIndex + 1} starter code in the sandbox.`}
+                          disabled={practiceOutputs[repKey]?.running}
+                          onPress={() => handleRunPractice(repKey, practiceCodes[repKey] ?? practiceRep.starterCode)}
+                          size="compact"
+                          tone="teal"
+                          variant="secondary"
+                          style={{ alignSelf: "flex-start", marginVertical: spacing.xs }}
+                        >
+                          {practiceOutputs[repKey]?.running ? "Running..." : `▶ Run rep ${repIndex + 1} code`}
+                        </ButtonShell>
+                        {practiceOutputs[repKey]?.output ? (
+                          <View>
+                            <SectionTitle>Rep output</SectionTitle>
+                            <Text style={styles.codeBlock}>{practiceOutputs[repKey].output}</Text>
+                          </View>
+                        ) : null}
+                        
+                        <SectionTitle>Expected output</SectionTitle>
+                        <Text selectable style={styles.codeBlock}>{practiceRep.expectedOutput}</Text>
+                        <SectionTitle>Check your answer</SectionTitle>
+                        <BodyText>{practiceRep.checkYourAnswer}</BodyText>
                       </View>
-                    ) : null}
-                    
-                    <SectionTitle>Expected output</SectionTitle>
-                    <Text selectable style={styles.codeBlock}>{practiceRep.expectedOutput}</Text>
-                    <SectionTitle>Check your answer</SectionTitle>
-                    <BodyText>{practiceRep.checkYourAnswer}</BodyText>
-                  </View>
-                );
-              }) : null}
-            </SubPanel>
-          ) : null}
+                    );
+                  }) : null}
+                </SubPanel>
+              ) : null}
+            </>
+          )}
 
           {/* Stepper Navigation */}
           <Row style={styles.navRow}>
@@ -446,24 +524,30 @@ export default function LessonDetailScreen(): ReactElement {
             <Badge tone={miniProjectDone ? "green" : "amber"}>{miniProjectDone ? "check passed" : "code lab"}</Badge>
             <Badge tone="teal">offline check</Badge>
           </Row>
-          <SectionTitle>Code Lab: {lesson.workshop.miniProject.title}</SectionTitle>
-          <BodyText>{lesson.workshop.miniProject.goal}</BodyText>
-          <SectionTitle>Build steps</SectionTitle>
-          {lesson.workshop.miniProject.steps.map((step) => (
-            <MutedText key={step}>• {step}</MutedText>
-          ))}
-          <SectionTitle>Deliverables</SectionTitle>
-          {lesson.workshop.miniProject.deliverables.map((deliverable) => (
-            <MutedText key={deliverable}>• {deliverable}</MutedText>
-          ))}
-          <SectionTitle>Check command</SectionTitle>
-          <Text selectable style={styles.codeBlock}>{lesson.workshop.miniProject.verifierCommand}</Text>
-          <SectionTitle>Expected output</SectionTitle>
-          <BodyText>{lesson.workshop.testingFocus}</BodyText>
-          <MutedText>If you see a final passed line, the app check confirmed your code. Only print it yourself when the lesson explicitly asks you to.</MutedText>
-          {lesson.workshop.miniProject.runnerSpec.expectedOutput.length > 0 ? (
-            <Text selectable style={styles.codeBlock}>{lesson.workshop.miniProject.runnerSpec.expectedOutput.join("\n")}</Text>
-          ) : null}
+          {lesson.depth ? (
+            <CodeLabBridge bridge={lesson.depth.codeLabBridge} />
+          ) : (
+            <>
+              <SectionTitle>Code Lab: {lesson.workshop.miniProject.title}</SectionTitle>
+              <BodyText>{lesson.workshop.miniProject.goal}</BodyText>
+              <SectionTitle>Build steps</SectionTitle>
+              {lesson.workshop.miniProject.steps.map((step) => (
+                <MutedText key={step}>• {step}</MutedText>
+              ))}
+              <SectionTitle>Deliverables</SectionTitle>
+              {lesson.workshop.miniProject.deliverables.map((deliverable) => (
+                <MutedText key={deliverable}>• {deliverable}</MutedText>
+              ))}
+              <SectionTitle>Check command</SectionTitle>
+              <Text selectable style={styles.codeBlock}>{lesson.workshop.miniProject.verifierCommand}</Text>
+              <SectionTitle>Expected output</SectionTitle>
+              <BodyText>{lesson.workshop.testingFocus}</BodyText>
+              <MutedText>If you see a final passed line, the app check confirmed your code. Only print it yourself when the lesson explicitly asks you to.</MutedText>
+              {lesson.workshop.miniProject.runnerSpec.expectedOutput.length > 0 ? (
+                <Text selectable style={styles.codeBlock}>{lesson.workshop.miniProject.runnerSpec.expectedOutput.join("\n")}</Text>
+              ) : null}
+            </>
+          )}
           <CodeLab
             attemptHistory={lessonCodeRunHistory}
             isSaving={isSaving}
@@ -817,6 +901,10 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     padding: spacing.md,
     marginVertical: spacing.xs
+  },
+  practiceInput: {
+    minHeight: 100,
+    textAlignVertical: "top"
   },
   stepTitle: {
     fontSize: 14,

@@ -13,7 +13,8 @@ import {
   setMissionCompletion,
   setQuizCompletion,
   setRoleTarget,
-  setWeeklyPlanTaskCompletion
+  setWeeklyPlanTaskCompletion,
+  ensureProgressProfile
 } from "@/domain/progress";
 import type { EvidenceItem, QuizAttempt, ReviewEvent, ReviewItem, UserProgress, WeeklyReportSnapshot } from "@/domain/types";
 import type { CodeRunAttempt } from "@/domain/types";
@@ -732,7 +733,7 @@ describe("progress-store", () => {
     expect(fakeDb.reviewEvents).toHaveLength(1);
     expect(fakeDb.weeklyReports).toHaveLength(1);
     expect(fakeDb.weeklyReports[0]?.report.portfolioMarkdown).toContain("CareerForge Portfolio Report");
-    expect(loadedProgress).toEqual(richProgress);
+    expect(loadedProgress).toEqual(ensureProgressProfile(richProgress));
   });
 
   it("creates initial progress when no row exists", async () => {

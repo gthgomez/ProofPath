@@ -85,12 +85,70 @@ export function formatSandboxFailureFeedback({
     ].join("\n");
   }
 
-  return [
+  const pythonClue = language === "python" && detail ? getPythonBeginnerClue(detail) : undefined;
+  const lines = [
     "The code crashed before the test could finish checking it.",
     `Read the first ${label} error clue, then ask: which name, value, or line is the program complaining about?`,
-    detail ? `Error clue: ${detail}` : "Error clue: no extra detail was reported.",
-    "Make the smallest change that would prove your next assumption, then run the test again."
-  ].join("\n");
+    detail ? `Error clue: ${detail}` : "Error clue: no extra detail was reported."
+  ];
+  if (pythonClue) {
+    lines.push(pythonClue);
+  }
+  lines.push("Make the smallest change that would prove your next assumption, then run the test again.");
+  return lines.join("\n");
+}
+
+function getPythonBeginnerClue(detail: string): string | undefined {
+  if (/SyntaxError/i.test(detail)) {
+    return [
+      "💡 Python beginner tip (SyntaxError):",
+      "• What it means: You have a typo in the code structure that Python does not recognize (like a missing colon, mismatched quotes, or unmatched parentheses).",
+      "• How to fix: Look closely at the line mentioned. Check that every opening `(`, `[`, or `{` has a matching closing bracket, and loops or conditionals end with a colon `:`."
+    ].join("\n");
+  }
+  if (/NameError/i.test(detail)) {
+    return [
+      "💡 Python beginner tip (NameError):",
+      "• What it means: You used a variable name or function name that has not been defined yet, or is spelled differently.",
+      "• How to fix: Check the spelling of the name. Did you define the variable before using it? Remember that Python is case-sensitive (`my_var` is different from `My_Var`)."
+    ].join("\n");
+  }
+  if (/TypeError/i.test(detail)) {
+    return [
+      "💡 Python beginner tip (TypeError):",
+      "• What it means: You tried to perform an operation on data types that don't mix (like adding a string to a number).",
+      "• How to fix: Convert variables to the correct type first. For example, use `str(5)` to combine a number with a string, or `int('5')` to do math with a string digit."
+    ].join("\n");
+  }
+  if (/IndentationError/i.test(detail)) {
+    return [
+      "💡 Python beginner tip (IndentationError):",
+      "• What it means: The spaces or tabs at the beginning of the lines are not aligned correctly. Python uses spacing to group blocks of code.",
+      "• How to fix: Make sure all lines inside the same block (like under an `if` or a loop) are indented by the exact same number of spaces (typically 4). Avoid mixing tabs and spaces."
+    ].join("\n");
+  }
+  if (/KeyError/i.test(detail)) {
+    return [
+      "💡 Python beginner tip (KeyError):",
+      "• What it means: You tried to look up a key in a dictionary, but that key doesn't exist.",
+      "• How to fix: Check the spelling of the key. You can check if the key exists first (`if key in my_dict:`) or use the `.get(key, default)` method to avoid crashes."
+    ].join("\n");
+  }
+  if (/IndexError/i.test(detail)) {
+    return [
+      "💡 Python beginner tip (IndexError):",
+      "• What it means: You tried to access an item in a list using a position (index) that is out of range.",
+      "• How to fix: Python list indices start at 0 and end at length - 1. Make sure your index is less than `len(my_list)`."
+    ].join("\n");
+  }
+  if (/ValueError/i.test(detail)) {
+    return [
+      "💡 Python beginner tip (ValueError):",
+      "• What it means: You passed an argument to a function that has the correct type but an invalid value (like trying to convert the letters `'abc'` to a number).",
+      "• How to fix: Check the value you are passing to the function and make sure it can be processed (e.g. only convert digits to integers)."
+    ].join("\n");
+  }
+  return undefined;
 }
 
 export function formatPolicyViolationFeedback(

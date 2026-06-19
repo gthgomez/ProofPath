@@ -164,8 +164,12 @@ export function createNativeWebViewRunnerHtml(): string {
       };
 
       if (request.runMode === "run_file") {
-        const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode);
-        runner(sandboxConsole);
+        try {
+          const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode);
+          runner(sandboxConsole);
+        } catch (error) {
+          stderr.push(error instanceof Error ? error.message : String(error));
+        }
         return buildAttempt(request, startedAt, stdout, stderr, testResults);
       }
 
@@ -245,7 +249,11 @@ export function createNativeWebViewRunnerHtml(): string {
       pyodide.setStderr({ batched: (text) => stderr.push(text) });
 
       if (request.runMode === "run_file") {
-        await pyodide.runPythonAsync(request.code);
+        try {
+          await pyodide.runPythonAsync(request.code);
+        } catch (error) {
+          stderr.push(error instanceof Error ? error.message : String(error));
+        }
         return buildAttempt(request, startedAt, stdout, stderr, testResults);
       }
 
@@ -315,9 +323,13 @@ export function createNativeWebViewRunnerHtml(): string {
       }
 
       if (request.runMode === "run_file") {
-        const result = db.exec(request.code);
-        const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\\n");
-        stdout.push(output);
+        try {
+          const result = db.exec(request.code);
+          const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\\n");
+          stdout.push(output);
+        } catch (error) {
+          stderr.push(error instanceof Error ? error.message : String(error));
+        }
         return buildAttempt(request, startedAt, stdout.filter(Boolean), stderr, testResults);
       }
 
@@ -350,7 +362,8 @@ export function createNativeWebViewRunnerHtml(): string {
     }
 
     function runnerErrorAttempt(request, error) {
-      const guidance = formatRunnerFailureMessage(error, request.spec.language);
+      const rawError = error instanceof Error ? error.message : String(error || "No extra detail was reported.");
+      const guidance = request.runMode === "run_file" ? rawError : formatRunnerFailureMessage(error, request.spec.language);
       return {
         id: "code-run-" + request.lessonId + "-" + request.now.replace(/[^0-9]/g, ""),
         lessonId: request.lessonId,
@@ -362,7 +375,7 @@ export function createNativeWebViewRunnerHtml(): string {
         passed: false,
         score: 0,
         runtimeMs: 0,
-        testResults: [{ id: "native-webview-runner-error", name: "Native WebView runner", passed: false, visible: true, message: guidance }],
+        testResults: request.runMode === "run_file" ? [] : [{ id: "native-webview-runner-error", name: "Native WebView runner", passed: false, visible: true, message: guidance }],
         createdAt: request.now
       };
     }

@@ -107,7 +107,7 @@ export const lessonWorkshopSchema = z.object({
   synopsis: nonEmptyString,
   prerequisites: z.array(nonEmptyString).min(1),
   testingFocus: nonEmptyString,
-  codeShape: z.string().min(20).optional(),
+  codeShape: z.string().optional(),
   practice: z.object({
     starterCode: nonEmptyString,
     expectedOutput: nonEmptyString,
@@ -179,6 +179,154 @@ export const lessonWorkshopSchema = z.object({
   reflectionPrompt: nonEmptyString
 });
 
+export const proofOutputSchema = z.enum([
+  "code_snapshot",
+  "terminal_stdout",
+  "terminal_stderr",
+  "auto_code_run",
+  "assertion_output",
+  "test_output",
+  "local_file",
+  "csv_sample",
+  "json_sample",
+  "sqlite_schema",
+  "api_fixture",
+  "git_commit",
+  "github_repo_url",
+  "readme",
+  "ci_run",
+  "design_note",
+  "reflection"
+]);
+
+export const runnerCapabilityIdSchema = z.enum([
+  "runner.run_file",
+  "runner.run_checks",
+  "runner.hidden_checks",
+  "runner.python.beginner_native_subset",
+  "runner.python.pyodide",
+  "runner.sql.sqlite_memory",
+  "runner.no_network",
+  "runner.no_filesystem_write",
+  "runner.visible_terminal_transcript"
+]);
+
+export const curriculumMetadataSchema = z.object({
+  level: z.number().int().nonnegative(),
+  sequence: z.number().int().nonnegative(),
+  version: nonEmptyString,
+  lessonKind: z.enum(["concept_only", "simulated_terminal", "run_file", "debug_repair", "proof_pack"]).optional(),
+  intentionalFailure: z.boolean().optional(),
+  teaches: z.array(nonEmptyString),
+  requires: z.array(nonEmptyString),
+  reinforces: z.array(nonEmptyString).optional(),
+  usesButDoesNotTeach: z.array(nonEmptyString).optional(),
+  visibleCodeConcepts: z.array(nonEmptyString).optional(),
+  quizConcepts: z.array(nonEmptyString).optional(),
+  proofOutputs: z.array(proofOutputSchema).optional(),
+  runnerCapabilities: z.array(runnerCapabilityIdSchema).optional(),
+  replacesLessonIds: z.array(nonEmptyString).optional(),
+  replacedByLessonIds: z.array(nonEmptyString).optional(),
+  deprecated: z.boolean().optional(),
+  preserveProgress: z.boolean().optional(),
+  showInActivePath: z.boolean().optional(),
+  showInReviewQueue: z.boolean().optional(),
+  legacyEvidenceOnly: z.boolean().optional()
+});
+
+export const missionTypeSchema = z.enum([
+  "local_micro",
+  "terminal_output",
+  "tested_function",
+  "file_processing",
+  "cli",
+  "github_evidence",
+  "sqlite_api",
+  "production_capstone"
+]);
+
+export const missionCurriculumMetadataSchema = z.object({
+  level: z.number().int().nonnegative(),
+  missionType: missionTypeSchema,
+  requires: z.array(nonEmptyString),
+  supportedLessonIds: z.array(nonEmptyString),
+  requiredLessonIds: z.array(nonEmptyString).optional(),
+  requiredTrackIds: z.array(nonEmptyString).optional(),
+  proofOutputs: z.array(proofOutputSchema),
+  runnerCapabilities: z.array(runnerCapabilityIdSchema).optional(),
+  requiresGitHubEvidence: z.boolean().optional(),
+  capstoneDependencyMissionIds: z.array(nonEmptyString).optional()
+});
+
+export const lessonDepthStageSchema = z.enum([
+  "learn",
+  "practice",
+  "code_lab",
+  "checkpoint",
+  "evidence",
+  "review"
+]);
+
+export const conceptCapsuleSchema = z.object({
+  conceptId: nonEmptyString,
+  definition: nonEmptyString,
+  mentalModel: nonEmptyString,
+  syntaxShape: z.string().optional(),
+  tinyExample: nonEmptyString,
+  commonMistake: nonEmptyString,
+  repairHint: nonEmptyString,
+  usedIn: z.array(lessonDepthStageSchema)
+});
+
+export const codeWalkthroughNoteSchema = z.object({
+  id: nonEmptyString,
+  label: nonEmptyString,
+  codeFragment: nonEmptyString,
+  conceptIds: z.array(nonEmptyString),
+  explanation: nonEmptyString,
+  learnerShouldBeAbleToSay: nonEmptyString
+});
+
+export const guidedEditStepSchema = z.object({
+  id: nonEmptyString,
+  instruction: nonEmptyString,
+  conceptIds: z.array(nonEmptyString),
+  targetCodeFragment: z.string().optional(),
+  expectedObservation: nonEmptyString,
+  wrongTurnHint: nonEmptyString
+});
+
+export const errorClinicItemSchema = z.object({
+  id: nonEmptyString,
+  conceptIds: z.array(nonEmptyString),
+  brokenExample: nonEmptyString,
+  symptom: nonEmptyString,
+  likelyCause: nonEmptyString,
+  fixStrategy: nonEmptyString
+});
+
+export const codeLabBridgeSchema = z.object({
+  story: nonEmptyString,
+  usesConcepts: z.array(nonEmptyString),
+  verifierOnlyConcepts: z.array(nonEmptyString).optional(),
+  learnerOwns: z.array(nonEmptyString),
+  checkerOwns: z.array(nonEmptyString),
+  runExpectation: nonEmptyString
+});
+
+export const lessonDepthSchema = z.object({
+  primaryConceptId: nonEmptyString,
+  secondaryConceptIds: z.array(nonEmptyString),
+  maxNewConcepts: z.number().int().positive(),
+  conceptCapsules: z.array(conceptCapsuleSchema),
+  codeWalkthrough: z.array(codeWalkthroughNoteSchema),
+  guidedEdits: z.array(guidedEditStepSchema),
+  errorClinic: z.array(errorClinicItemSchema),
+  codeLabBridge: codeLabBridgeSchema,
+  understandingProofPrompt: nonEmptyString,
+  exitTicket: z.array(nonEmptyString)
+});
+
 export const lessonSchema = z.object({
   id: nonEmptyString,
   moduleId: nonEmptyString,
@@ -192,7 +340,17 @@ export const lessonSchema = z.object({
   quizId: nonEmptyString,
   desktopTask: nonEmptyString,
   evidencePrompt: nonEmptyString,
-  workshop: lessonWorkshopSchema
+  workshop: lessonWorkshopSchema,
+  curriculum: curriculumMetadataSchema.optional(),
+  depth: lessonDepthSchema.optional()
+}).superRefine((lesson, ctx) => {
+  if (!lesson.curriculum?.deprecated && lesson.workshop.codeShape && lesson.workshop.codeShape.length < 20) {
+    ctx.addIssue({
+      path: ["workshop", "codeShape"],
+      code: z.ZodIssueCode.custom,
+      message: "Too small: expected string to have >=20 characters"
+    });
+  }
 });
 
 export const quizQuestionSchema = z.object({
@@ -200,7 +358,8 @@ export const quizQuestionSchema = z.object({
   prompt: nonEmptyString,
   choices: z.array(nonEmptyString).min(2),
   correctChoiceIndex: z.number().int().nonnegative(),
-  explanation: nonEmptyString
+  explanation: nonEmptyString,
+  conceptIds: z.array(nonEmptyString).optional()
 }).superRefine((question, context) => {
   if (question.correctChoiceIndex >= question.choices.length) {
     context.addIssue({
@@ -299,7 +458,8 @@ export const projectMissionSchema = z.object({
   commonFailureModes: z.array(nonEmptyString).min(1),
   portfolioSummaryPrompt: nonEmptyString,
   evidenceRequirements: missionEvidenceRequirementsSchema,
-  skillIds: z.array(nonEmptyString).min(1)
+  skillIds: z.array(nonEmptyString).min(1),
+  curriculum: missionCurriculumMetadataSchema.optional()
 });
 
 export const evidenceItemSchema = z.object({

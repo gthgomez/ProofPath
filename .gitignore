@@ -36,3 +36,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.log
+
+# Test runs and temporary artifacts
+runs/
+ProofPath_Review.zip
+val_err.txt

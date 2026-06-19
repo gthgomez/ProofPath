@@ -201,7 +201,7 @@ self.onmessage = (event) => {
     } catch (error) {
       self.postMessage({
         stdout: stdout.join("\\n"),
-        stderr: formatSandboxFailureMessage(error, language),
+        stderr: (stderr.length > 0 ? stderr.join("\\n") + "\\n" : "") + (error instanceof Error ? error.message : String(error)),
         testResults
       });
     }
@@ -288,8 +288,12 @@ async function runJavaScriptInProcess(spec: LessonRunnerSpec, runtimeCode: strin
   };
 
   if (runMode === "run_file") {
-    const runner = new Function("console", `"use strict";\n${runtimeCode}`);
-    runner(sandboxConsole);
+    try {
+      const runner = new Function("console", `"use strict";\n${runtimeCode}`);
+      runner(sandboxConsole);
+    } catch (error) {
+      captured.stderr.push(error instanceof Error ? error.message : String(error));
+    }
     return {
       stdout: captured.stdout.join("\n"),
       stderr: captured.stderr.join("\n"),
@@ -410,7 +414,11 @@ async function runPythonFile(code: string): Promise<Pick<CodeRunAttempt, "stdout
 
   pyodide.setStdout({ batched: (text: string) => stdout.push(text) });
   pyodide.setStderr({ batched: (text: string) => stderr.push(text) });
-  await pyodide.runPythonAsync(code);
+  try {
+    await pyodide.runPythonAsync(code);
+  } catch (error) {
+    stderr.push(error instanceof Error ? error.message : String(error));
+  }
 
   return {
     stdout: stdout.join("\n"),
@@ -502,15 +510,23 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
 async function runSqlFile(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
   const SQL = await getSqlJs();
   const db = new SQL.Database();
+  const stdout: string[] = [];
+  const stderr: string[] = [];
 
-  if (spec.setupCode) {
-    db.run(spec.setupCode);
+  try {
+    if (spec.setupCode) {
+      db.run(spec.setupCode);
+    }
+
+    const result = db.exec(code);
+    stdout.push(result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n"));
+  } catch (error) {
+    stderr.push(error instanceof Error ? error.message : String(error));
   }
 
-  const result = db.exec(code);
   return {
-    stdout: result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n"),
-    stderr: "",
+    stdout: stdout.join("\n"),
+    stderr: stderr.join("\n"),
     testResults: []
   };
 }
@@ -596,15 +612,15 @@ export async function runLessonSandbox(
     const rawTestResults = runMode === "run_checks" ? result.testResults : [];
     const passedTests = rawTestResults.filter((testResult) => testResult.passed).length;
     const score = rawTestResults.length === 0 ? 0 : Math.round((passedTests / rawTestResults.length) * 100);
-    const passed = runMode === "run_file"
-      ? true
-      : rawTestResults.length > 0 && rawTestResults.every((testResult) => testResult.passed);
     const { visibleCheckResults, hiddenCheckSummary } = redactCheckResults(rawTestResults);
     const diagnostics = buildProblemDiagnostics({
       language: spec.language,
       stderr: result.stderr,
       checkMessages: visibleCheckResults.filter((testResult) => !testResult.passed).map((testResult) => testResult.message)
     });
+    const passed = runMode === "run_file"
+      ? diagnostics.every((diagnostic) => diagnostic.severity !== "error")
+      : rawTestResults.length > 0 && rawTestResults.every((testResult) => testResult.passed);
     const runtimeMs = Date.now() - startedAt;
     return normalizeCodeRunAttempt({
       id: `code-run-${lessonId}-${now.replace(/[^0-9]/g, "")}`,
@@ -636,16 +652,18 @@ export async function runLessonSandbox(
       createdAt: now
     });
   } catch (error) {
+    const rawError = error instanceof Error ? error.message : normalizeOutput(error);
     const message = formatSandboxFailureFeedback({
       kind: classifySandboxError(error),
       language: spec.language,
-      detail: error instanceof Error ? error.message : normalizeOutput(error)
+      detail: rawError
     });
+    const stderrContent = runMode === "run_file" ? rawError : message;
     const runtimeMs = Date.now() - startedAt;
     const diagnostics = buildProblemDiagnostics({
       language: spec.language,
-      errorMessage: error instanceof Error ? error.message : normalizeOutput(error),
-      stderr: message,
+      errorMessage: rawError,
+      stderr: stderrContent,
       timedOut: classifySandboxError(error) === "timeout"
     });
     const testResults = runMode === "run_checks" ? [
@@ -665,7 +683,7 @@ export async function runLessonSandbox(
       command,
       codeSnapshot: code,
       stdout: "",
-      stderr: message,
+      stderr: stderrContent,
       passed: false,
       score: 0,
       runtimeMs,
@@ -680,7 +698,7 @@ export async function runLessonSandbox(
         passed: false,
         runMode,
         runtimeMs,
-        stderr: message,
+        stderr: stderrContent,
         stdout: "",
         testResults
       }),

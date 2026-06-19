@@ -1,6 +1,6 @@
 import { DEFAULT_ROLE_TARGET_ID, legacyCareerPathIdMap, pathProofGates, roleTargets, type CareerUnlock, type PathProofGate } from "@/content/roles";
 import { findLesson, getLessonsForModule, getModulesForTrack } from "@/domain/content";
-import { getMissionProofChecklist, missionEvidenceMeetsRequirements, type MissionProofChecklistItem } from "@/domain/progress";
+import { getMissionProofChecklist, missionEvidenceMeetsRequirements, isLessonSatisfied, getProofCompletedLessonIds, type MissionProofChecklistItem } from "@/domain/progress";
 import type { ContentPack, Lesson, Module, ProjectMission, RoleTarget, UserProfile, UserProgress } from "@/domain/types";
 import { getLessonStatus, getMissionReadiness } from "@/domain/learning-path";
 
@@ -83,7 +83,7 @@ export function getContentForRole(content: ContentPack, roleTargetId = DEFAULT_R
 
 export function getNextLessonForRole(content: ContentPack, progress: UserProgress): Lesson | undefined {
   return getLessonsForRole(content, progress.profile.roleTargetId)
-    .find((lesson) => !progress.completedLessonIds.includes(lesson.id));
+    .find((lesson) => !isLessonSatisfied(progress, lesson.id));
 }
 
 export function getNextMissionForRole(content: ContentPack, progress: UserProgress): ProjectMission | undefined {
@@ -210,7 +210,7 @@ export function isGitTrackCompleted(content: ContentPack, progress: UserProgress
   if (gitLessons.length === 0) {
     return false;
   }
-  return gitLessons.every((l) => progress.completedLessonIds.includes(l!.id));
+  return gitLessons.every((l) => isLessonSatisfied(progress, l!.id));
 }
 
 export interface PathNode {
@@ -270,7 +270,7 @@ export function getPathNodes(content: ContentPack, trackId: string, progress: Us
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
     const isCompleted = node.type === "lesson"
-      ? progress.completedLessonIds.includes(node.id)
+      ? getProofCompletedLessonIds(progress).includes(node.id)
       : progress.completedProjectMissionIds.includes(node.id);
     const isPlacedOut = node.type === "lesson" && (progress.placedOutLessonIds || []).includes(node.id);
 

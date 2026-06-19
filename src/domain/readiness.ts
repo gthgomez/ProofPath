@@ -1,5 +1,6 @@
 import { getRelevantReviewEvents } from "./review";
 import type { ContentPack, EvidenceItem, ReadinessBreakdown, ReadinessScore, UserProgress } from "./types";
+import { getSatisfiedLessonIds, getSatisfiedQuizIds } from "./progress";
 
 function percentage(completed: number, total: number): number {
   if (total === 0) {
@@ -119,14 +120,8 @@ export function calculateReadinessScore(content: ContentPack, progress: UserProg
     return linkedLessonIsRelevant && linkedMissionIsRelevant;
   });
 
-  const completedOrPlacedOutLessons = Array.from(new Set([
-    ...progress.completedLessonIds,
-    ...(progress.placedOutLessonIds || [])
-  ]));
-  const completedOrPlacedOutQuizzes = Array.from(new Set([
-    ...progress.completedQuizIds,
-    ...(progress.placedOutQuizIds || [])
-  ]));
+  const completedOrPlacedOutLessons = getSatisfiedLessonIds(progress);
+  const completedOrPlacedOutQuizzes = getSatisfiedQuizIds(progress);
 
   const lessonCompletion = percentage(countKnownCompleted(completedOrPlacedOutLessons, lessonIds), content.lessons.length);
   const quizPerformance = percentage(countKnownCompleted(completedOrPlacedOutQuizzes, quizIds), content.quizzes.length);

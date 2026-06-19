@@ -35,6 +35,34 @@ function uniqueValues(values: string[]): string[] {
   return Array.from(new Set(values));
 }
 
+export function isLessonSatisfied(progress: UserProgress, lessonId: string): boolean {
+  return (progress.completedLessonIds || []).includes(lessonId) ||
+         (progress.placedOutLessonIds || []).includes(lessonId);
+}
+
+export function isQuizSatisfied(progress: UserProgress, quizId: string): boolean {
+  return (progress.completedQuizIds || []).includes(quizId) ||
+         (progress.placedOutQuizIds || []).includes(quizId);
+}
+
+export function getSatisfiedLessonIds(progress: UserProgress): string[] {
+  return Array.from(new Set([
+    ...(progress.completedLessonIds || []),
+    ...(progress.placedOutLessonIds || [])
+  ]));
+}
+
+export function getSatisfiedQuizIds(progress: UserProgress): string[] {
+  return Array.from(new Set([
+    ...(progress.completedQuizIds || []),
+    ...(progress.placedOutQuizIds || [])
+  ]));
+}
+
+export function getProofCompletedLessonIds(progress: UserProgress): string[] {
+  return progress.completedLessonIds || [];
+}
+
 function withTimestamp(progress: Omit<UserProgress, "updatedAt">, now: string): UserProgress {
   return {
     ...progress,
@@ -186,8 +214,94 @@ type StoredProgress = Omit<UserProgress, "profile" | "evidenceItems" | "quizAtte
 export function ensureProgressProfile(progress: StoredProgress, now = new Date().toISOString()): UserProgress {
   const fallbackProfile = createInitialProfile(now);
 
+  const completedLessonIds = progress.completedLessonIds ?? [];
+  let placedOutLessonIds = progress.placedOutLessonIds ?? [];
+  let placedOutQuizIds = progress.placedOutQuizIds ?? [];
+
+  // Migration: learners who completed the old Level 0 anchor lesson are placed out of all Level 0 micro-lessons.
+  // Also placed out of the new Level 1 micro-lessons, since lesson-python-values taught equivalent content.
+  if (completedLessonIds.includes("lesson-python-values")) {
+    const level0LessonIds = [
+      "lesson-python-zero-files-folders",
+      "lesson-python-zero-terminal",
+      "lesson-python-zero-first-script",
+      "lesson-python-zero-change-rerun",
+      "lesson-python-zero-first-error"
+    ];
+    const level0QuizIds = [
+      "quiz-python-zero-files-folders",
+      "quiz-python-zero-terminal",
+      "quiz-python-zero-first-script",
+      "quiz-python-zero-change-rerun",
+      "quiz-python-zero-first-error"
+    ];
+    // New Level 1 micro-lessons that replace lesson-python-values
+    const level1MicroLessonIds = [
+      "lesson-python-literals",
+      "lesson-python-assignment",
+      "lesson-python-print-values",
+      "lesson-python-numbers",
+      "lesson-python-strings",
+      "lesson-python-fstrings"
+    ];
+    const level1MicroQuizIds = [
+      "quiz-python-literals",
+      "quiz-python-assignment",
+      "quiz-python-print-values",
+      "quiz-python-numbers",
+      "quiz-python-strings",
+      "quiz-python-fstrings"
+    ];
+
+    placedOutLessonIds = uniqueValues([...placedOutLessonIds, ...level0LessonIds, ...level1MicroLessonIds]);
+    placedOutQuizIds = uniqueValues([...placedOutQuizIds, ...level0QuizIds, ...level1MicroQuizIds]);
+  }
+
+  // Migration: learners who completed the old monolithic functions lesson are placed out of the Level 3 micro-lessons.
+  if (completedLessonIds.includes("lesson-python-functions")) {
+    const level3MicroLessonIds = [
+      "lesson-python-why-functions",
+      "lesson-python-def-call",
+      "lesson-python-parameters",
+      "lesson-python-return",
+      "lesson-python-print-vs-return"
+    ];
+    const level3MicroQuizIds = [
+      "quiz-python-why-functions",
+      "quiz-python-def-call",
+      "quiz-python-parameters",
+      "quiz-python-return",
+      "quiz-python-print-vs-return"
+    ];
+
+    placedOutLessonIds = uniqueValues([...placedOutLessonIds, ...level3MicroLessonIds]);
+    placedOutQuizIds = uniqueValues([...placedOutQuizIds, ...level3MicroQuizIds]);
+  }
+
+  // Migration: learners who completed the old traceback clinic lesson are placed out of the Level 4 micro-lessons.
+  if (completedLessonIds.includes("lesson-python-traceback-clinic")) {
+    const level4MicroLessonIds = [
+      "lesson-python-read-traceback",
+      "lesson-python-nameerror",
+      "lesson-python-typeerror",
+      "lesson-python-valueerror",
+      "lesson-python-try-except"
+    ];
+    const level4MicroQuizIds = [
+      "quiz-python-read-traceback",
+      "quiz-python-nameerror",
+      "quiz-python-typeerror",
+      "quiz-python-valueerror",
+      "quiz-python-try-except"
+    ];
+
+    placedOutLessonIds = uniqueValues([...placedOutLessonIds, ...level4MicroLessonIds]);
+    placedOutQuizIds = uniqueValues([...placedOutQuizIds, ...level4MicroQuizIds]);
+  }
+
   return {
     ...progress,
+    completedLessonIds,
     profile: {
       ...fallbackProfile,
       ...progress.profile,
@@ -195,12 +309,12 @@ export function ensureProgressProfile(progress: StoredProgress, now = new Date()
       createdAt: progress.profile?.createdAt || progress.updatedAt || now,
       updatedAt: progress.profile?.updatedAt || progress.updatedAt || now
     },
-    evidenceItems: progress.evidenceItems.map(normalizeEvidenceItem),
+    evidenceItems: (progress.evidenceItems ?? []).map(normalizeEvidenceItem),
     quizAttempts: progress.quizAttempts ?? [],
     codeRunAttempts: (progress.codeRunAttempts ?? []).map(normalizeCodeRunAttempt),
     completedLessonMiniProjectIds: progress.completedLessonMiniProjectIds ?? [],
-    placedOutLessonIds: progress.placedOutLessonIds ?? [],
-    placedOutQuizIds: progress.placedOutQuizIds ?? [],
+    placedOutLessonIds,
+    placedOutQuizIds,
     completedProjectMissionDeliverableIds: progress.completedProjectMissionDeliverableIds ?? [],
     completedProjectMissionPhaseIds: progress.completedProjectMissionPhaseIds ?? [],
     reviewItems: progress.reviewItems ?? [],
@@ -414,7 +528,7 @@ export function isLessonVerifiedComplete(progress: UserProgress, lesson: Lesson)
 
 export function isWeeklyTaskComplete(task: WeeklyPlanTask, progress: UserProgress): boolean {
   if (task.linkedLessonId) {
-    return progress.completedLessonIds.includes(task.linkedLessonId);
+    return isLessonSatisfied(progress, task.linkedLessonId);
   }
 
   if (task.linkedProjectMissionId) {
@@ -447,7 +561,7 @@ function deriveCompletedMissionIds(content: ContentPack, progress: UserProgress)
     .filter((mission) => {
       const supportedLessonIds = getMissionSupportedLessonIds(mission, content.lessons, content);
       const preparationComplete = supportedLessonIds.length === 0
-        || supportedLessonIds.every((lessonId) => progress.completedLessonIds.includes(lessonId));
+        || supportedLessonIds.every((lessonId) => isLessonSatisfied(progress, lessonId));
 
       return preparationComplete && missionEvidenceMeetsRequirements(progress, mission);
     })
@@ -483,7 +597,7 @@ function deriveCompletedWeeklyTaskIds(content: ContentPack, progress: UserProgre
 function reconcileReviewItems(progress: UserProgress, now: string): UserProgress["reviewItems"] {
   let reviewItems = progress.reviewItems.filter((item) => {
     if (item.targetType === "lesson") {
-      return progress.completedLessonIds.includes(item.targetId);
+      return getProofCompletedLessonIds(progress).includes(item.targetId);
     }
 
     if (item.targetType === "quiz") {
@@ -493,7 +607,7 @@ function reconcileReviewItems(progress: UserProgress, now: string): UserProgress
     return progress.completedProjectMissionIds.includes(item.targetId);
   });
 
-  for (const lessonId of progress.completedLessonIds) {
+  for (const lessonId of getProofCompletedLessonIds(progress)) {
     reviewItems = upsertReviewItem(reviewItems, "lesson", lessonId, now);
   }
 
