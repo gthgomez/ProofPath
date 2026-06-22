@@ -1,103 +1,202 @@
-import type { Lesson, Quiz } from "@/domain/types";
-import { proofLesson, checkpointQuiz } from "./shared";
+import type { Lesson, LessonPracticeBlock, Quiz } from "@/domain/types";
+import { proofLesson, checkpointQuiz, codeReadingQuiz } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Practice rep pools
 // ---------------------------------------------------------------------------
 
-const literalsPracticeReps = [
+const literalsPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "# Which line below stores a whole number?\n# a) count = \"5\"\n# b) count = 5\n# c) count = 5.0\ncount = 5\nprint(\"Type check result is below\")\nprint(type(count))",
     expectedOutput: "Type check result is below\n<class 'int'>",
-    checkYourAnswer: "type() returns the data type. An integer has no quotes and no decimal. The string '5' looks like a number but behaves like text."
+    checkYourAnswer: "type() returns the data type. An integer has no quotes and no decimal. The string '5' looks like a number but behaves like text.",
+    tier: "replicate"
   },
   {
     starterCode: "active = True\nprint(\"Active type is below\")\nprint(type(active))\nprint(\"Active value is below\")\nprint(active)",
     expectedOutput: "Active type is below\n<class 'bool'>\nActive value is below\nTrue",
-    checkYourAnswer: "True and False must be capitalised and have no quotes. Lowercase true or 'True' in quotes will not work the same way."
+    checkYourAnswer: "True and False must be capitalised and have no quotes. Lowercase true or 'True' in quotes will not work the same way.",
+    tier: "replicate"
+  },
+  {
+    starterCode: 'count = "5"\nprint("Count type is below")\nprint(type(count))',
+    expectedOutput: "Count type is below\n<class 'int'>",
+    checkYourAnswer: "The bug is that count holds the string '5', not the integer 5. Remove the quotes around 5 so type() reports <class 'int'>.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: '# Write three type() calls to check the type of the string "python",\n# the integer 42, and the boolean True.\n# Print the result of each type() call.\n',
+    expectedOutput: "<class 'str'>\n<class 'int'>\n<class 'bool'>",
+    checkYourAnswer: "Call print(type(...)) for each value. Make sure you write the literal correctly: 'python' needs quotes, 42 needs none, True needs a capital T.",
+    tier: "synthesize"
   }
 ];
 
-const assignmentPracticeReps = [
+const assignmentPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "topic = \"git\"\nminutes = 15\ncompleted = False\nprint(\"Topic name is\")\nprint(topic)\nprint(\"Minutes count is\")\nprint(minutes)\nprint(\"Completed status is\")\nprint(completed)",
     expectedOutput: "Topic name is\ngit\nMinutes count is\n15\nCompleted status is\nFalse",
-    checkYourAnswer: "Each variable holds one value. Notice topic is text (quotes), minutes is a number (no quotes), and completed is a boolean (capital T or F, no quotes)."
+    checkYourAnswer: "Each variable holds one value. Notice topic is text (quotes), minutes is a number (no quotes), and completed is a boolean (capital T or F, no quotes).",
+    tier: "replicate"
   },
   {
     starterCode: "track = \"backend\"\nlesson_count = 2\nready = False\nprint(\"Track name is\")\nprint(track)\nprint(\"Lesson count is\")\nprint(lesson_count)\nprint(\"Ready status is\")\nprint(ready)",
     expectedOutput: "Track name is\nbackend\nLesson count is\n2\nReady status is\nFalse",
-    checkYourAnswer: "The names on the left describe the values on the right. A good variable name is a tiny label for the data it holds."
+    checkYourAnswer: "The names on the left describe the values on the right. A good variable name is a tiny label for the data it holds.",
+    tier: "replicate"
+  },
+  {
+    starterCode: '# Fix the bug: minutes should hold the integer 30, not the string "30".\nminutes = "30"\nprint("Minutes value is")\nprint(minutes)',
+    expectedOutput: "Minutes value is printed as\n30",
+    checkYourAnswer: "The bug is that minutes holds the string '30' instead of the integer 30. Remove the quotes so Python treats it as a number.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: '# Create three variables for a study tracker session:\n# topic (string), minutes (integer), and completed (boolean).\n# Assign any values you like and print all three.\n',
+    expectedOutput: "topic is python\nminutes is 45\ncompleted is False",
+    checkYourAnswer: "Define topic, minutes, and completed with the correct types. Strings need quotes, integers need none, booleans need capital T or F.",
+    tier: "synthesize"
   }
 ];
 
-const printValuesPracticeReps = [
+const printValuesPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "language = \"Python\"\nversion = 3\nprint(\"Language value is\")\nprint(language)\nprint(\"Version value is\")\nprint(version)",
     expectedOutput: "Language value is\nPython\nVersion value is\n3",
-    checkYourAnswer: "print(language) sends the value stored in language to the terminal. Without print nothing is visible."
+    checkYourAnswer: "print(language) sends the value stored in language to the terminal. Without print nothing is visible.",
+    tier: "replicate"
   },
   {
     starterCode: "score = 100\npassed = True\nprint(\"Score value is\")\nprint(score)\nprint(\"Passed value is\")\nprint(passed)",
     expectedOutput: "Score value is\n100\nPassed value is\nTrue",
-    checkYourAnswer: "Printing a boolean shows True or False. This is different from printing the string 'True'."
+    checkYourAnswer: "Printing a boolean shows True or False. This is different from printing the string 'True'.",
+    tier: "replicate"
+  },
+  {
+    starterCode: '# Fix the bug: the code prints the literal word instead of the stored value.\ntopic = "git"\nprint("topic")',
+    expectedOutput: "The printed value is\ngit",
+    checkYourAnswer: "The bug is that print(\"topic\") prints the literal word topic instead of the variable's value. Remove the quotes inside print() to print the variable.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: '# Assign a variable called session_name with the value "review" and\n# a variable called duration with the value 20. Print both on separate lines.\n',
+    expectedOutput: "session name is review\nduration is 20",
+    checkYourAnswer: "Assign session_name = \"review\" and duration = 20, then call print() with each variable name — not a string literal.",
+    tier: "synthesize"
   }
 ];
 
-const numbersPracticeReps = [
+const numbersPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "sessions = 3\nminutes_each = 20\ntotal = sessions * minutes_each\nprint(\"Total calculated sum is\")\nprint(total)",
     expectedOutput: "Total calculated sum is\n60",
-    checkYourAnswer: "Multiplication uses *. The result is a new integer, not a string. If total was 0 the right-hand side didn't run."
+    checkYourAnswer: "Multiplication uses *. The result is a new integer, not a string. If total was 0 the right-hand side didn't run.",
+    tier: "replicate"
   },
   {
     starterCode: "total = 75\ndone = 2\nremaining = total - done\nprint(\"Remaining lessons count is\")\nprint(remaining)",
     expectedOutput: "Remaining lessons count is\n73",
-    checkYourAnswer: "Subtraction with - produces a new value stored in remaining. Variables on both sides of - are looked up first."
+    checkYourAnswer: "Subtraction with - produces a new value stored in remaining. Variables on both sides of - are looked up first.",
+    tier: "replicate"
+  },
+  {
+    starterCode: 'session_a = 15\nsession_b = 10\ntotal = session_a - session_b\nprint("Total minutes is")\nprint(total)',
+    expectedOutput: "New total minutes value is\n25",
+    checkYourAnswer: "The bug is that the code subtracts instead of adding. Change the - to + so total becomes the sum of both sessions.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: '# Calculate the total minutes for three study sessions:\n# session_1 = 25, session_2 = 30, session_3 = 15.\n# Store the sum in a variable called grand_total and print it.\n',
+    expectedOutput: "The grand total is\n70",
+    checkYourAnswer: "Assign all three session variables, then add them with + and store the result in grand_total before printing.",
+    tier: "synthesize"
   }
 ];
 
-const stringsPracticeReps = [
+const stringsPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "greeting = \"Hello\"\nname = \"learner\"\nmessage = greeting + \" \" + name\nprint(\"Formatted joined message is\")\nprint(message)",
     expectedOutput: "Formatted joined message is\nHello learner",
-    checkYourAnswer: "+ joins two strings. The space in the middle is itself a tiny string literal. Without it the words run together."
+    checkYourAnswer: "+ joins two strings. The space in the middle is itself a tiny string literal. Without it the words run together.",
+    tier: "replicate"
   },
   {
     starterCode: "raw = \"  Python  \"\nclean = raw.strip()\nprint(\"Stripped clean value is\")\nprint(clean)",
     expectedOutput: "Stripped clean value is\nPython",
-    checkYourAnswer: ".strip() removes leading and trailing spaces. The original raw stays unchanged; strip returns a new value."
+    checkYourAnswer: ".strip() removes leading and trailing spaces. The original raw stays unchanged; strip returns a new value.",
+    tier: "replicate"
+  },
+  {
+    starterCode: 'raw = "  Python  "\nraw.strip()\nprint("Cleaned value is")\nprint(raw)',
+    expectedOutput: "Cleaned value is\nPython",
+    checkYourAnswer: "The bug is that raw.strip() returns a new value but nothing saves it. Assign the result: clean = raw.strip() and print clean instead of raw.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: '# Join the two strings topic = "python" and status = "completed"\n# into one message: "python-completed".\n# Then apply .upper() to make the result uppercase and print it.\n',
+    expectedOutput: "The final result is\nPYTHON-COMPLETED",
+    checkYourAnswer: "Use + to join the strings with a hyphen in between, then chain .upper() on the result and print it.",
+    tier: "synthesize"
   }
 ];
 
-const fstringsPracticeReps = [
+const fstringsPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "topic = \"python\"\nminutes = 30\nsummary = f\"{topic} session took {minutes} min\"\nprint(summary)",
     expectedOutput: "python session took 30 min",
-    checkYourAnswer: "Each {} is replaced by the variable's value at runtime. The surrounding text is literal characters."
+    checkYourAnswer: "Each {} is replaced by the variable's value at runtime. The surrounding text is literal characters.",
+    tier: "replicate"
   },
   {
     starterCode: "sessions = 4\ntotal_minutes = 90\nreport = f\"{sessions} sessions and {total_minutes} minutes\"\nprint(report)",
     expectedOutput: "4 sessions and 90 minutes",
-    checkYourAnswer: "f-strings combine numbers and text without explicit conversion. 4 is still an int; the f-string handles the display."
+    checkYourAnswer: "f-strings combine numbers and text without explicit conversion. 4 is still an int; the f-string handles the display.",
+    tier: "replicate"
+  },
+  {
+    starterCode: 'topic = "python"\nminutes = 30\nsummary = "{topic}: {minutes} min"\nprint(summary)',
+    expectedOutput: "The output is: python: 30 min",
+    checkYourAnswer: "The bug is that the f prefix is missing before the opening quote. Add f before the string so Python replaces {} with variable values.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: '# Build a session summary string using an f-string.\n# Variables: topic = "git", sessions = 3.\n# Expected output: "git: 3 sessions logged".\n',
+    expectedOutput: "git: 3 sessions logged",
+    checkYourAnswer: "Write an f-string with {} placeholders for topic and sessions. Remember the f prefix and use \\n only if you want a newline.",
+    tier: "synthesize"
   }
 ];
 
-const pythonValuePracticeReps = [
+const pythonValuePracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "topic = \"git\"\nminutes = 15\ncompleted = False\nsummary = \"\"\nprint(summary)",
     expectedOutput: "git: 15 minutes planned",
-    checkYourAnswer: "Use the variables instead of typing an unrelated sentence. If minutes later changes, the summary should be the only output that changes with it."
+    checkYourAnswer: "Use the variables instead of typing an unrelated sentence. If minutes later changes, the summary should be the only output that changes with it.",
+    tier: "synthesize"
   },
   {
     starterCode: "topic = \"python\"\nminutes = 30\ncompleted = True\nstatus = \"\"\nprint(status)",
     expectedOutput: "python session complete: True",
-    checkYourAnswer: "The boolean should stay True, not the string \"True\". Ask yourself whether a later if statement could use the value directly."
+    checkYourAnswer: "The boolean should stay True, not the string \"True\". Ask yourself whether a later if statement could use the value directly.",
+    tier: "synthesize"
   },
   {
     starterCode: "track = \"backend\"\nlesson_count = 2\nready = False\nreport = \"\"\nprint(report)",
     expectedOutput: "backend has 2 lessons ready=False",
-    checkYourAnswer: "This rep checks whether you can combine text, numbers, and booleans without losing the type of each original value."
+    checkYourAnswer: "This rep checks whether you can combine text, numbers, and booleans without losing the type of each original value.",
+    tier: "synthesize"
+  },
+  {
+    starterCode: 'topic = "git"\nminutes = 15\ncompleted = False\nsummary = f"{topic}: {minutes} minutes planned"\nprint(summary)',
+    expectedOutput: "git: 15 minutes planned",
+    checkYourAnswer: "The summary is already built for you. Run the code and observe how the f-string combines topic, minutes, and the literal text.",
+    tier: "replicate"
+  },
+  {
+    starterCode: 'topic = "python"\nminutes = 30\ncompleted = True\nstatus = "python session complete:" + " " + True\nprint(status)',
+    expectedOutput: "python session complete: True",
+    checkYourAnswer: "The bug is that True is a boolean and cannot be concatenated with + and a string. Use an f-string or convert True to a string with str().",
+    tier: "diagnose"
   }
 ];
 
@@ -111,7 +210,7 @@ const literalsLesson = proofLesson({
   slug: "python-literals",
   title: "Python's Three Starter Types",
   summary: "Learn what strings, integers, and booleans look like before you name them.",
-  bodyMarkdown: "Python has three types you will use in every program: strings (text in quotes), integers (whole numbers without quotes), and booleans (True or False). Recognising which type a value is helps you predict what will happen when you combine or compare values.",
+  bodyMarkdown: "Python has three types you will use in every program: strings (text in quotes), integers (whole numbers without quotes), and booleans (True or False). You can check any value's type by calling `type(value)` — it will tell you whether the value is a string, an integer, or a boolean. Recognising which type a value is helps you predict what will happen when you combine or compare values.",
   estimatedMinutes: 4,
   difficulty: "foundation",
   skillIds: ["skill-python-basics"],
@@ -492,7 +591,7 @@ const printValuesLesson = proofLesson({
   ],
   curriculum: {
     level: 1,
-    sequence: 3,
+    sequence: 4,
     version: "1.0.0",
     lessonKind: "run_file",
     teaches: ["py.print.variable"],
@@ -624,7 +723,7 @@ const numbersLesson = proofLesson({
   ],
   curriculum: {
     level: 1,
-    sequence: 4,
+    sequence: 5,
     version: "1.0.0",
     lessonKind: "run_file",
     teaches: ["py.arithmetic"],
@@ -707,7 +806,7 @@ const stringsLesson = proofLesson({
   slug: "python-strings",
   title: "Text, Quotes, and String Operations",
   summary: "Join, clean, and inspect strings using + and built-in methods.",
-  bodyMarkdown: "Strings have methods you can call with a dot: .strip() removes leading and trailing spaces, .lower() converts to lowercase, and len() counts characters. You can join two strings with +.",
+  bodyMarkdown: "### What is a method?\nA method is a built-in action that belongs to a specific type of value. You've already used a function: print(). A method is like a function, but it's attached to the value it works on.\n\nYou write it with a dot after the value, followed by parentheses: \"hello\".upper(). The dot means \"this action belongs to this value.\" The parentheses mean \"run the action now.\"\n\nThink of a TV remote: the buttons are methods. The remote (the object) has buttons you press. You don't need to know how the remote works inside — you just press the button you need.\n\nStrings have methods you can call with a dot: .strip() removes leading and trailing spaces, .lower() converts to lowercase, and len() counts characters. You can join two strings with +.",
   estimatedMinutes: 5,
   difficulty: "foundation",
   skillIds: ["skill-python-basics"],
@@ -754,23 +853,23 @@ const stringsLesson = proofLesson({
   ],
   curriculum: {
     level: 1,
-    sequence: 5,
+    sequence: 6,
     version: "1.0.0",
     lessonKind: "run_file",
-    teaches: ["py.string.methods"],
+    teaches: ["py.string.methods", "py.method"],
     requires: ["py.variable.assignment", "py.string"],
     reinforces: ["py.string"],
-    visibleCodeConcepts: ["py.string.methods", "py.string"],
+    visibleCodeConcepts: ["py.string.methods", "py.method", "py.string"],
     usesButDoesNotTeach: ["py.assertion"],
-    quizConcepts: ["py.string.methods"],
+    quizConcepts: ["py.string.methods", "py.method"],
     proofOutputs: ["terminal_stdout", "auto_code_run"]
   }
 });
 
 stringsLesson.depth = {
   primaryConceptId: "py.string.methods",
-  secondaryConceptIds: [],
-  maxNewConcepts: 1,
+  secondaryConceptIds: ["py.method"],
+  maxNewConcepts: 2,
   conceptCapsules: [
     {
       conceptId: "py.string.methods",
@@ -781,6 +880,16 @@ stringsLesson.depth = {
       commonMistake: "Forgetting that methods return a new string — the original variable is unchanged unless you reassign.",
       repairHint: "Assign the result: clean = raw.strip() so the cleaned value is stored.",
       usedIn: ["learn", "practice", "code_lab"]
+    },
+    {
+      conceptId: "py.method",
+      definition: "A built-in action that belongs to a specific type of value, called using dot notation.",
+      mentalModel: "Think of a method like a button on a TV remote: the remote (the value) has buttons you can press (the methods). You don't need to know how the remote works inside.",
+      syntaxShape: 'value.method() or "text".method()',
+      tinyExample: '"hello".upper()',
+      commonMistake: "Forgetting parentheses at the end of a method call, which returns the method object instead of executing it.",
+      repairHint: "Always add () after the method name to execute it: value.method().",
+      usedIn: ["learn", "practice"]
     }
   ],
   codeWalkthrough: [
@@ -889,14 +998,14 @@ const fstringsLesson = proofLesson({
   ],
   curriculum: {
     level: 1,
-    sequence: 6,
+    sequence: 3,
     version: "1.0.0",
     lessonKind: "run_file",
     teaches: ["py.f_string"],
-    requires: ["py.variable.assignment", "py.string", "py.print.variable"],
+    requires: ["py.variable.assignment", "py.string"],
     visibleCodeConcepts: ["py.f_string"],
     quizConcepts: ["py.f_string"],
-    usesButDoesNotTeach: ["py.assertion"],
+    usesButDoesNotTeach: ["py.assertion", "py.dict.literal"],
     proofOutputs: ["terminal_stdout", "auto_code_run"]
   }
 });
@@ -1091,10 +1200,10 @@ deprecatedValuesLesson.depth = {
 export const level1Lessons: Lesson[] = [
   literalsLesson,
   assignmentLesson,
+  fstringsLesson,
   printValuesLesson,
   numbersLesson,
-  stringsLesson,
-  fstringsLesson
+  stringsLesson
 ];
 
 /** Kept in the content pack so old learner progress IDs still resolve. */
@@ -1107,70 +1216,76 @@ export const deprecatedLevel1Lessons: Lesson[] = [
 // ---------------------------------------------------------------------------
 
 export const level1Quizzes: Quiz[] = [
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-literals",
     "lesson-python-literals",
     "Literal Types Checkpoint",
+    'type("python")\ntype(30)\ntype(False)',
     "Python's three starter types",
-    "Strings are text in quotes, integers are whole numbers without quotes, and booleans are exactly True or False.",
-    "Strings and integers are the same because both can hold numbers.",
-    "Booleans are strings that say 'true' or 'false'.",
-    "Each type has a distinct syntax. Quotes make something a string. No quotes and no decimal makes an integer. Capital T/F makes a boolean.",
+    "type() tells you whether each value is a string, integer, or boolean",
+    "type() converts each value to a string so you can print it",
+    "type() returns the length of each value",
+    "type() returns <class 'str'>, <class 'int'>, or <class 'bool'> depending on the value inside the parentheses.",
     ["py.string", "py.integer", "py.boolean"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-assignment",
     "lesson-python-assignment",
     "Variable Assignment Checkpoint",
+    'topic = "python"\nminutes = 30\ncompleted = False',
     "variable assignment",
-    "Write the variable name on the left of = and the value on the right.",
-    "Write the value on the left of = and the variable name on the right.",
-    "Use == to store a value in a variable.",
-    "name = value stores the value under the name. Reversing the sides causes SyntaxError.",
+    'The name on the left stores the value on the right: topic holds "python", minutes holds 30',
+    'The equals sign compares topic to "python" and returns True',
+    "The value on the left is stored into the name on the right",
+    "In Python, = is assignment, not equality. It stores the right-side value into the left-side name.",
     ["py.variable.assignment"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-print-values",
     "lesson-python-print-values",
     "Print Values Checkpoint",
+    'topic = "python"\nprint(topic)',
     "printing variable values",
-    "Call print(variable_name) without quotes to display the stored value.",
-    "Call print('variable_name') with quotes to display the stored value.",
-    "Variables print themselves automatically without needing print().",
-    "print(name) displays the value stored in name. Quotes inside print() make a string literal instead.",
+    'print(topic) displays the value "python" stored inside topic, not the word topic',
+    'print(topic) displays the text "topic" because it prints the variable name',
+    "print(topic) causes an error because variables cannot be printed",
+    "print(variable) looks up the variable's stored value. To print the literal word, you would need quotes: print(\"topic\").",
     ["py.print.variable"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-numbers",
     "lesson-python-numbers",
     "Arithmetic Checkpoint",
+    "total = session_a + session_b\nprint(total)",
     "integer arithmetic",
-    "Use +, -, *, and // to compute integer results stored in variables.",
-    "Use / for whole-number division to avoid decimal results.",
-    "Integer arithmetic requires explicit type conversion before computing.",
-    "Arithmetic operators compute a new value. // is floor division (drops the decimal). / may produce a float.",
+    "You must use // for integer division; / produces a float like 3.5",
+    "/ and // both produce the same result for whole-number division",
+    "You should use + for division because it is the most common operator",
+    "// performs floor division (drops the decimal). / performs true division and may return a float.",
     ["py.arithmetic"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-strings",
     "lesson-python-strings",
     "String Methods Checkpoint",
+    'raw = "  Python  "\nclean = raw.strip().lower()',
     "string methods",
-    "Call .strip() and .lower() to clean and normalise a string value.",
-    "Modify the original string in place using .strip() without reassigning.",
-    "String methods need an import statement before they can be called.",
-    "String methods return new strings. Assign the result to store the cleaned value.",
+    'clean = "python" — no spaces and all lowercase. The original raw is unchanged.',
+    'raw is now "python" because .strip() and .lower() modify the variable in place',
+    "This causes an error because you cannot chain two methods together",
+    "String methods return NEW values without changing the original. Chaining works left to right: strip() removes spaces, then lower() lowercases the result.",
     ["py.string.methods"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-fstrings",
     "lesson-python-fstrings",
     "f-string Checkpoint",
-    "f-string interpolation",
-    "Prefix the string with f and embed variable names inside {} to build readable output.",
-    "Use + to concatenate variables into strings when building output.",
-    "Use str() on every variable before including it in a string output.",
-    "f-strings embed variables at {} slots. The f prefix is required. Each {} is replaced at runtime with the variable's value.",
+    'topic = "python"\nsummary = f"{topic}: 30 minutes"',
+    "f-strings",
+    "The f prefix and {} placeholder let you insert the value of topic into the string",
+    "Without the f prefix, {topic} is also replaced by the variable value",
+    "The {} brackets store the result back into the variable topic",
+    'f"{variable}" replaces {variable} with its current value. Without the f prefix, Python treats {topic} as literal text.',
     ["py.f_string"]
   ),
   // Deprecated quiz — kept so old quiz attempt IDs still resolve

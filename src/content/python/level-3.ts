@@ -1,85 +1,272 @@
-import type { Lesson, Quiz } from "@/domain/types";
-import { proofLesson, checkpointQuiz } from "./shared";
+import type { Lesson, Quiz, LessonPracticeBlock } from "@/domain/types";
+import { proofLesson, checkpointQuiz, codeReadingQuiz } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Practice rep pools
 // ---------------------------------------------------------------------------
 
-const whyFunctionsPracticeReps = [
+const whyFunctionsPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "# Without a function, the same block runs twice.\nminutes_a = 30\ntotal_a = minutes_a + 10\nprint(f\"session a: {total_a} minutes\")\n\nminutes_b = 20\ntotal_b = minutes_b + 10\nprint(f\"session b: {total_b} minutes\")\n# How would a function remove the duplicated logic?",
     expectedOutput: "session a: 40 minutes\nsession b: 30 minutes",
-    checkYourAnswer: "Both blocks do the same calculation. A function lets you write the logic once and call it twice with different inputs."
+    checkYourAnswer: "Both blocks do the same calculation. A function lets you write the logic once and call it twice with different inputs.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "# Bug: one of the calculations uses the wrong value.\nminutes_a = 30\ntotal_a = minutes_a + 10\n\nminutes_b = 20\ntotal_b = minutes_b + 5  # <-- should be + 10 to match\nprint(f\"session a: {total_a} minutes\")\nprint(f\"session b: {total_b} minutes\")",
+    expectedOutput: "session a: 40 minutes\nsession b: 30 minutes",
+    checkYourAnswer: "total_b uses + 5 instead of + 10. A function would guarantee both branches use the same logic — a single edit fixes both.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "# Write a function that applies overhead to any minutes value.\ndef add_overhead(minutes):\n    # Add the overhead (10) to minutes and return the total.\n    return 0\n\nprint(add_overhead(30))\nprint(add_overhead(20))",
+    expectedOutput: "add_overhead(30) returns 40\nadd_overhead(20) returns 30",
+    checkYourAnswer: "The function should return minutes + 10. Once defined, it removes the need to write + 10 at every call site.",
+    tier: "synthesize"
   }
 ];
 
-const defCallPracticeReps = [
+const defCallPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "def greet():\n    print(\"greeting hello world\")\n\ngreet()",
     expectedOutput: "greeting hello world",
-    checkYourAnswer: "def names the function. Calling greet() runs the body. Since there is no return statement, the function executes print directly."
+    checkYourAnswer: "def names the function. Calling greet() runs the body. Since there is no return statement, the function executes print directly.",
+    tier: "replicate"
   },
   {
     starterCode: "def describe():\n    print(\"python study session details\")\n\ndescribe()",
     expectedOutput: "python study session details",
-    checkYourAnswer: "Calling describe() runs the print statement inside its body. This makes the output visible in the terminal."
+    checkYourAnswer: "Calling describe() runs the print statement inside its body. This makes the output visible in the terminal.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "# Fix the function definition.\ndef log_session()\n    print(\"study session logged\")\n\nlog_session()",
+    expectedOutput: "study session logged",
+    checkYourAnswer: "The def line is missing a colon. Python requires : at the end of the def statement before the indented body.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "# Write a function named track_study that prints \"tracking: python for 30 min\"\n# then call it.\n",
+    expectedOutput: "tracking: python for 30 min",
+    checkYourAnswer: "Define the function with def track_study(): and add a print statement in the body. Then call track_study() on its own line.",
+    tier: "synthesize"
   }
 ];
 
-const parametersPracticeReps = [
+const parametersPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "def describe_session(topic, minutes):\n    print(f\"session: {topic} took {minutes} min\")\n\ndescribe_session(\"python\", 30)",
     expectedOutput: "session: python took 30 min",
-    checkYourAnswer: "topic and minutes are parameters — local names for the values the caller passes in. Change the call to (\"git\", 15) and re-run."
+    checkYourAnswer: "topic and minutes are parameters — local names for the values the caller passes in. Change the call to (\"git\", 15) and re-run.",
+    tier: "replicate"
   },
   {
     starterCode: "def add_minutes(a, b):\n    print(f\"calculated total is {a + b} minutes\")\n\nadd_minutes(30, 20)",
     expectedOutput: "calculated total is 50 minutes",
-    checkYourAnswer: "a and b receive the values 30 and 20 from the call. The function adds them and prints the result."
+    checkYourAnswer: "a and b receive the values 30 and 20 from the call. The function adds them and prints the result.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "# Bug: the function is called with the wrong number of arguments.\ndef log_session(topic, minutes):\n    print(f\"logged {topic} for {minutes} min\")\n\nlog_session(\"python\")",
+    expectedOutput: "logged python for 30 min",
+    checkYourAnswer: "log_session expects two arguments but receives one. Add the missing minutes argument: log_session(\"python\", 30).",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "# Write a function named session_summary that takes topic and duration\n# and prints \"SUMMARY: topic for duration min\". Then call it with \"sql\" and 45.\n",
+    expectedOutput: "SUMMARY: sql for 45 min",
+    checkYourAnswer: "Define session_summary(topic, duration) with a print statement that uses both parameters. Call it with the two arguments.",
+    tier: "synthesize"
   }
 ];
 
-const returnPracticeReps = [
+const returnPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "def double(n):\n    return n * 2\n\nresult = double(15)\nprint(f\"double result value: {result}\")",
     expectedOutput: "double result value: 30",
-    checkYourAnswer: "return sends the result back. result stores it. Without return the function sends back None."
+    checkYourAnswer: "return sends the result back. result stores it. Without return the function sends back None.",
+    tier: "replicate"
   },
   {
     starterCode: "def total_minutes(sessions):\n    total = 0\n    for s in sessions:\n        total += s[\"minutes\"]\n    return total\n\nprint(f\"total minutes sum: {total_minutes([{'minutes': 30}, {'minutes': 20}])}\")",
     expectedOutput: "total minutes sum: 50",
-    checkYourAnswer: "The loop accumulates into total. return total at the end sends the accumulated value back to the caller."
+    checkYourAnswer: "The loop accumulates into total. return total at the end sends the accumulated value back to the caller.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "# Bug: this function prints instead of returning.\ndef study_minutes(a, b):\n    print(a + b)\n\nresult = study_minutes(15, 25)\nprint(f\"study_minutes returned: {result}\")",
+    expectedOutput: "40\nstudy_minutes returned: None",
+    checkYourAnswer: "study_minutes prints the sum but returns None. Change print(a + b) to return a + b so the caller receives the number.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "# Write a function calc_total that takes a list of minute values and returns their sum.\n# Example: calc_total([10, 20, 15]) should return 45.\ndef calc_total(minutes_list):\n    total = 0\n    # Add each minute value to total.\n    return total\n\nprint(f\"total: {calc_total([10, 20, 15])}\")",
+    expectedOutput: "calc_total returns the correct sum: 45",
+    checkYourAnswer: "Loop through minutes_list, add each value to total, then return total. Without the loop body, total stays 0.",
+    tier: "synthesize"
   }
 ];
 
-const printVsReturnPracticeReps = [
+const printVsReturnPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "def bad_total(a, b):\n    print(a + b)\n\nresult = bad_total(30, 20)\nprint(\"bad_total result variable value:\")\nprint(result)",
     expectedOutput: "50\nbad_total result variable value:\nNone",
-    checkYourAnswer: "bad_total prints the sum but returns None. The caller stores None. This is why print inside a function is almost never what you want."
+    checkYourAnswer: "bad_total prints the sum but returns None. The caller stores None. This is why print inside a function is almost never what you want.",
+    tier: "replicate"
   },
   {
     starterCode: "def good_total(a, b):\n    return a + b\n\nresult = good_total(30, 20)\nprint(\"good_total result variable value:\")\nprint(result)",
     expectedOutput: "good_total result variable value:\n50",
-    checkYourAnswer: "good_total returns the value. The caller can store, test, or pass it on. Print only shows it — it cannot be reused."
+    checkYourAnswer: "good_total returns the value. The caller can store, test, or pass it on. Print only shows it — it cannot be reused.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "# Bug: the function prints the total instead of returning it.\ndef track_total(a, b):\n    print(a + b)\n\nresult = track_total(10, 5)\nprint(f\"result is: {result}\")\nif result == 15:\n    print(\"test passed\")\nelse:\n    print(\"test failed: track_total did not return the total\")",
+    expectedOutput: "15\nresult is: None\ntest failed: track_total did not return the total",
+    checkYourAnswer: "track_total prints 15 but returns None. The if/else check fails because None is not 15. Change print(a + b) to return a + b so the function returns the value.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "# Write two functions: one that prints the sum and one that returns it.\n# Call both and show what each gives back to the caller.\ndef print_sum(a, b):\n    # print the sum\n\ndef return_sum(a, b):\n    # return the sum\n\nresult_p = print_sum(10, 20)\nresult_r = return_sum(10, 20)\nprint(f\"print_sum returned: {result_p}\")\nprint(f\"return_sum returned: {result_r}\")",
+    expectedOutput: "30\nprint_sum returned: None\nreturn_sum returned: 30",
+    checkYourAnswer: "print_sum should print a + b but not return anything. return_sum should return a + b. The final print lines prove the difference.",
+    tier: "synthesize"
   }
 ];
 
-const pythonFunctionPracticeReps = [
+const functionsCapstonePracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: [
+      "sessions = [",
+      '    {"topic": "python", "minutes": 30},',
+      '    {"topic": "git", "minutes": 15},',
+      '    {"topic": "python", "minutes": 25},',
+      "]",
+      "",
+      "def parse_row(row):",
+      "    return f\"{row['topic']}: {row['minutes']} min\"",
+      "",
+      "def total_minutes(records):",
+      "    total = 0",
+      "    for r in records:",
+      "        total += r['minutes']",
+      "    return total",
+      "",
+      "def focus_sessions(records):",
+      "    count = 0",
+      "    for r in records:",
+      "        if r['minutes'] >= 30:",
+      "            count += 1",
+      "    return count",
+      "",
+      "def format_summary(n, t, f):",
+      '    return f"{n} sessions, {t} minutes, {f} focus session"',
+      "",
+      "result = format_summary(",
+      "    len(sessions), total_minutes(sessions), focus_sessions(sessions)",
+      ")",
+      "print(result)",
+      "print(parse_row(sessions[0]))",
+    ].join("\n"),
+    expectedOutput: "3 sessions, 70 minutes, 1 focus session\npython: 30 min",
+    checkYourAnswer: "Each function has one responsibility: parsing a row, summing minutes, counting focus sessions, or formatting the summary. The call site composes functions by passing one function's result to another.",
+    tier: "replicate"
+  },
+  {
+    starterCode: [
+      "# Bug: one function body has incorrect logic.",
+      "# Find the bug and fix it so the summary is correct.",
+      "sessions = [",
+      '    {"topic": "python", "minutes": 30},',
+      '    {"topic": "git", "minutes": 15},',
+      '    {"topic": "python", "minutes": 25},',
+      "]",
+      "",
+      "def parse_row(row):",
+      "    return f\"{row['topic']}: {row['minutes']} min\"",
+      "",
+      "def total_minutes(records):",
+      "    total = 0",
+      "    for r in records:",
+      "        total += r['minutes']",
+      "    return total",
+      "",
+      "def focus_sessions(records):",
+      "    count = 0",
+      "    for r in records:",
+      '        if r["minutes"] > 30:',
+      "            count += 1",
+      "    return count",
+      "",
+      "def format_summary(n, t, f):",
+      '    return f"{n} sessions, {t} minutes, {f} focus session"',
+      "",
+      "print(",
+      "    format_summary(",
+      "        len(sessions), total_minutes(sessions), focus_sessions(sessions)",
+      "    )",
+      ")",
+    ].join("\n"),
+    expectedOutput: "3 sessions, 70 minutes, 2 focus session",
+    checkYourAnswer: "focus_sessions uses > 30 instead of >= 30. A 30-minute session should count as focus. Change > 30 to >= 30 in the if condition to include the 30-minute python entry.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: [
+      "# From scratch: decompose the tracker into four functions.",
+      "# Define:",
+      "#   parse_row(row)        -> 'topic: minutes min'",
+      "#   total_minutes(records)-> sum of all minutes",
+      "#   focus_sessions(records)-> count with 30+ minutes",
+      "#   format_summary(n,t,f) -> 'X sessions, Y minutes, Z focus session'",
+      "# Then print the summary for the sessions below.",
+      "",
+      "sessions = [",
+      '    {"topic": "python", "minutes": 30},',
+      '    {"topic": "git", "minutes": 15},',
+      '    {"topic": "python", "minutes": 25},',
+      "]",
+      "",
+      "# Define parse_row, total_minutes, focus_sessions, format_summary here.",
+      "",
+      "# Call them to produce: 3 sessions, 70 minutes, 1 focus session",
+    ].join("\n"),
+    expectedOutput: "3 sessions, 70 minutes, 1 focus session",
+    checkYourAnswer: "Each function owns one piece of logic. total_minutes loops and sums. focus_sessions counts by condition. format_summary composes all three. Decomposition makes each part independently testable.",
+    tier: "synthesize"
+  }
+];
+
+const pythonFunctionPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "def describe_session(topic, minutes):\n    return \"\"\n\nprint(describe_session(\"python\", 30))",
     expectedOutput: "python: 30 minutes planned",
-    checkYourAnswer: "This rep practices parameters and return. The function should use the topic and minutes it receives, not hardcoded values."
+    checkYourAnswer: "This rep practices parameters and return. The function should use the topic and minutes it receives, not hardcoded values.",
+    tier: "synthesize"
   },
   {
     starterCode: "def group_minutes(sessions):\n    totals = {}\n    # Add each session's minutes by topic.\n    return totals\n\nprint(group_minutes([{\"topic\": \"python\", \"minutes\": 30}]))",
     expectedOutput: "{'python': 30} grouped by topic",
-    checkYourAnswer: "Start with one record before trying several. The returned dictionary should use the topic as the key and minutes as the value."
+    checkYourAnswer: "Start with one record before trying several. The returned dictionary should use the topic as the key and minutes as the value.",
+    tier: "synthesize"
   },
   {
     starterCode: "def group_minutes(sessions):\n    totals = {}\n    return totals\n\nprint(group_minutes([]))",
     expectedOutput: "{} for empty sessions input",
-    checkYourAnswer: "An empty input should return an empty dictionary. This failure case proves the function does not depend on hidden global data."
+    checkYourAnswer: "An empty input should return an empty dictionary. This failure case proves the function does not depend on hidden global data.",
+    tier: "synthesize"
+  },
+  {
+    starterCode: "# Run the working function and observe the output.\ndef add_tracked(a, b):\n    return a + b\n\ntotal = add_tracked(45, 15)\nprint(f\"add_tracked result: {total}\")",
+    expectedOutput: "add_tracked result: 60",
+    checkYourAnswer: "add_tracked returns the sum of its two parameters. The caller stores the returned value and prints it.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "# Bug: the function computes the total but returns the wrong value.\ndef daily_total(minutes_list):\n    total = 0\n    for m in minutes_list:\n        total += m\n    return 0\n\nprint(daily_total([10, 20, 30]))",
+    expectedOutput: "daily_total([10, 20, 30]) should return 60",
+    checkYourAnswer: "daily_total computes total correctly in the loop but returns 0 instead of total. Change return 0 to return total.",
+    tier: "diagnose"
   }
 ];
 
@@ -93,7 +280,7 @@ const whyFunctionsLesson = proofLesson({
   slug: "python-why-functions",
   title: "Why Functions Exist",
   summary: "Understand what problem functions solve before learning the syntax.",
-  bodyMarkdown: "Without functions, duplicate code forces you to edit the same logic in multiple places. A function packages a reusable step under a name. You call it once per session instead of copying and pasting it. Functions also make programs easier to test because you can check one step in isolation.",
+  bodyMarkdown: "Without functions, duplicate code forces you to edit the same logic in multiple places. A function packages a reusable step under a name. In programming, 'calling' a function means telling Python to run the code inside that function. You call it by writing its name followed by parentheses, like `add_overhead(30)`. You call it once per session instead of copying and pasting it. Functions also make programs easier to test because you can check one step in isolation.",
   estimatedMinutes: 4,
   difficulty: "foundation",
   skillIds: ["skill-python-functions"],
@@ -142,7 +329,7 @@ const whyFunctionsLesson = proofLesson({
     requires: ["py.variable.assignment", "py.f_string"],
     visibleCodeConcepts: ["py.variable.assignment", "py.f_string"],
     quizConcepts: ["py.function.motivation"],
-    usesButDoesNotTeach: ["py.assertion"],
+    usesButDoesNotTeach: ["py.assertion", "py.function.def", "py.return"],
     proofOutputs: ["terminal_stdout"]
   }
 });
@@ -784,6 +971,241 @@ printVsReturnLesson.depth = {
 };
 
 // ---------------------------------------------------------------------------
+// Micro-lesson 6 — Functions Capstone: Decompose the Tracker (proof_pack)
+// ---------------------------------------------------------------------------
+
+const functionsCapstoneLesson = proofLesson({
+  id: "lesson-python-functions-capstone",
+  moduleId: "module-python-core",
+  slug: "python-functions-capstone",
+  title: "Functions Capstone: Decompose the Tracker",
+  summary: "Take the flat Level 2 capstone script and extract Study Tracker logic into reusable functions: parse_row(), total_minutes(), focus_sessions(), format_summary().",
+  bodyMarkdown: "The Level 2 capstone put sessions, loops, decisions, and output into one flat block. That works for a short script, but real programs need reusable parts. Your job is to decompose that flat script into four focused functions, each with a single responsibility.\n\nYou will create:\n- **parse_row(row)** — format one session dictionary into a readable string\n- **total_minutes(records)** — sum the minutes across all sessions\n- **focus_sessions(records)** — count how many sessions are 30+ minutes\n- **format_summary(n, t, f)** — combine the three numbers into the expected summary line\n\nEach function does ONE thing. The original flat script's logic is preserved, but now it is organized into named, testable pieces that can be called and reused independently.",
+  estimatedMinutes: 18,
+  difficulty: "applied",
+  skillIds: ["skill-python-basics", "skill-testing-debugging"],
+  quizId: "quiz-python-functions-capstone",
+  desktopTask: "Decompose the flat Level 2 capstone script into four named helper functions and verify the output matches the original summary.",
+  evidencePrompt: "Record the four function definitions, the printed summary output, and one line that proves the result matches the Level 2 capstone output.",
+  language: "Python",
+  tools: ["Python 3", "terminal"],
+  synopsis: "You have four focused Python functions ready to define: parse_row, total_minutes, focus_sessions, and format_summary. Your previous capstone wrote one flat script; this one splits the logic across testable, single-responsibility helpers.",
+  prerequisites: [
+    "Know how to define, call, parameterize, and return from functions (Level 3 micro-lessons 1-5).",
+    "Understand the Study Tracker flat script from the Level 2 capstone (lesson-python-foundation-capstone)."
+  ],
+  testingFocus: "The sandbox tests each function in isolation — parse_row on a single row, total_minutes on a list, focus_sessions on the condition edge case, and format_summary on the combined result.",
+  objective: "Decompose a flat tracker script into four single-responsibility functions that produce the same output.",
+  whyItMatters: "Real codebases grow beyond one script. Decomposition is how you keep programs maintainable: each function is testable in isolation, debugged once, and reused without copying logic.",
+  coreConcept: "Decomposition means splitting one block of code into smaller named pieces, each with one job. The original behavior stays the same, but each piece becomes independently testable and reusable. A well-decomposed function can be understood without reading the rest of the program.",
+  workedExample: "The flat capstone loop that calculates total_minutes AND focus_sessions AND builds the summary is split into three functions. total_minutes(records) only sums. focus_sessions(records) only counts. format_summary(n, t, f) only formats.",
+  guidedExercise: "Start with parse_row, which is the simplest: it takes one dictionary and returns a formatted string. Then write total_minutes using a for-loop accumulator. Then focus_sessions using a conditional counter. Finally write format_summary to compose all three.",
+  missionConnection: "The CLI Study Tracker's aggregation layer will use these exact four functions. Every future feature — filtering, reporting, exporting — will add new single-responsibility helpers in the same pattern.",
+  reflectionPrompt: "Which of the four functions would be hardest to test if it also printed its result? How does returning data instead of printing it make the function more reusable?",
+  practiceStarter: "sessions = [\n    {\"topic\": \"python\", \"minutes\": 30},\n    {\"topic\": \"git\", \"minutes\": 15},\n    {\"topic\": \"python\", \"minutes\": 25},\n]\n\n# TODO: Define parse_row, total_minutes, focus_sessions, format_summary\n# Then call them to produce:\n# 3 sessions, 70 minutes, 1 focus session\n\nprint(\"replace this with the function calls\")",
+  practiceExpected: "3 sessions, 70 minutes, 1 focus session",
+  practiceCheck: "If the output is empty or wrong, test each function in isolation. Does total_minutes return the correct sum? Does focus_sessions count correctly? Debug the smallest function first.",
+  practiceReps: functionsCapstonePracticeReps,
+  miniTitle: "Decompose the tracker into functions",
+  miniGoal: "Extract four single-responsibility functions from the flat Level 2 capstone script so each piece is independently testable.",
+  miniSteps: [
+    "Define parse_row to format one session dictionary",
+    "Define total_minutes to sum all minutes",
+    "Define focus_sessions to count 30+ minute sessions",
+    "Define format_summary to build the output line",
+    "Call all four to reproduce the original capstone output"
+  ],
+  miniDeliverables: [
+    "Python file with four function definitions",
+    "Printed summary matching the Level 2 capstone output",
+    "One sentence describing how decomposition improves testability"
+  ],
+  verifierCommand: "python decompose_tracker.py",
+  expectedEvidence: "Terminal output showing the correct summary line, plus four function definitions that each handle one responsibility.",
+  projectConnection: "This decomposition is the foundation for all future Study Tracker features — every new capability will follow the same pattern of single-responsibility functions.",
+  requiredCodeIncludes: ["def parse_row", "def total_minutes", "def focus_sessions", "def format_summary", "return"],
+  requiredOutputIncludes: ["3 sessions", "70 minutes", "1 focus"],
+  runnerLanguage: "python",
+  runnerStarterCode: "sessions = [\n    {\"topic\": \"python\", \"minutes\": 30},\n    {\"topic\": \"git\", \"minutes\": 15},\n    {\"topic\": \"python\", \"minutes\": 25},\n]\n\n# TODO: Define parse_row, total_minutes, focus_sessions, format_summary\n# Then call them to produce:\n# 3 sessions, 70 minutes, 1 focus session\n\nprint(\"replace this with the function calls\")",
+  runnerTestCode: [
+    "assert callable(parse_row), 'parse_row must be a function'",
+    "assert callable(total_minutes), 'total_minutes must be a function'",
+    "assert callable(focus_sessions), 'focus_sessions must be a function'",
+    "assert callable(format_summary), 'format_summary must be a function'",
+    "assert total_minutes(sessions) == 70, 'total_minutes should return 70'",
+    "assert focus_sessions(sessions) == 1, 'focus_sessions should return 1'",
+    "assert format_summary(3, 70, 1) == '3 sessions, 70 minutes, 1 focus session', 'format_summary must match expected'",
+    "print('functions-capstone passed')"
+  ].join("\n"),
+  hiddenTests: [
+    {
+      id: "func-capstone-parse-row",
+      name: "parse_row formats a single row",
+      code: "assert parse_row({'topic': 'test', 'minutes': 10}) == 'test: 10 min', 'parse_row should format topic and minutes'"
+    },
+    {
+      id: "func-capstone-empty-inputs",
+      name: "Functions handle empty input",
+      code: "assert total_minutes([]) == 0, 'total_minutes([]) should be 0'\nassert focus_sessions([]) == 0, 'focus_sessions([]) should be 0'"
+    },
+    {
+      id: "func-capstone-focus-edge",
+      name: "focus_sessions uses >= 30 edge case",
+      code: "assert focus_sessions([{'topic': 'x', 'minutes': 30}]) == 1, '30 minutes should count as focus'\nassert focus_sessions([{'topic': 'x', 'minutes': 29}]) == 0, '29 minutes should not count as focus'"
+    }
+  ],
+  curriculum: {
+    level: 3,
+    sequence: 6,
+    version: "1.0.0",
+    lessonKind: "proof_pack",
+    teaches: ["py.single_responsibility.basic", "py.decomposition.helper_function"],
+    requires: ["py.function.def", "py.parameter", "py.return"],
+    visibleCodeConcepts: ["py.decomposition.helper_function", "py.single_responsibility.basic", "py.function.def", "py.parameter", "py.return"],
+    quizConcepts: ["py.decomposition.helper_function", "py.single_responsibility.basic"],
+    usesButDoesNotTeach: ["py.for_loop", "py.dict.literal", "py.f_string", "py.list.append", "py.assertion"],
+    proofOutputs: ["terminal_stdout"]
+  },
+  codeShape: [
+    "# Flat version (Level 2 capstone): all logic in one block",
+    "for session in sessions:",
+    "    total_minutes += session['minutes']",
+    "    if session['minutes'] >= 30:",
+    "        focus_count += 1",
+    "",
+    "# Decomposed version: each step is its own function",
+    "def total_minutes(records):",
+    "    ...  # loop and sum",
+    "def focus_sessions(records):",
+    "    ...  # loop and count",
+    "def format_summary(n, t, f):",
+    "    ...  # format string"
+  ].join("\n")
+});
+
+functionsCapstoneLesson.depth = {
+  primaryConceptId: "py.decomposition.helper_function",
+  secondaryConceptIds: ["py.single_responsibility.basic"],
+  maxNewConcepts: 2,
+  conceptCapsules: [
+    {
+      conceptId: "py.decomposition.helper_function",
+      definition: "Breaking a larger block of code into smaller, named helper functions, each with a single responsibility.",
+      mentalModel: "Think of a chef's kitchen: one person chops (parse_row), one person stirs (total_minutes), one person tastes (focus_sessions), and one person plates (format_summary). Each station is independent but contributes to the same dish.",
+      syntaxShape: "def helper_name(inputs):\n    # one job\n    return result",
+      tinyExample: "def total_minutes(records):\n    return sum(r['minutes'] for r in records)",
+      commonMistake: "Creating a function that does two things at once (e.g., summing minutes AND printing the result inside the same function body).",
+      repairHint: "If you cannot name the function's single job in five words, it does too much. Split it.",
+      usedIn: ["learn", "practice", "code_lab"]
+    },
+    {
+      conceptId: "py.single_responsibility.basic",
+      definition: "Each function should have exactly one well-defined responsibility and do it completely.",
+      mentalModel: "A Swiss Army knife has many tools, but you use one blade at a time. Each function is one blade — it does its job and hands off to the next tool.",
+      syntaxShape: "Not a specific syntax — a design principle applied when choosing what code to put inside a function.",
+      tinyExample: "total_minutes only sums minutes; it does not count focus sessions.",
+      commonMistake: "Writing a function that aggregates, filters, formats, and prints all at once.",
+      repairHint: "Look at the function body. If you find a for loop, an if statement, AND a print call together, the function likely breaks single responsibility. Extract the output logic into a separate function.",
+      usedIn: ["learn", "practice"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-fcap-1",
+      label: "Flat script — all in one block",
+      codeFragment: [
+        "total_minutes = 0",
+        "focus_count = 0",
+        "for session in sessions:",
+        "    total_minutes += session['minutes']",
+        "    if session['minutes'] >= 30:",
+        "        focus_count += 1",
+        "summary = f\"{len(sessions)} sessions, {total_minutes} minutes, {focus_count} focus session\"",
+      ].join("\n"),
+      conceptIds: ["py.decomposition.helper_function"],
+      explanation: "The flat version does three things in one loop: sum minutes, count focus sessions, and prepare the summary string. If a bug appears in the focus count, you edit inside the same loop that handles totals.",
+      learnerShouldBeAbleToSay: "This block mixes summing, counting, and formatting — three responsibilities in one place"
+    },
+    {
+      id: "w-fcap-2",
+      label: "Decomposed — each step is its own function",
+      codeFragment: [
+        "def total_minutes(records):",
+        "    total = 0",
+        "    for r in records:",
+        "        total += r['minutes']",
+        "    return total",
+        "",
+        "def focus_sessions(records):",
+        "    count = 0",
+        "    for r in records:",
+        "        if r['minutes'] >= 30:",
+        "            count += 1",
+        "    return count",
+      ].join("\n"),
+      conceptIds: ["py.decomposition.helper_function", "py.single_responsibility.basic"],
+      explanation: "Now each function has one job. total_minutes only sums. focus_sessions only counts. Each can be tested and debugged independently.",
+      learnerShouldBeAbleToSay: "total_minutes does not know about focus sessions, and focus_sessions does not know about totals — they are independent"
+    },
+    {
+      id: "w-fcap-3",
+      label: "Compose the functions",
+      codeFragment: [
+        "result = format_summary(",
+        "    len(sessions),",
+        "    total_minutes(sessions),",
+        "    focus_sessions(sessions)",
+        ")",
+      ].join("\n"),
+      conceptIds: ["py.decomposition.helper_function"],
+      explanation: "The call site passes function results to other functions. This is composition: small pieces wired together to produce the final output.",
+      learnerShouldBeAbleToSay: "The call site combines results from multiple single-responsibility functions"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-fcap-1",
+      instruction: "Change the focus threshold from 30 to 25 minutes in the focus_sessions function. Re-run and observe the output change from 1 to 2 focus sessions.",
+      conceptIds: ["py.single_responsibility.basic"],
+      targetCodeFragment: "if r['minutes'] >= 30:",
+      expectedObservation: "The focus count changes because only the focus_sessions function needs editing. The other three functions are unchanged.",
+      wrongTurnHint: "Only edit the condition inside focus_sessions. Do not touch total_minutes or format_summary."
+    },
+    {
+      id: "g-fcap-2",
+      instruction: "Add a new session with minutes 45 to the sessions list. Predict whether focus_sessions changes before running.",
+      conceptIds: ["py.decomposition.helper_function"],
+      targetCodeFragment: '    {"topic": "python", "minutes": 25},',
+      expectedObservation: "The total becomes 115 and focus sessions become 2, computed automatically by independent functions.",
+      wrongTurnHint: "Add the new dictionary after the last session in the list, keeping the same shape."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-fcap-1",
+      conceptIds: ["py.single_responsibility.basic"],
+      brokenExample: "def total_minutes(records):\n    total = 0\n    for r in records:\n        total += r['minutes']\n        if r['minutes'] >= 30:\n            count += 1\n    return total",
+      symptom: "focus_sessions(records) returns 0 or raises NameError because 'count' was defined inside total_minutes.",
+      likelyCause: "Putting focus-counting logic inside the total_minutes function, which breaks single responsibility.",
+      fixStrategy: "Remove the focus-counting block from total_minutes and put it in its own function focus_sessions."
+    }
+  ],
+  codeLabBridge: {
+    story: "The four helper functions — parse_row, total_minutes, focus_sessions, format_summary — are the foundation of the CLI Study Tracker's data pipeline.",
+    usesConcepts: ["py.decomposition.helper_function", "py.single_responsibility.basic"],
+    learnerOwns: ["parse_row", "total_minutes", "focus_sessions", "format_summary"],
+    checkerOwns: ["func-capstone-parse-row", "func-capstone-empty-inputs", "func-capstone-focus-edge"],
+    runExpectation: "prints functions-capstone passed"
+  },
+  understandingProofPrompt: "Explain how decomposing the flat tracker script into four functions improves testability. Give one specific example of a bug that would be easier to fix in the decomposed version than in the flat version.",
+  exitTicket: [
+    "I can identify when a block of code does more than one thing and split it into separate functions.",
+    "I can compose multiple single-responsibility functions to produce a combined result.",
+    "I know that returning data from functions makes them independently testable."
+  ]
+};
+
+// ---------------------------------------------------------------------------
 // Deprecated — original monolithic lesson (kept for progress resolution)
 // ---------------------------------------------------------------------------
 
@@ -886,7 +1308,8 @@ export const level3Lessons: Lesson[] = [
   defCallLesson,
   parametersLesson,
   returnLesson,
-  printVsReturnLesson
+  printVsReturnLesson,
+  functionsCapstoneLesson
 ];
 
 /** Kept in the content pack so old learner progress IDs still resolve. */
@@ -899,60 +1322,89 @@ export const deprecatedLevel3Lessons: Lesson[] = [
 // ---------------------------------------------------------------------------
 
 export const level3Quizzes: Quiz[] = [
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-why-functions",
     "lesson-python-why-functions",
     "Why Functions Checkpoint",
+    "overage_a = minutes_a + 10\noverage_b = minutes_b + 10",
     "why functions exist",
-    "Functions remove duplicated logic by naming a reusable step you can call instead of copy-paste.",
-    "Functions are only useful when a program is longer than 50 lines.",
-    "Functions are a way to run code slower so it is easier to debug.",
-    "Functions solve the duplication problem. Any repeated logic is a candidate for a function.",
+    "A function would let you write the calculation once and reuse it instead of copying the line",
+    "A function would make the code slower because calling a function is expensive",
+    "A function is not helpful here because each variable has a different name",
+    "Duplicated logic means editing in two places. A function captures the pattern and lets you call it with different inputs.",
     ["py.function.motivation"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-def-call",
     "lesson-python-def-call",
     "Define and Call Checkpoint",
+    'def greet():\n    return "hello"\n\nresult = greet\nprint(result)',
     "defining and calling functions",
-    "Use def name(): with an indented body to define, and name() to call.",
-    "Use function name() to define and run name to call.",
-    "Use call name() to define and def name to run.",
-    "def creates the function. Calling it with () runs the body.",
+    "Without (), greet refers to the function object, not the result. It should be greet()",
+    "greet without () still calls the function, just without arguments",
+    'This code prints "hello" correctly because greet is a valid function name',
+    "greet (no parentheses) refers to the function itself — Python prints something like <function greet at 0x...>. greet() with parentheses calls it.",
     ["py.function.def", "py.function.call"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-parameters",
     "lesson-python-parameters",
     "Parameters Checkpoint",
+    'def describe(topic, minutes):\n    return f"{topic}: {minutes} min"\n\ndescribe("python", 30)',
     "function parameters",
-    "Parameters are local names in the def line; arguments are the values passed at the call site.",
-    "Parameters and arguments are the same thing used in different contexts.",
-    "Parameters must have the same name as the variables the caller passes in.",
-    "Parameters receive arguments by position. They are local to the function for one call.",
+    'Parameters are placeholders; the actual values ("python", 30) fill them when the function is called',
+    "The parameters (topic, minutes) must have the exact same names as variables in the rest of the program",
+    "You need 30 parameters, one for each possible argument you might ever pass",
+    'Parameters are local to the function. "python" goes into topic, 30 into minutes for this call. Next call can pass different values.',
     ["py.parameter", "py.argument"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-return",
     "lesson-python-return",
     "Return Values Checkpoint",
-    "return statements",
-    "return sends the computed value back to the caller so it can be stored, tested, or passed on.",
-    "return prints the value to the terminal and ends the function.",
-    "return is only needed when the function is called inside an assert statement.",
-    "Without return, the function gives back None. return sends the actual computed value.",
+    "def total(a, b):\n    print(a + b)\n\nresult = total(30, 20)\nprint(result)",
+    "return values",
+    "total prints 50 but returns None, so result is None — not the number 50",
+    "total returns 50 because print() sends the value back to the caller",
+    "This code raises a TypeError because you cannot assign the result of a print function",
+    "print() outputs text but returns None. Without a return statement, a function always returns None.",
     ["py.return"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-print-vs-return",
     "lesson-python-print-vs-return",
     "Print vs Return Checkpoint",
+    'def good(a, b):\n    return a + b\n\ndef bad(a, b):\n    print(a + b)',
     "print vs return",
-    "return sends data to the caller; print shows text and returns None, making the function untestable.",
-    "print and return are interchangeable — both send the value to the caller.",
-    "return is slower than print, so use print when performance matters.",
-    "print is for human-readable output. return is for data the rest of the program can use.",
+    "good returns data the caller can use; bad only displays output and returns None",
+    "Both functions work the same way — the caller gets 50 from either one",
+    "bad is better because you can see the result in the terminal",
+    "return sends the value to the caller for further use. print shows it on screen but gives the caller nothing.",
     ["py.print_vs_return"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-functions-capstone",
+    "lesson-python-functions-capstone",
+    "Functions Capstone Checkpoint",
+    `sessions = [{"topic": "python", "minutes": 30}]
+
+def parse_row(row):
+    return f"{row['topic']}: {row['minutes']} min"
+
+def total_minutes(records):
+    total = 0
+    for r in records:
+        total += r['minutes']
+    return total
+
+result = parse_row(sessions[0])
+print(result)`,
+    "function decomposition",
+    "parse_row takes one dictionary and returns a formatted string — each function owns one responsibility, making it testable in isolation",
+    "Decomposition is only useful when the program has more than 100 lines of code",
+    "parse_row should also print the result because printing makes the output visible to the user",
+    "Decomposition means each function has a single responsibility. parse_row only formats a row — it does not loop, accumulate, or print. This makes it independently testable and reusable across the program.",
+    ["py.decomposition.helper_function", "py.single_responsibility.basic"]
   ),
   // Deprecated quiz — kept so old quiz attempt IDs still resolve
   checkpointQuiz(

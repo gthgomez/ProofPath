@@ -1,5 +1,5 @@
 import type { Lesson, Quiz } from "@/domain/types";
-import { proofLesson, checkpointQuiz } from "./shared";
+import { proofLesson, codeReadingQuiz } from "./shared";
 
 export const level0Lessons: Lesson[] = [
   proofLesson({
@@ -10,7 +10,8 @@ export const level0Lessons: Lesson[] = [
       version: "1.0.0",
       lessonKind: "concept_only",
       teaches: ["tool.files.file", "tool.files.extension", "tool.files.path"],
-      requires: []
+      requires: [],
+      visibleCodeConcepts: ["tool.files.file", "tool.files.extension", "tool.files.path"]
     },
     moduleId: "module-python-core",
     slug: "python-zero-files-folders",
@@ -22,7 +23,7 @@ export const level0Lessons: Lesson[] = [
     skillIds: ["skill-python-basics"],
     quizId: "quiz-python-zero-files-folders",
     desktopTask: "Identify the file name, directory, and extension in a path.",
-    evidencePrompt: "Provide the absolute path of your workspace folder.",
+    evidencePrompt: "Provide the full path (starting from the root, like C:\\Users\\YourName\\workspace) of your workspace folder.",
     language: "Python",
     tools: ["Files", "Folders", "Paths"],
     synopsis: "You are learning the basic anatomy of files and paths.",
@@ -60,7 +61,8 @@ export const level0Lessons: Lesson[] = [
       version: "1.0.0",
       lessonKind: "simulated_terminal",
       teaches: ["tool.terminal.command", "tool.terminal.prompt", "tool.terminal.stdout"],
-      requires: []
+      requires: [],
+      visibleCodeConcepts: ["tool.terminal.command", "tool.terminal.prompt", "tool.terminal.stdout"]
     },
     moduleId: "module-python-core",
     slug: "python-zero-terminal",
@@ -72,7 +74,7 @@ export const level0Lessons: Lesson[] = [
     skillIds: ["skill-python-basics"],
     quizId: "quiz-python-zero-terminal",
     desktopTask: "Distinguish command input from standard output in a terminal.",
-    evidencePrompt: "Provide a transcription of a command and its stdout.",
+    evidencePrompt: "Write down the command you typed and the output you saw.",
     language: "Python",
     tools: ["Terminal", "Prompt", "CLI"],
     synopsis: "You are learning to use a text interface command loop.",
@@ -110,7 +112,8 @@ export const level0Lessons: Lesson[] = [
       version: "1.0.0",
       lessonKind: "run_file",
       teaches: ["py.script.run", "py.print.literal"],
-      requires: []
+      requires: [],
+      visibleCodeConcepts: ["py.script.run", "py.print.literal"]
     },
     moduleId: "module-python-core",
     slug: "python-zero-first-script",
@@ -154,7 +157,7 @@ export const level0Lessons: Lesson[] = [
       {
         id: "check-first-run-hidden",
         name: "Check first run output exists",
-        code: "import sys; assert 'first run' in sys.stdout.getvalue() or True, 'Expected first run to be printed'"
+        code: "import sys; assert 'first run' in sys.stdout.getvalue(), 'Expected first run to be printed'"
       }
     ]
   }),
@@ -166,7 +169,8 @@ export const level0Lessons: Lesson[] = [
       version: "1.0.0",
       lessonKind: "run_file",
       teaches: ["tool.feedback_loop.rerun"],
-      requires: []
+      requires: [],
+      visibleCodeConcepts: ["tool.feedback_loop.rerun"]
     },
     moduleId: "module-python-core",
     slug: "python-zero-change-rerun",
@@ -210,7 +214,7 @@ export const level0Lessons: Lesson[] = [
       {
         id: "check-rerun-hidden",
         name: "Check rerun success is present",
-        code: "import sys; assert 'rerun success' in sys.stdout.getvalue() or True, 'Expected rerun success to be printed'"
+        code: "import sys; assert 'rerun success' in sys.stdout.getvalue(), 'Expected rerun success to be printed'"
       }
     ]
   }),
@@ -223,7 +227,8 @@ export const level0Lessons: Lesson[] = [
       lessonKind: "run_file",
       intentionalFailure: true,
       teaches: ["debug.syntax_error.basic", "debug.line_number.basic", "stderr.basic"],
-      requires: []
+      requires: [],
+      visibleCodeConcepts: ["debug.syntax_error.basic", "debug.line_number.basic", "stderr.basic"]
     },
     moduleId: "module-python-core",
     slug: "python-zero-first-error",
@@ -267,7 +272,7 @@ export const level0Lessons: Lesson[] = [
       {
         id: "check-fixed-syntax-hidden",
         name: "Check syntax error is fixed",
-        code: "import sys; assert 'fixed syntax' in sys.stdout.getvalue() or True, 'Expected fixed syntax to be printed'"
+        code: "import sys; assert 'fixed syntax' in sys.stdout.getvalue(), 'Expected fixed syntax to be printed'"
       }
     ]
   })
@@ -609,59 +614,64 @@ level0Lessons[4].depth = {
 };
 
 export const level0Quizzes: Quiz[] = [
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-zero-files-folders",
     "lesson-python-zero-files-folders",
     "Files and Paths Checkpoint",
-    "files and folders",
-    "Locate code scripts and identify their types using filenames, extensions, and paths.",
-    "Write code commands directly without saving files first.",
-    "Ignore folder structures and write files in temporary system folders.",
-    "Files represent code storage, directories group files, extensions dictate interpretation, and paths locate them.",
+    "/workspace/project/main.py",
+    "file paths and extensions",
+    "The .py extension identifies this as a Python script file",
+    "The file is stored in the root directory with no folders",
+    "The path shows the file contents, not its location",
+    "The .py extension tells the operating system this is a Python script, and the path /workspace/project/main.py shows exactly where it lives in the folder tree.",
     ["tool.files.file", "tool.files.extension", "tool.files.path"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-zero-terminal",
     "lesson-python-zero-terminal",
     "Terminal Checkpoint",
-    "terminal inputs",
-    "Distinguish command line prompts from commands and standard output streams.",
-    "Run multiple python scripts concurrently inside the same text editor window.",
-    "Treat standard output lines as keyboard command inputs.",
-    "The terminal prompt waits for command strings to run, returning stdout results.",
+    "$ python hello.py",
+    "terminal commands",
+    'The command is "python hello.py" — the $ is just the prompt symbol',
+    "The entire line including $ is the command to type",
+    "The terminal is showing the output of a previous command",
+    'The $ prompt symbol waits for input. Only "python hello.py" is the command. Typing $ would cause an error.',
     ["tool.terminal.command", "tool.terminal.prompt", "tool.terminal.stdout"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-zero-first-script",
     "lesson-python-zero-first-script",
     "Running Scripts Checkpoint",
-    "running python scripts",
-    "Execute python files by passing the script path, outputting string literal print statements.",
-    "Directly edit terminal prompt text to change script variables.",
-    "Print variable labels without declaring them in files first.",
-    "The python command executes file instructions and evaluates print statements.",
+    'print("first run")',
+    "running Python scripts",
+    'It prints the text "first run" to standard output',
+    'It saves "first run" into a variable named print',
+    'It opens a file named first_run.py and reads it',
+    "print() writes its argument to stdout. This is how a script produces visible output.",
     ["py.script.run", "py.print.literal"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-zero-change-rerun",
     "lesson-python-zero-change-rerun",
     "Rerun Loop Checkpoint",
-    "rerunning edit cycles",
-    "Use the edit-save-run cycle in a feedback loop to inspect incremental changes.",
-    "Rerun previous output traces without updating the source script code.",
-    "Run files without saving because python detects unsaved text automatically.",
-    "Developing is an iterative save-and-rerun feedback loop to observe stdout updates.",
+    'print("rerun success")',
+    "the edit-save-run cycle",
+    "You must save the file before rerunning, or the old version still runs",
+    "Python automatically detects changes and updates the output",
+    "You only need to save once — after that all reruns use the latest code",
+    "Python runs whatever is in the file on disk. If you edit but don't save (Ctrl+S), the old code runs again.",
     ["tool.feedback_loop.rerun"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-zero-first-error",
     "lesson-python-zero-first-error",
     "First Syntax Error Checkpoint",
-    "syntax errors",
-    "Read exception names, line numbers, and stderr details calmly to locate typos.",
-    "Delete the traceback text block so the script compiles successfully.",
-    "Panic and edit random code lines without referencing line number indicators.",
-    "SyntaxError indicates grammar rule violations. Line numbers pinpoint the issue.",
+    'print("fixed syntax)',
+    "reading syntax errors",
+    "It causes a SyntaxError because the closing quote is missing",
+    'It prints "fixed syntax" correctly because Python auto-fixes missing quotes',
+    'It causes a NameError because "syntax" is undefined',
+    "Every opening quote needs a matching closing quote. Without it, Python cannot find where the string ends.",
     ["debug.syntax_error.basic", "debug.line_number.basic", "stderr.basic"]
   )
 ];

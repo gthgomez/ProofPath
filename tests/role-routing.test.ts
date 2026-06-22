@@ -51,7 +51,7 @@ describe("role routing", () => {
     }
     const withFirstMission = ensureProgressProfile({ ...withFirstLesson, completedProjectMissionIds: ["mission-cli-study-tracker"] });
 
-    expect(getNextLessonForRole(contentPack, withFirstMission)?.id).toBe("lesson-python-collections");
+    expect(getNextLessonForRole(contentPack, withFirstMission)?.id).toBe("lesson-python-lists");
     expect(getNextMissionForRole(contentPack, withFirstMission)?.id).toBe("mission-python-data-cleaner");
   });
 

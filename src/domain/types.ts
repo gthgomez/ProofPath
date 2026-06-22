@@ -173,6 +173,7 @@ export interface LessonPracticeBlock {
   starterCode: string;
   expectedOutput: string;
   checkYourAnswer: string;
+  tier?: "replicate" | "diagnose" | "synthesize";
 }
 
 export interface LessonMiniProject {

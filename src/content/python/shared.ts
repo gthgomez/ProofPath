@@ -151,10 +151,15 @@ export function lessonRecallCards(objective: string, coreConcept: string, guided
   ];
 }
 
-export function lessonMisconceptionChecks(commonMistakes: string[]): LessonMisconceptionCheck[] {
+export function lessonMisconceptionChecks(
+  commonMistakes: string[],
+  /** Optional map from mistake text to custom repair guidance. If omitted, generates a mistake-specific repair. */
+  customRepairs?: Record<string, string>
+): LessonMisconceptionCheck[] {
   return commonMistakes.slice(0, 2).map((mistake) => ({
     mistake,
-    repair: "Slow down to one observable behavior, run the smallest check, and explain what changed before moving on.",
+    repair: customRepairs?.[mistake]
+      ?? `The mistake is: ${lowerFirst(mistake)}. Fix it, re-run the smallest check, and confirm the output changes as expected.`,
     checkPrompt: `How would you catch this mistake before claiming the lesson is done: ${lowerFirst(mistake)}?`
   }));
 }
@@ -168,6 +173,7 @@ export function workshop(
   missionConnection: string,
   reflectionPrompt: string,
   commonMistakes = ["Skipping the failure case", "Recording completion without check output"],
+  customRepairs?: Record<string, string>,
   beginnerContext: Pick<LessonWorkshop, "language" | "tools" | "synopsis" | "prerequisites" | "testingFocus"> & { codeShape?: string } = {
     language: "Career skill",
     tools: ["CareerForge"],
@@ -206,7 +212,7 @@ export function workshop(
     coreConcept: professorCoreConcept(coreConcept),
     workedExample,
     commonMistakes,
-    misconceptionChecks: lessonMisconceptionChecks(commonMistakes),
+    misconceptionChecks: lessonMisconceptionChecks(commonMistakes, customRepairs),
     recallCards: lessonRecallCards(objective, coreConcept, guidedExercise, missionConnection),
     guidedExercise: professorGuidedExercise(guidedExercise),
     missionConnection,
@@ -258,6 +264,8 @@ export interface ProofLessonInput {
   hiddenTests?: any[]; // optional hidden tests override
   curriculum?: CurriculumMetadata;
   codeShape?: string;
+  /** Optional map from mistake text to custom repair guidance for misconception checks */
+  customRepairs?: Record<string, string>;
 }
 
 export function proofLesson(input: ProofLessonInput): Lesson {
@@ -284,6 +292,7 @@ export function proofLesson(input: ProofLessonInput): Lesson {
       input.missionConnection,
       input.reflectionPrompt,
       ["Skipping the negative case", "Claiming completion without check output"],
+      input.customRepairs,
       {
         language: input.language,
         tools: input.tools,
@@ -334,6 +343,137 @@ export function proofLesson(input: ProofLessonInput): Lesson {
   return baseLesson;
 }
 
+/**
+ * Deterministic shuffle keyed to a seed string. The same seed always produces
+ * the same permutation, so quiz choice order is stable across reruns but varies
+ * between different quiz IDs (preventing answer position bias).
+ */
+export function deterministicShuffle<T>(array: T[], seed: string): T[] {
+  // DJB2 hash: convert seed string into a numeric state
+  let hash = 5381;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) + hash) + seed.charCodeAt(i);
+    hash = hash & 0x7fffffff;
+  }
+  // Fisher-Yates shuffle driven by a linear congruential generator
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    hash = (hash * 1103515245 + 12345) & 0x7fffffff;
+    const j = hash % (i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+/**
+ * Generate a quiz with code-reading, scenario, and output-prediction questions.
+ * Choices are shuffled deterministically per question ID so correct answer
+ * position varies between lessons while remaining stable across reruns.
+ */
+export function codeReadingQuiz(
+  id: string,
+  lessonId: string,
+  title: string,
+  codeSnippet: string,
+  concept: string,
+  rightAnswer: string,
+  wrongAnswerA: string,
+  wrongAnswerB: string,
+  explanation: string,
+  conceptIds?: string[]
+): Quiz {
+  // Q1: Code-reading — shuffle the 3 answer choices
+  const q1Choices = [rightAnswer, wrongAnswerA, wrongAnswerB];
+  const q1Shuffled = deterministicShuffle(q1Choices, `${id}-cr-1`);
+  const q1CorrectIndex = q1Shuffled.indexOf(rightAnswer);
+
+  // Q2: Output prediction — shuffle the 3 hardcoded scenario choices
+  const q2Raw = [
+    "It would produce the exact same output",
+    "It would produce a different output or error",
+    "The program would not run at all"
+  ];
+  const q2Shuffled = deterministicShuffle(q2Raw, `${id}-cr-2`);
+  const q2CorrectIndex = q2Shuffled.indexOf("It would produce a different output or error");
+
+  // Q3: Application — shuffle the 3 hardcoded application choices
+  const q3Raw = [
+    "Never — this is just theory",
+    "Only when installing Python on a new computer",
+    "When processing or inspecting session data"
+  ];
+  const q3Shuffled = deterministicShuffle(q3Raw, `${id}-cr-3`);
+  const q3CorrectIndex = q3Shuffled.indexOf("When processing or inspecting session data");
+
+  // Q4: Debug — shuffle the 3 generic debug choices
+  const q4Raw = [
+    "A NameError from an undefined variable",
+    "A TypeError from mixing incompatible types",
+    "A logic error from misunderstanding what the function returns"
+  ];
+  const q4Shuffled = deterministicShuffle(q4Raw, `${id}-cr-4`);
+  const q4CorrectIndex = q4Shuffled.indexOf("A logic error from misunderstanding what the function returns");
+
+  // Q5: Refactor — shuffle the 3 generic refactor choices
+  const q5Raw = [
+    "Add more comments to explain each line",
+    "Extract a helper function for the repeated logic",
+    "Rename all variables to be shorter"
+  ];
+  const q5Shuffled = deterministicShuffle(q5Raw, `${id}-cr-5`);
+  const q5CorrectIndex = q5Shuffled.indexOf("Extract a helper function for the repeated logic");
+
+  return {
+    id,
+    lessonId,
+    title,
+    passingScore: 80,
+    questions: [
+      {
+        id: `${id}-cr-1`,
+        prompt: `Look at this code:\n\`\`\`python\n${codeSnippet}\n\`\`\`\nWhat does it produce or do?`,
+        choices: q1Shuffled,
+        correctChoiceIndex: q1CorrectIndex,
+        explanation,
+        conceptIds
+      },
+      {
+        id: `${id}-cr-2`,
+        prompt: `What would happen if you ran this version of the code?\n\`\`\`python\n${wrongAnswerA.includes("print") ? codeSnippet.replace(/print\([^)]+\)/, 'print("wrong")') : codeSnippet.replace(wrongAnswerA.includes("=") ? /[a-z_]+ = / : /print/, "x = 1\n    print")}\n\`\`\``,
+        choices: q2Shuffled,
+        correctChoiceIndex: q2CorrectIndex,
+        explanation: "Changing code changes behavior. Always predict the output before running.",
+        conceptIds
+      },
+      {
+        id: `${id}-cr-3`,
+        prompt: `In the Study Tracker project, where would you apply ${concept}?`,
+        choices: q3Shuffled,
+        correctChoiceIndex: q3CorrectIndex,
+        explanation: "This concept helps you build the Study Tracker feature that reads, validates, or reports on sessions.",
+        conceptIds
+      },
+      {
+        id: `${id}-cr-4`,
+        prompt: `What is the most likely bug someone would introduce in this code?`,
+        choices: q4Shuffled,
+        correctChoiceIndex: q4CorrectIndex,
+        explanation: "Logic errors are the most common real-world bug — the code runs but produces wrong results.",
+        conceptIds
+      },
+      {
+        id: `${id}-cr-5`,
+        prompt: `What single change would most improve this code?`,
+        choices: q5Shuffled,
+        correctChoiceIndex: q5CorrectIndex,
+        explanation: "Extracting a helper function for repeated logic follows the DRY (Don't Repeat Yourself) principle, making code more maintainable.",
+        conceptIds
+      }
+    ]
+  };
+}
+
+/** @deprecated Replaced by codeReadingQuiz(). Shuffle backported to eliminate position bias. Use codeReadingQuiz for all new quizzes. */
 export function checkpointQuiz(
   id: string,
   lessonId: string,
@@ -345,6 +485,20 @@ export function checkpointQuiz(
   explanation: string,
   conceptIds?: string[]
 ): Quiz {
+  // Q1: Concept purpose — shuffle the 3 answer choices
+  const q1Choices = deterministicShuffle([rightAnswer, wrongAnswerA, wrongAnswerB], `${id}-cp-1`);
+  const q1CorrectIndex = q1Choices.indexOf(rightAnswer);
+
+  // Q2: Review check — shuffle the 3 hardcoded choices
+  const q2Raw = ["A private note with no example", "A small result plus check output", "A claim that the idea is obvious"];
+  const q2Choices = deterministicShuffle(q2Raw, `${id}-cp-2`);
+  const q2CorrectIndex = q2Choices.indexOf("A small result plus check output");
+
+  // Q3: Beginner pitfalls — shuffle the 3 hardcoded choices
+  const q3Raw = ["Naming the assumption", "Recording the check command", "Skipping the failure case"];
+  const q3Choices = deterministicShuffle(q3Raw, `${id}-cp-3`);
+  const q3CorrectIndex = q3Choices.indexOf("Skipping the failure case");
+
   return {
     id,
     lessonId,
@@ -354,24 +508,24 @@ export function checkpointQuiz(
       {
         id: `${id}-1`,
         prompt: `What is the main purpose of ${concept}?`,
-        choices: [rightAnswer, wrongAnswerA, wrongAnswerB],
-        correctChoiceIndex: 0,
+        choices: q1Choices,
+        correctChoiceIndex: q1CorrectIndex,
         explanation,
         conceptIds
       },
       {
         id: `${id}-2`,
         prompt: `Which check makes ${concept} reviewable?`,
-        choices: ["A private note with no example", "A small result plus check output", "A claim that the idea is obvious"],
-        correctChoiceIndex: 1,
+        choices: q2Choices,
+        correctChoiceIndex: q2CorrectIndex,
         explanation: "CareerForge treats finished work as an inspectable result plus a check result or explicit review note.",
         conceptIds
       },
       {
         id: `${id}-3`,
         prompt: `What should a beginner avoid when practicing ${concept}?`,
-        choices: ["Naming the assumption", "Recording the check command", "Skipping the failure case"],
-        correctChoiceIndex: 2,
+        choices: q3Choices,
+        correctChoiceIndex: q3CorrectIndex,
         explanation: "The failure case shows whether the work handles real-world mess instead of only the happy path.",
         conceptIds
       }

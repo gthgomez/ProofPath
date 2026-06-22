@@ -33,22 +33,34 @@ export const pythonCoreLessonArcs: LessonArc[] = [
     missionHint: "Build the first tracker slice."
   },
   {
-    id: "clean-validate-data",
-    title: "Clean and Validate Data",
-    lessonIndexes: [5, 6, 7, 8, 9],
-    missionHint: "Prepare parser and rejected-row checks."
+    id: "variables-output",
+    title: "Variables and Output",
+    lessonIndexes: [5, 6, 7, 8, 9, 10],
+    missionHint: "Store data and produce readable output."
   },
   {
-    id: "real-cli",
-    title: "Build a Real CLI",
-    lessonIndexes: [10, 11, 12, 13, 14],
-    missionHint: "Turn scripts into reviewer-friendly commands."
+    id: "collections-control-flow",
+    title: "Collections and Control Flow",
+    lessonIndexes: [11, 12, 13, 14, 15, 16],
+    missionHint: "Lists, dicts, decisions, and loops with the module guard."
   },
   {
-    id: "package-proof",
-    title: "Package for Review",
-    lessonIndexes: [15, 16],
-    missionHint: "Package your work and pass the project review."
+    id: "functions",
+    title: "Functions",
+    lessonIndexes: [17, 18, 19, 20, 21, 22],
+    missionHint: "Decompose the tracker into reusable functions."
+  },
+  {
+    id: "debugging-assertions",
+    title: "Debugging and Assertions",
+    lessonIndexes: [23, 24, 25, 26, 27, 28, 29],
+    missionHint: "Read tracebacks, handle exceptions, and write regression tests."
+  },
+  {
+    id: "file-io-cli",
+    title: "File I/O and CLI",
+    lessonIndexes: [30, 31, 32, 33, 34, 35, 36, 37, 38],
+    missionHint: "Build a real CLI with file parsing, rejected rows, and portfolio proof."
   }
 ];
 
@@ -63,34 +75,34 @@ const moduleLessonArcs: Record<string, LessonArc[]> = {
     {
       id: "python-professional-operations",
       title: "Errors, Config, and Quality",
-      lessonIndexes: [3, 4, 5, 6, 7, 8],
-      missionHint: "Add logging, metadata, installability, config, and repeatable checks."
+      lessonIndexes: [3, 4, 5, 6, 7, 8, 9],
+      missionHint: "Add logging, metadata, installability, environments, config, and repeatable checks."
     },
     {
       id: "python-professional-review",
       title: "Professional Review Gate",
-      lessonIndexes: [9],
+      lessonIndexes: [10],
       missionHint: "Confirm the package is maintainable before integration depth."
     }
   ],
-  "module-python-integration": [
+  "module-python-dashboard": [
     {
-      id: "python-integration-boundaries",
+      id: "python-dashboard-boundaries",
       title: "Validation and Services",
-      lessonIndexes: [0, 1],
-      missionHint: "Harden input boundaries and service state."
+      lessonIndexes: [0, 1, 2],
+      missionHint: "Harden input boundaries and prepare typed service state for the dashboard."
     },
     {
-      id: "python-integration-data-api",
-      title: "Persistence and APIs",
-      lessonIndexes: [2, 3],
-      missionHint: "Connect SQLite repositories and safe API clients."
+      id: "python-dashboard-data-api",
+      title: "Persistence, APIs, and Mocks",
+      lessonIndexes: [3, 4, 5],
+      missionHint: "Connect SQLite repositories, safe API clients, and mocked test doubles."
     },
     {
-      id: "python-integration-capstone",
-      title: "Integration Review",
-      lessonIndexes: [4, 5],
-      missionHint: "Stitch layers together, inspect failure paths, and choose one improvement."
+      id: "python-dashboard-capstone",
+      title: "Dashboard Build and Review",
+      lessonIndexes: [6, 7],
+      missionHint: "Build the dashboard, inspect failure paths, and choose one improvement."
     }
   ],
   "module-typescript-core": [

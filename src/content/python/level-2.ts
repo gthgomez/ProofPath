@@ -1,105 +1,361 @@
-import type { Lesson, Quiz } from "@/domain/types";
-import { proofLesson, checkpointQuiz } from "./shared";
+import type { Lesson, LessonPracticeBlock, Quiz } from "@/domain/types";
+import { proofLesson, checkpointQuiz, codeReadingQuiz } from "./shared";
 
-const pythonCollectionPracticeReps = [
+const pythonListPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "sessions = []\n# Add python 30 and git 15 as dictionaries.\nprint(sessions)",
-    expectedOutput: "[{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]",
-    checkYourAnswer: "You should have one list and two dictionaries. If you made topic1 and topic2 variables, you avoided the record shape the next lessons need."
+    starterCode: "topics = ['python', 'git', 'sql']\nsecond = ''\nprint(second)",
+    expectedOutput: "git\nIndex 1 is the second item because lists start at 0.",
+    checkYourAnswer: "List positions start at 0. Index 0 is 'python', index 1 is 'git'. Make sure you access index 1, not index 2.",
+    tier: "replicate"
   },
   {
-    starterCode: "session = {\"topic\": \"python\", \"minutes\": 30}\n# Add a completed field set to False.\nprint(session)",
-    expectedOutput: "{'topic': 'python', 'minutes': 30, 'completed': False}",
-    checkYourAnswer: "A dictionary can grow one named field at a time. Check that completed is a boolean, because later decisions will branch on it."
+    starterCode: "mixed = [30, 15, 45]\nfirst = ''\nprint(first)",
+    expectedOutput: "30 is at index 0 in the list.",
+    checkYourAnswer: "The first item in the list is at position 0. Access mixed[0] to get 30.",
+    tier: "replicate"
   },
   {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes': 15}]\nsecond_topic = \"\"\nprint(second_topic)",
-    expectedOutput: "second topic: git\nThe second record's topic is git.",
-    checkYourAnswer: "Read the list position first, then the dictionary key. The second item is index 1 because Python lists start at zero."
+    starterCode: "items = [10, 20, 30]\n# Bug: the code tries to read an item beyond the list.\ntotal = items[3]\nprint(total)",
+    expectedOutput: "List index fix: access valid positions 0, 1, or 2 only.",
+    checkYourAnswer: "A list with 3 items has valid indices 0, 1, and 2. Index 3 is out of range. Fix by accessing an existing position.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "# Create a list called minutes_list that holds three numbers: 30, 15, and 45.\n# Then use the list to build a total.\nminutes_list = []\ntotal = 0\nprint(total)",
+    expectedOutput: "90 total minutes created from list items",
+    checkYourAnswer: "Create the list with three numbers, then add them up by index. Each number stays inside the list brackets separated by commas.",
+    tier: "synthesize"
   }
 ];
 
-const pythonDecisionPracticeReps = [
+const pythonDictPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "session = {'topic': 'python', 'minutes': 30}\n# Add a completed field set to False.\nprint(session)",
+    expectedOutput: "{'topic': 'python', 'minutes': 30, 'completed': False}",
+    checkYourAnswer: "A dictionary can grow one named field at a time. Check that completed is a boolean, because later decisions will branch on it.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "session = {'topic': 'python'}\n# Add the minutes field with value 30.\nprint(session)",
+    expectedOutput: "{'topic': 'python', 'minutes': 30}",
+    checkYourAnswer: "Add minutes by assigning it like a variable. The new key-value pair appears in the dictionary output.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "session = {'topic': 'python', 'minutes': 30}\n# Bug: the code tries to read a field that does not exist.\nname = session['name']\nprint(name)",
+    expectedOutput: "Fix: use the correct key 'topic' instead of 'name'.",
+    checkYourAnswer: "The key 'name' does not exist in the dictionary. Change it to 'topic' which is one of the actual keys.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "# Create a session dictionary with topic and minutes fields.\n# topic should be 'python', minutes should be 30.\n# Then print the topic value.\nsession = {}\nvalue = \"\"\nprint(value)",
+    expectedOutput: "python accessed from dictionary key",
+    checkYourAnswer: "Build the dictionary with curly braces, colons between keys and values, and commas between pairs. Then access topic by its key name.",
+    tier: "synthesize"
+  }
+];
+
+const pythonRecordListPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "sessions = []\n# Add python 30 and git 15 as dictionaries.\nprint(sessions)",
+    expectedOutput: "[{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]",
+    checkYourAnswer: "You should have one list and two dictionaries. If you made separate variables, you avoided the record shape the next lessons need.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}]\nsecond_topic = \"\"\nprint(second_topic)",
+    expectedOutput: "second topic: git\nThe second record's topic is git.",
+    checkYourAnswer: "Read the list position first, then the dictionary key. The second item is index 1 because Python lists start at zero.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "# Create a list called records with three study sessions.\n# Each session needs topic, minutes, and completed fields.\n# Use mixed data: at least two topics, varied minutes.\nprint(records)",
+    expectedOutput: "[{'topic': 'python', 'minutes': 30, 'completed': False}, {'topic': 'git', 'minutes': 15, 'completed': True}, {'topic': 'sql', 'minutes': 45, 'completed': False}]",
+    checkYourAnswer: "All three dictionaries must use the exact same key names in the same order. If the output is wrong, check that each record has topic, minutes, and completed — no extras, no missing fields.",
+    tier: "synthesize"
+  }
+];
+
+const pythonDecisionPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "minutes = 10\nlabel = \"\"\n# Use if/else so short sessions become quick.\nprint(label)",
     expectedOutput: "quick session planned",
-    checkYourAnswer: "This is the branch the main example does not take. If it still prints focus, reread the comparison as a true-or-false question."
+    checkYourAnswer: "This is the branch the main example does not take. If it still prints focus, reread the comparison as a true-or-false question.",
+    tier: "replicate"
   },
   {
     starterCode: "completed = False\nmessage = \"\"\n# If completed is true, message is done. Otherwise message is keep going.\nprint(message)",
     expectedOutput: "keep going until complete",
-    checkYourAnswer: "Do not compare completed to the text \"False\". A boolean can be used directly in an if statement."
+    checkYourAnswer: "Do not compare completed to the text \"False\". A boolean can be used directly in an if statement.",
+    tier: "replicate"
   },
   {
     starterCode: "errors = 0\nstatus = \"\"\n# If there are no errors, status is clean. Otherwise status is needs review.\nprint(status)",
     expectedOutput: "clean: no errors found",
-    checkYourAnswer: "This rep practices equality. Ask whether errors == 0 is true for the starter value before you choose the branch."
+    checkYourAnswer: "This rep practices equality. Ask whether errors == 0 is true for the starter value before you choose the branch.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "completed = True\n# Bug: the condition below compares a boolean to a string.\nif completed == \"True\":\n    message = \"done\"\nelse:\n    message = \"keep going\"\nprint(message)",
+    expectedOutput: "done: session marked complete",
+    checkYourAnswer: "The bug is comparing completed (a boolean) to the string \"True\". Remove the == comparison and use the boolean directly: if completed:",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "total_minutes = 45\n# From scratch: if total_minutes is more than 0, set report to \"study time logged\".\n# Otherwise, set report to \"no study time yet\". Print the report.\nreport = \"\"\nprint(report)",
+    expectedOutput: "study time logged report",
+    checkYourAnswer: "You need the full if/else structure. The condition checks whether total_minutes > 0. If the output is blank, your if/else never assigned report to either branch.",
+    tier: "synthesize"
   }
 ];
 
-const pythonLoopPracticeReps = [
+const pythonLoopPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"sql\", \"minutes\": 20}]\ncount = 0\n# Count each session with a loop.\nprint(count)",
     expectedOutput: "3 sessions counted\nCount one session during each loop pass.",
-    checkYourAnswer: "The count should change once per record. If it stays zero, the loop body never updated the running count."
+    checkYourAnswer: "The count should change once per record. If it stays zero, the loop body never updated the running count.",
+    tier: "replicate"
   },
   {
     starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"sql\", \"minutes\": 20}]\ntopics = []\n# Append each topic to topics.\nprint(topics)",
     expectedOutput: "['python', 'git', 'sql']",
-    checkYourAnswer: "This rep asks you to collect one field from every record. If only one topic appears, the append likely happened outside the loop."
+    checkYourAnswer: "This rep asks you to collect one field from every record. If only one topic appears, the append likely happened outside the loop.",
+    tier: "replicate"
   },
   {
     starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"python\", \"minutes\": 25}]\npython_minutes = 0\n# Add minutes only when topic is python.\nprint(python_minutes)",
     expectedOutput: "55 python minutes\nOnly python records are included in this total.",
-    checkYourAnswer: "This combines a loop with a decision. The total should skip git and include both python records."
+    checkYourAnswer: "This combines a loop with a decision. The total should skip git and include both python records.",
+    tier: "synthesize"
+  },
+  {
+    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}]\ntotal = 0\n# Bug: this loop resets the total on each pass.\nfor session in sessions:\n    total = 0\n    total = total + session[\"minutes\"]\nprint(total)",
+    expectedOutput: "45 total minutes accumulated",
+    checkYourAnswer: "The total always ends up as 15 because total = 0 inside the loop resets it on each pass. Move total = 0 before the loop so it accumulates correctly.",
+    tier: "diagnose"
   }
 ];
 
-const pythonFoundationCapstonePracticeReps = [
+const pythonFoundationCapstonePracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}]\ntotal_minutes = 0\n# Add each session's minutes with a loop.\nprint(total_minutes)",
     expectedOutput: "45 total minutes counted",
-    checkYourAnswer: "This rep isolates the total before the full capstone. If the answer is 0, the loop did not update total_minutes. If it is only 15 or 30, only one record was counted."
+    checkYourAnswer: "This rep isolates the total before the full capstone. If the answer is 0, the loop did not update total_minutes. If it is only 15 or 30, only one record was counted.",
+    tier: "replicate"
   },
   {
     starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"sql\", \"minutes\": 45}]\nfocus_count = 0\n# Count sessions where minutes is 30 or more.\nprint(focus_count)",
     expectedOutput: "2 focus sessions counted",
-    checkYourAnswer: "This rep checks the decision inside the loop. A 30-minute session counts because the condition is greater than or equal to 30."
+    checkYourAnswer: "This rep checks the decision inside the loop. A 30-minute session counts because the condition is greater than or equal to 30.",
+    tier: "replicate"
   },
   {
     starterCode: "session_count = 3\ntotal_minutes = 70\nfocus_count = 1\nsummary = \"\"\n# Build the exact readable summary from the calculated values.\nprint(summary)",
     expectedOutput: "3 sessions, 70 minutes, 1 focus session",
-    checkYourAnswer: "This rep separates presentation from calculation. The summary should use the calculated variables instead of typing unrelated numbers."
+    checkYourAnswer: "This rep separates presentation from calculation. The summary should use the calculated variables instead of typing unrelated numbers.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"python\", \"minutes\": 25}]\ntotal_minutes = 0\nfocus_count = 0\n# Bug: the output shows 70 minutes but focus_count stays 0. Fix the missing logic.\nfor session in sessions:\n    total_minutes = total_minutes + session[\"minutes\"]\nprint(total_minutes)\nprint(focus_count)",
+    expectedOutput: "70 minutes, 2 focus sessions counted",
+    checkYourAnswer: "The focus_count is never incremented because no if decision exists inside the loop. Add if session['minutes'] >= 30: focus_count = focus_count + 1 in the loop body.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "# From scratch: create a sessions list with two records: python 30, git 15.\n# Loop over it to calculate total_minutes and focus_count.\n# Print: \"X sessions, Y minutes, Z focus\"\ntotal_minutes = 0\nfocus_count = 0\nsummary = \"\"\nprint(summary)",
+    expectedOutput: "2 sessions, 45 minutes, 1 focus",
+    checkYourAnswer: "No list is provided — you must create it yourself. If the output is wrong, check whether you created sessions, looped correctly, and built the summary from your calculated values.",
+    tier: "synthesize"
   }
 ];
 
-const pythonStringCleanupPracticeReps = [
+const pythonStringCleanupPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "raw_topic = \"  PYTHON  \"\nclean_topic = \"\"\nprint(clean_topic)",
     expectedOutput: "python cleaned topic",
-    checkYourAnswer: "Use strip before lower so edge spaces disappear and capitalization becomes consistent. The cleaned value should not keep the original spacing."
+    checkYourAnswer: "Use strip before lower so edge spaces disappear and capitalization becomes consistent. The cleaned value should not keep the original spacing.",
+    tier: "replicate"
   },
   {
     starterCode: "clean_topic = \"python basics\"\nslug = \"\"\nprint(slug)",
     expectedOutput: "python-basics slug output",
-    checkYourAnswer: "Create the slug after cleaning the topic. If spaces remain in slug, replace spaces with hyphens on the cleaned value."
+    checkYourAnswer: "Create the slug after cleaning the topic. If spaces remain in slug, replace spaces with hyphens on the cleaned value.",
+    tier: "replicate"
   },
   {
     starterCode: "raw_topics = [\" Python \", \"python\", \"PYTHON\"]\ncleaned_topics = []\n# Add the cleaned version of each topic.\nprint(cleaned_topics)",
     expectedOutput: "['python', 'python', 'python']",
-    checkYourAnswer: "This rep shows why cleanup matters. Three visually different inputs should become the same dependable topic before grouping."
+    checkYourAnswer: "This rep shows why cleanup matters. Three visually different inputs should become the same dependable topic before grouping.",
+    tier: "synthesize"
+  },
+  {
+    starterCode: "raw_topic = \"  Python  \"\n# Bug: this code keeps the edge spaces.\nclean_topic = raw_topic.lower()\nprint(clean_topic)",
+    expectedOutput: "python cleaned topic",
+    checkYourAnswer: "The code calls lower() before strip(), so edge spaces remain. Swap the order: strip first, or chain as raw_topic.strip().lower().",
+    tier: "diagnose"
+  }
+];
+
+const pythonModuleGuardPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "def count_sessions(sessions):\n    return len(sessions)\n\n# Add the module guard. Inside:\n#   data = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\n#   print(f\"{count_sessions(data)} session(s)\")\n",
+    expectedOutput: "2 session(s) counted",
+    checkYourAnswer: "Copy the guard pattern: if __name__ == '__main__': with the test code indented below. Both double-underscore pairs on name and main are essential.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "def total_minutes(sessions):\n    total = 0\n    for s in sessions:\n        total = total + s['minutes']\n    return total\n\n# Bug: the guard below never evaluates to True.\nif __name__ == '__main_':\n    data = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\n    result = total_minutes(data)\n    print(f'{result} total minutes')\n",
+    expectedOutput: "45 total minutes summed",
+    checkYourAnswer: "The guard has '__main_' with only one trailing underscore instead of two. Python never matches '__main_' to '__main__', so the block never runs. Fix the spelling.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "def parse_sessions(raw):\n    \"\"\"Convert [topic, minutes] pairs into session dicts.\"\"\"\n    result = []\n    for item in raw:\n        result.append({'topic': item[0], 'minutes': int(item[1])})\n    return result\n\n# Write from scratch:\n# 1. Add a module guard so parse_sessions is importable.\n# 2. Inside, create test data and print the result count.\n# Test data: [[\"python\", \"30\"], [\"git\", \"15\"], [\"sql\", \"20\"]]\n",
+    expectedOutput: "3 sessions parsed correctly",
+    checkYourAnswer: "You need the full guard with __name__ == '__main__' and the test code indented inside. If nothing prints, check the double underscores and indentation.",
+    tier: "synthesize"
   }
 ];
 
 export const level2Lessons: Lesson[] = [
   proofLesson({
-    id: "lesson-python-collections",
+    id: "lesson-python-lists",
       curriculum: {
         level: 2,
         sequence: 1,
         version: "1.0.0",
-        teaches: ["py.record.list_of_dicts", "py.list.literal", "py.dict.literal"],
-        requires: ["py.variable.assignment", "py.string", "py.integer", "py.boolean"],
+        teaches: ["py.list.literal"],
+        requires: ["py.variable.assignment", "py.string", "py.integer"],
+        usesButDoesNotTeach: ["py.assertion"]
+      },
+    codeShape: [
+      "# Square brackets make a list.",
+      "topics = [\"python\", \"git\", \"sql\"]",
+      "",
+      "# Access items by position (starts at 0):",
+      "second = topics[1]",
+      "print(second)"
+    ].join("\n"),
+    moduleId: "module-python-core",
+    slug: "python-lists",
+    title: "Lists Hold Ordered Items",
+    summary: "Use a Python list to store multiple values in one variable by position.",
+    bodyMarkdown: "Square brackets [] make a list. Items inside are separated by commas. Think of a list like numbered train cars — each car holds one item, and you access cars by their position number (starting at 0). Lists keep items in order so you can always find the first, second, or last value.",
+    estimatedMinutes: 8,
+    difficulty: "foundation",
+    skillIds: ["skill-python-basics", "skill-testing-debugging"],
+    quizId: "quiz-python-lists",
+    desktopTask: "Create a list of topics and print the second topic.",
+    evidencePrompt: "Record the list code, the output, and one reason position 0 matters.",
+    language: "Python",
+    tools: ["Python 3", "terminal", "lists"],
+    synopsis: "You are learning how Python stores multiple values in one ordered list.",
+    prerequisites: ["Know that a variable can store a single value.", "Know that strings use quotes and numbers usually do not."],
+    testingFocus: "You will test that the list is created correctly and that items can be accessed by their zero-based index.",
+    objective: "Create a Python list and access items by their index position.",
+    whyItMatters: "Real scripts rarely work with one value at a time. Lists let you store and process many values together.",
+    coreConcept: "A list is an ordered collection wrapped in square brackets. Each item has a position called an index, starting at 0. You read an item by writing the list variable followed by the index in brackets: topics[1] reads the second item.",
+    workedExample: "topics = ['python', 'git', 'sql'] stores three strings in order. topics[0] is 'python', topics[1] is 'git', topics[2] is 'sql'.",
+    guidedExercise: "Create a list of study topics, then print the second topic using its index.",
+    missionConnection: "This prepares you to hold multiple study sessions in one variable instead of separate named variables.",
+    reflectionPrompt: "If a list has 3 items, what is the index of the last item, and what happens if you try index 3?",
+    practiceStarter: "topics = ['python']\n\n# Add 'git' and 'sql' to the list, then print the second topic.\nprint(topics)",
+    practiceExpected: "git\nIndex 1 is the second topic.",
+    practiceCheck: "The output should show the second item. If you see python, you printed index 0 instead of index 1.",
+    practiceReps: pythonListPracticeReps,
+    miniTitle: "Build a topic list",
+    miniGoal: "Create a Python list that stores three study topics and access one by index.",
+    miniSteps: ["Create a list with three topic strings", "Access index 1 to get the second topic", "Print the result"],
+    miniDeliverables: ["Python list code", "Output showing the second topic", "One sentence about zero-based indexing"],
+    verifierCommand: "python topics_list.py",
+    expectedEvidence: "Terminal output showing the second topic plus a note about zero-based indexing.",
+    projectConnection: "This becomes the foundation for storing repeated records in the Study Tracker.",
+    requiredCodeIncludes: ["topics", "[", "]"],
+    requiredOutputIncludes: ["git"],
+    runnerLanguage: "python",
+    runnerStarterCode: "topics = ['python']\n\n# Add 'git' and 'sql' to the list, then print the second topic.\nprint(topics)",
+    runnerTestCode: "assert isinstance(topics, list), 'topics must be a list'\nassert len(topics) == 3, 'topics must contain exactly 3 items'\nassert topics[1] == 'git', 'the second topic should be git'\nprint('git list passed')",
+    hiddenTests: [
+      {
+        id: "list-items-are-strings",
+        name: "Every item in the list is a string",
+        code: "assert all(isinstance(item, str) for item in topics), 'All items must be strings'"
+      }
+    ]
+  }),
+  proofLesson({
+    id: "lesson-python-dicts",
+      curriculum: {
+        level: 2,
+        sequence: 2,
+        version: "1.0.0",
+        teaches: ["py.dict.literal"],
+        requires: ["py.list.literal", "py.variable.assignment", "py.string"],
+        usesButDoesNotTeach: ["py.assertion"]
+      },
+    codeShape: [
+      "# Curly braces make a dictionary.",
+      "session = {\"topic\": \"python\", \"minutes\": 30}",
+      "",
+      "# Access values by their key name:",
+      "topic = session[\"topic\"]",
+      "print(topic)"
+    ].join("\n"),
+    moduleId: "module-python-core",
+    slug: "python-dicts",
+    title: "Dictionaries Map Keys to Values",
+    summary: "Use a Python dictionary to store labeled fields in one variable.",
+    bodyMarkdown: "Curly braces {} make a dictionary. Think of a dictionary like a labeling drawer — each item has a label (key) and the thing inside (value), and you find things by their label, not their position. Keys and values are separated by a colon, and key-value pairs are separated by commas.",
+    estimatedMinutes: 8,
+    difficulty: "foundation",
+    skillIds: ["skill-python-basics", "skill-testing-debugging"],
+    quizId: "quiz-python-dicts",
+    desktopTask: "Create a study session dictionary and print the topic value by its key name.",
+    evidencePrompt: "Record the dictionary code, the output, and one key that every session record should share.",
+    language: "Python",
+    tools: ["Python 3", "terminal", "dictionaries"],
+    synopsis: "You are learning how Python stores labeled data in key-value pairs.",
+    prerequisites: ["Know that a variable can store a single value.", "Know that strings use quotes."],
+    testingFocus: "You will test that the dictionary is created with the right keys and that values can be accessed by their key name.",
+    objective: "Create a Python dictionary and access values by their key names.",
+    whyItMatters: "Dictionaries give names to data fields, so code meaning stays clear instead of relying on position alone.",
+    coreConcept: "A dictionary pairs keys with values using curly braces. Each key is a name (usually a string), and each value is the data for that field. You read a value by writing the dictionary variable followed by the key in brackets: session['topic'].",
+    workedExample: "session = {'topic': 'python', 'minutes': 30} stores two fields. session['topic'] returns 'python', and session['minutes'] returns 30.",
+    guidedExercise: "Create a dictionary with topic and minutes, then print the topic value using its key.",
+    missionConnection: "This prepares you to represent one study session as a labeled record.",
+    reflectionPrompt: "What happens if you try to read a key that does not exist in the dictionary?",
+    practiceStarter: "session = {\"topic\": \"python\"}\n\n# Add the minutes field with value 30, then print the topic.\nprint(session)",
+    practiceExpected: "{'topic': 'python', 'minutes': 30}",
+    practiceCheck: "Add minutes by assigning session['minutes'] = 30. The output should show both keys.",
+    practiceReps: pythonDictPracticeReps,
+    miniTitle: "Build a session dictionary",
+    miniGoal: "Create a Python dictionary that stores one study session with topic and minutes fields.",
+    miniSteps: ["Create a dictionary with a topic key", "Add a minutes key with value 30", "Print the dictionary"],
+    miniDeliverables: ["Python dict code", "Output showing both fields", "One sentence about key names vs positions"],
+    verifierCommand: "python session_dict.py",
+    expectedEvidence: "Terminal output showing the dictionary with topic and minutes plus a note about key access.",
+    projectConnection: "This becomes the record shape that the Study Tracker uses for every session.",
+    requiredCodeIncludes: ["session", "{", "}"],
+    requiredOutputIncludes: ["topic", "minutes"],
+    runnerLanguage: "python",
+    runnerStarterCode: "session = {\"topic\": \"python\"}\n\n# Add the minutes field with value 30, then print the session.\nprint(session)",
+    runnerTestCode: "assert isinstance(session, dict), 'session must be a dictionary'\nassert 'topic' in session and 'minutes' in session, 'session must have topic and minutes keys'\nassert session['topic'] == 'python', 'topic should be python'\nassert session['minutes'] == 30, 'minutes should be 30'\nprint('python 30 dict passed')",
+    hiddenTests: [
+      {
+        id: "session-has-required-keys",
+        name: "Session has topic and minutes keys",
+        code: "assert isinstance(session, dict)\nassert len(session) == 2, 'session should have exactly 2 keys'\nassert isinstance(session['minutes'], int), 'minutes must be an integer'"
+      }
+    ]
+  }),
+  proofLesson({
+    id: "lesson-python-list-of-dicts",
+      curriculum: {
+        level: 2,
+        sequence: 3,
+        version: "1.0.0",
+        teaches: ["py.record.list_of_dicts"],
+        requires: ["py.list.literal", "py.dict.literal", "py.variable.assignment", "py.string", "py.integer", "py.boolean"],
         usesButDoesNotTeach: ["py.assertion"]
       },
     codeShape: [
@@ -115,32 +371,32 @@ export const level2Lessons: Lesson[] = [
       "print(second_topic)"
     ].join("\n"),
     moduleId: "module-python-core",
-    slug: "python-collections",
-    title: "Lists and Dictionaries Hold Real Records",
+    slug: "python-list-of-dicts",
+    title: "Lists of Dictionaries Hold Real Records",
     summary: "Use a list of dictionaries so Python can hold more than one study session.",
-    bodyMarkdown: "A list keeps items in order between square brackets. A dictionary names the parts of one item between curly braces. Together, they let a beginner script hold real records instead of one loose pile of variables.",
+    bodyMarkdown: "A list of dictionaries combines two ideas you already know: a list holds items in order, and a dictionary stores labeled fields. Together they form a record collection where the list is the filing cabinet (keeping sessions in order) and each dictionary is one file folder with named fields. Since you already know lists and dicts separately, this lesson shows how to combine them into the record shape that real scripts use.",
     estimatedMinutes: 8,
     difficulty: "foundation",
     skillIds: ["skill-python-basics", "skill-testing-debugging"],
-    quizId: "quiz-python-collections",
+    quizId: "quiz-python-list-of-dicts",
     desktopTask: "Represent two study sessions as a list of dictionaries and print the second topic.",
     evidencePrompt: "Record the data structure, output, and one field name that every record should share.",
     language: "Python",
-    tools: ["Python 3", "terminal", "lists and dictionaries"],
+    tools: ["Python 3", "terminal", "lists of dictionaries"],
     synopsis: "You are learning how Python holds repeated records. A record is one study session, and repeated records are what let the tracker move beyond one hardcoded example.",
-    prerequisites: ["Know that a variable can store a value.", "Know that strings use quotes and numbers usually do not."],
+    prerequisites: ["Know that a list stores items in order by position.", "Know that a dictionary maps key names to values."],
     testingFocus: "You will test that the sessions value is a list, that it contains two dictionaries, and that both records use the same beginner-friendly keys: topic and minutes.",
     objective: "Represent two related study sessions with a list of dictionaries.",
     whyItMatters: "Real scripts rarely work with one value at a time. They need a shape that can hold repeated records consistently.",
-    coreConcept: "A record is one complete item of information. In Python, a dictionary uses keys and values: the key names the field, and the value is the data in that field. A list stores several records in order so the same code can work with all of them.",
-    workedExample: "sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}] keeps two records in one variable. sessions[1] reads the second record because list positions start at zero.",
+    coreConcept: "A record is one complete item of information. In Python, a dictionary uses keys and values: the key names the field, and the value is the data in that field. A list stores several records in order so the same code can work with all of them. The combination of both — a list of dictionaries — is the most common way to hold tabular data in Python.",
+    workedExample: "sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}] keeps two records in one variable. sessions[1] reads the second record because list positions start at zero, and sessions[1]['topic'] reads the second record's topic field.",
     guidedExercise: "Add a second study-session dictionary to a sessions list, then print the second session's topic.",
     missionConnection: "This prepares the CLI Study Tracker to hold a week of sessions instead of one hardcoded line.",
     reflectionPrompt: "Which keys should every session share, and what would break if one record used name instead of topic?",
     practiceStarter: "sessions = [\n    {\"topic\": \"python\", \"minutes\": 30}\n]\n\n# Add a git session with 15 minutes.\nprint(sessions)",
     practiceExpected: "[{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]",
     practiceCheck: "The output should show square brackets for the list and curly braces for each dictionary. If the second record is missing, check whether it was added inside the list brackets.",
-    practiceReps: pythonCollectionPracticeReps,
+    practiceReps: pythonRecordListPracticeReps,
     miniTitle: "Build a two-session record list",
     miniGoal: "Create a Python list that stores two study-session dictionaries with consistent field names.",
     miniSteps: ["Keep the first python session", "Add a second git session with 15 minutes", "Print the second topic from the list"],
@@ -165,7 +421,7 @@ export const level2Lessons: Lesson[] = [
     id: "lesson-python-decisions",
       curriculum: {
         level: 2,
-        sequence: 2,
+        sequence: 4,
         version: "1.0.0",
         teaches: ["py.if_else", "py.comparison", "py.indentation.block"],
         requires: ["py.variable.assignment"],
@@ -188,7 +444,7 @@ export const level2Lessons: Lesson[] = [
     slug: "python-decisions",
     title: "Decisions Make Scripts Useful",
     summary: "Use if and else so Python can label a session based on its minutes.",
-    bodyMarkdown: "An if statement lets a program choose between paths. The line ending with : asks a true-or-false question, and the indented lines below it are the code Python runs for that answer.",
+    bodyMarkdown: "An if statement lets a program choose between paths. The line ending with : asks a true-or-false question, and the indented lines below it are the code Python runs for that answer. The `>=` operator means 'greater than or equal to' — so `minutes >= 30` asks: is minutes 30 or more?",
     estimatedMinutes: 8,
     difficulty: "foundation",
     skillIds: ["skill-python-basics", "skill-testing-debugging"],
@@ -235,7 +491,7 @@ export const level2Lessons: Lesson[] = [
     id: "lesson-python-loops",
       curriculum: {
         level: 2,
-        sequence: 3,
+        sequence: 5,
         version: "1.0.0",
         teaches: ["py.for_loop", "py.accumulator", "py.loop_body"],
         requires: ["py.record.list_of_dicts"],
@@ -303,7 +559,7 @@ export const level2Lessons: Lesson[] = [
     id: "lesson-python-foundation-capstone",
       curriculum: {
         level: 2,
-        sequence: 4,
+        sequence: 6,
         version: "1.0.0",
         teaches: [],
         requires: ["py.for_loop", "py.if_else", "py.accumulator"],
@@ -375,7 +631,7 @@ export const level2Lessons: Lesson[] = [
     id: "lesson-python-strings-cleanup",
       curriculum: {
         level: 2,
-        sequence: 5,
+        sequence: 7,
         version: "1.0.0",
         teaches: ["py.string"],
         requires: ["py.variable.assignment"],
@@ -436,39 +692,220 @@ export const level2Lessons: Lesson[] = [
         code: "assert clean_topic == clean_topic.strip(), 'clean_topic should be stripped'\nassert clean_topic.islower(), 'clean_topic should be lowercase'\nassert ' ' not in slug, 'slug should not contain spaces'"
       }
     ]
+  }),
+  proofLesson({
+    id: "lesson-python-module-guard",
+      curriculum: {
+        level: 2,
+        sequence: 8,
+        version: "1.0.0",
+        teaches: ["py.module.guard"],
+        requires: ["py.if_else", "py.f_string", "py.for_loop", "py.print.variable"],
+        usesButDoesNotTeach: ["py.assertion", "py.function.def", "py.return"]
+      },
+    codeShape: [
+      'def reusable_function():',
+      '    return "data that stays quiet on import"',
+      '',
+      'if __name__ == "__main__":',
+      '    # Only runs when the file is executed directly.',
+      '    print(reusable_function())'
+    ].join("\n"),
+    moduleId: "module-python-core",
+    slug: "python-module-guard",
+    title: "The Module Guard Lets Files Be Reusable AND Runnable",
+    summary: "Learn the module guard pattern that lets Python files act as reusable modules AND standalone scripts.",
+    bodyMarkdown: "When Python runs a script, the built-in variable __name__ is set to '__main__'. When another file imports that script, __name__ is the module name, not '__main__'. The guard `if __name__ == '__main__':` checks which case this is, so code inside only runs during direct execution. This means the Study Tracker file can define reusable functions at the top, and wrap the interactive CLI code behind the guard. When you write `from study_tracker import parse_row`, the import silently loads the function without triggering test prints or the menu prompt.",
+    estimatedMinutes: 10,
+    difficulty: "applied",
+    skillIds: ["skill-python-basics"],
+    quizId: "quiz-python-module-guard",
+    desktopTask: "Add a module guard to a script so the test data and print only run during direct execution.",
+    evidencePrompt: "Record the guarded script, the output from direct execution, and proof that importing the module stays silent.",
+    language: "Python",
+    tools: ["Python 3", "terminal", "module guard pattern"],
+    synopsis: "You are learning to protect your module's test and CLI code from running during import, which is the standard way professional Python projects organize reusable code.",
+    prerequisites: ["Know that a function is a reusable block of code.", "Know that import loads another module's symbols."],
+    testingFocus: "You will test that the guarded code runs only when the file is executed directly, and that importing the module does not trigger the guarded output.",
+    objective: "Explain and apply the if __name__ == '__main__' pattern to make Python files dual-purpose as modules and scripts.",
+    whyItMatters: "Without the module guard, importing a file runs all its code — including test prints and CLI prompts. The guard keeps reusable functions importable while still letting the file run as a script.",
+    coreConcept: "Every Python file has a built-in __name__ variable. When you run the file directly, Python sets __name__ to '__main__'. When another file imports it, __name__ is the module's name. The guard `if __name__ == '__main__':` checks which case this is, so code inside only runs during direct execution.",
+    workedExample: "def total_minutes(sessions): total = 0; for s in sessions: total += s['minutes']; return total then a guard block below creates test data, calls total_minutes, and prints the result. Importing the file gives you the function. Running it directly prints the summary.",
+    guidedExercise: "Add the module guard to a short script so the calculation code only runs when the file is executed directly.",
+    missionConnection: "The CLI Study Tracker will need this pattern to separate reusable data functions from the interactive menu script.",
+    reflectionPrompt: "What would happen if you imported a helper module that printed test output at the bottom? How does the guard prevent that confusion?",
+    practiceStarter: "def total_minutes(sessions):\n    total = 0\n    for s in sessions:\n        total = total + s['minutes']\n    return total\n\n# Add the module guard. Inside it:\n#   sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\n#   result = total_minutes(sessions)\n#   print(f'{result} total minutes')\n",
+    practiceExpected: "45 total minutes",
+    practiceCheck: "If the guard is missing or misspelled, the output might still be blank or might fire during import. Check that __name__ has double underscores on both sides and the comparison is to '__main__'.",
+    practiceReps: pythonModuleGuardPracticeReps,
+    miniTitle: "Guard the Study Tracker logic",
+    miniGoal: "Add an if __name__ guard to a module so the test code stays silent during import.",
+    miniSteps: ["Define a reusable helper function at module level", "Add the if __name__ == '__main__' guard check", "Put the test data and print inside the guarded block"],
+    miniDeliverables: ["Python file with module guard", "Output from direct execution", "One sentence explaining what the guard prevents"],
+    verifierCommand: "python guarded_tracker.py",
+    expectedEvidence: "Terminal output showing the summary plus a note that importing this file does not print the summary.",
+    projectConnection: "This pattern is essential for the CLI Study Tracker to separate reusable logic (importable) from the interactive menu (direct-run only).",
+    requiredCodeIncludes: ["__name__", "__main__", "if", "sessions"],
+    requiredOutputIncludes: ["minutes"],
+    runnerLanguage: "python",
+    runnerStarterCode: "def total_minutes(sessions):\n    total = 0\n    for s in sessions:\n        total = total + s['minutes']\n    return total\n\n# Add the module guard. Inside:\n#   sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\n#   result = total_minutes(sessions)\n#   print(f'{result} total minutes')\n",
+    runnerTestCode: "assert callable(total_minutes), 'total_minutes must be a function defined at module level'\ntest_sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\nassert total_minutes(test_sessions) == 45, 'total_minutes should return 45 for the test data'\nprint('module guard passed')",
+    hiddenTests: [
+      {
+        id: "module-guard-function-sums-correctly",
+        name: "total_minutes sums correctly with varied data",
+        code: "assert total_minutes([{'topic': 'x', 'minutes': 10}, {'topic': 'y', 'minutes': 20}]) == 30, 'total_minutes should sum two records'\nassert total_minutes([]) == 0, 'total_minutes should handle empty list'"
+      }
+    ]
   })
 ];
 
 // Add depth configurations to level2Lessons
 level2Lessons[0].depth = {
-  primaryConceptId: "py.record.list_of_dicts",
-  secondaryConceptIds: ["py.list.literal", "py.dict.literal"],
-  maxNewConcepts: 3,
+  primaryConceptId: "py.list.literal",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
   conceptCapsules: [
     {
       conceptId: "py.list.literal",
       definition: "An ordered collection of items wrapped in square brackets and separated by commas.",
-      mentalModel: "Think of a list as a numbered line of train cars, where you can add, remove, or access cars by their index number.",
+      mentalModel: "Think of a list like numbered train cars — each car holds one item, and you access cars by their position number (starting at 0).",
       syntaxShape: "[item1, item2]",
-      tinyExample: '["python", "git"]',
-      commonMistake: "Forgetting to separate list items with commas.",
-      repairHint: "Add a comma between adjacent list elements.",
+      tinyExample: '["python", "git", "sql"]',
+      commonMistake: "Forgetting to separate list items with commas. Also: accessing index 3 in a 3-item list causes IndexError because valid positions are 0, 1, and 2.",
+      repairHint: "Add a comma between adjacent list elements. Check that the index is within 0 to len(list) - 1.",
       usedIn: ["learn", "practice"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-list-1",
+      label: "Create a list",
+      codeFragment: 'topics = ["python", "git", "sql"]',
+      conceptIds: ["py.list.literal"],
+      explanation: "Creates a list named topics containing three string items in order.",
+      learnerShouldBeAbleToSay: "topics is a list storing three study topics in order"
     },
+    {
+      id: "w-list-2",
+      label: "Access by index",
+      codeFragment: 'second = topics[1]',
+      conceptIds: ["py.list.literal"],
+      explanation: "Reads the second item from topics. Index 1 means the second position because counting starts at 0.",
+      learnerShouldBeAbleToSay: "topics[1] reads the second item from the list"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-list-1",
+      instruction: "Add a fourth topic 'sql' to the topics list and print index 3.",
+      conceptIds: ["py.list.literal"],
+      targetCodeFragment: 'topics = ["python", "git"]',
+      expectedObservation: "The output shows 'sql' when accessing index 3.",
+      wrongTurnHint: "Add 'sql' inside the list brackets separated by a comma."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-list-1",
+      conceptIds: ["py.list.index"],
+      brokenExample: "items = [10, 20, 30]\nprint(items[3])",
+      symptom: "IndexError: list index out of range",
+      likelyCause: "Using an index position higher than length - 1 of the list.",
+      fixStrategy: "Access index 0, 1, or 2 since the list has 3 items."
+    }
+  ],
+  codeLabBridge: {
+    story: "Create a topics list and access the second item by its index.",
+    usesConcepts: ["py.list.literal"],
+    learnerOwns: ["topics"],
+    checkerOwns: ["topics-have-items"],
+    runExpectation: "prints passed"
+  },
+  understandingProofPrompt: "Why does Python start list indices at 0 instead of 1?",
+  exitTicket: [
+    "I understand list indexes start at 0.",
+    "I can create and access items in a Python list."
+  ]
+};
+
+level2Lessons[1].depth = {
+  primaryConceptId: "py.dict.literal",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
+  conceptCapsules: [
     {
       conceptId: "py.dict.literal",
       definition: "A collection of key-value pairs wrapped in curly braces, where each unique key maps to a value.",
-      mentalModel: "Think of a dictionary like a labeling drawer where each label name points directly to an object inside.",
+      mentalModel: "Think of a dictionary like a labeling drawer — each item has a label (key) and the thing inside (value), and you find things by their label, not their position.",
       syntaxShape: "{key1: value1, key2: value2}",
       tinyExample: '{"topic": "python", "minutes": 30}',
-      commonMistake: "Using equals (=) instead of colons (:) to link keys to values inside literal braces.",
-      repairHint: "Replace equals signs with colons inside dictionary braces.",
+      commonMistake: "Using equals (=) instead of colons (:) to link keys to values inside literal braces. Also: looking up a key that does not exist causes KeyError.",
+      repairHint: "Replace equals signs with colons inside dictionary braces. Check that the key name matches exactly, including quotes and spelling.",
       usedIn: ["learn", "practice"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-dict-1",
+      label: "Create a dictionary",
+      codeFragment: 'session = {"topic": "python", "minutes": 30}',
+      conceptIds: ["py.dict.literal"],
+      explanation: "Creates a dictionary named session with two key-value pairs. 'topic' maps to 'python' and 'minutes' maps to 30.",
+      learnerShouldBeAbleToSay: "session is a dictionary with topic and minutes fields"
     },
+    {
+      id: "w-dict-2",
+      label: "Access by key",
+      codeFragment: 'topic = session["topic"]',
+      conceptIds: ["py.dict.literal"],
+      explanation: "Reads the value stored under the key 'topic'. Unlike list indices, dictionary keys are names not positions.",
+      learnerShouldBeAbleToSay: "session['topic'] reads the value stored under the topic key"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-dict-1",
+      instruction: "Add a 'completed' field set to False in the session dictionary.",
+      conceptIds: ["py.dict.literal"],
+      targetCodeFragment: 'session = {"topic": "python", "minutes": 30}',
+      expectedObservation: "The printed output shows three key-value pairs including completed: False.",
+      wrongTurnHint: "Assign session['completed'] = False on a new line after creating the dictionary."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-dict-1",
+      conceptIds: ["py.dict.key_lookup"],
+      brokenExample: 'session = {"topic": "python", "minutes": 30}\nprint(session["name"])',
+      symptom: "KeyError: 'name'",
+      likelyCause: "Looking up a key name that does not exist in the session dictionary.",
+      fixStrategy: "Change the key lookup from 'name' to the correct field key: 'topic'."
+    }
+  ],
+  codeLabBridge: {
+    story: "Create a session dictionary with topic and minutes, then access the topic by its key name.",
+    usesConcepts: ["py.dict.literal"],
+    learnerOwns: ["session"],
+    checkerOwns: ["session-has-fields"],
+    runExpectation: "prints passed"
+  },
+  understandingProofPrompt: "Why do we use key names instead of positions to access dictionary values?",
+  exitTicket: [
+    "I can create a dictionary with key-value pairs.",
+    "I know how to access and add fields by their key names."
+  ]
+};
+
+level2Lessons[2].depth = {
+  primaryConceptId: "py.record.list_of_dicts",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
+  conceptCapsules: [
     {
       conceptId: "py.record.list_of_dicts",
       definition: "A structural pattern where database-like records are represented as dictionary objects inside a parent list.",
-      mentalModel: "Think of a list of dictionaries as a spreadsheet database, where the list is the spreadsheet and each dictionary is a row.",
+      mentalModel: "Think of a list of dictionaries as a filing cabinet: the list is the cabinet keeping folders in order, and each dictionary is one labeled folder with named fields.",
       syntaxShape: "[{key: val}, {key: val}]",
       tinyExample: '[{"topic": "python", "minutes": 30}, {"topic": "git", "minutes": 15}]',
       commonMistake: "Using inconsistent key names across different dictionaries in the same list.",
@@ -478,7 +915,7 @@ level2Lessons[0].depth = {
   ],
   codeWalkthrough: [
     {
-      id: "w-coll-1",
+      id: "w-rec-1",
       label: "Define list of dictionaries",
       codeFragment: 'sessions = [\n    {"topic": "python", "minutes": 30}\n]',
       conceptIds: ["py.record.list_of_dicts"],
@@ -488,7 +925,7 @@ level2Lessons[0].depth = {
   ],
   guidedEdits: [
     {
-      id: "g-coll-1",
+      id: "g-rec-1",
       instruction: "Add a second dictionary with topic 'git' and minutes 15 inside the sessions list.",
       conceptIds: ["py.record.list_of_dicts"],
       targetCodeFragment: 'sessions = [\n    {"topic": "python", "minutes": 30}\n]',
@@ -496,24 +933,7 @@ level2Lessons[0].depth = {
       wrongTurnHint: "Separate the two dictionary curly brace blocks with a comma."
     }
   ],
-  errorClinic: [
-    {
-      id: "e-coll-1",
-      conceptIds: ["py.dict.key_lookup"],
-      brokenExample: 'second_topic = sessions[1]["name"]',
-      symptom: "KeyError: 'name'",
-      likelyCause: "Looking up a key name that doesn't exist in the session dictionary.",
-      fixStrategy: "Change the key lookup from 'name' to the correct field key: 'topic'."
-    },
-    {
-      id: "e-coll-2",
-      conceptIds: ["py.list.index"],
-      brokenExample: "second = sessions[2]",
-      symptom: "IndexError: list index out of range",
-      likelyCause: "Using an index position higher than length - 1 of the list.",
-      fixStrategy: "Access the second item using zero-based index 1: sessions[1]."
-    }
-  ],
+  errorClinic: [],
   codeLabBridge: {
     story: "Define a sessions list containing two study records (python 30 and git 15).",
     usesConcepts: ["py.record.list_of_dicts"],
@@ -523,12 +943,12 @@ level2Lessons[0].depth = {
   },
   understandingProofPrompt: "Why do we prefer using a list of dictionaries over separate variable names for multiple records?",
   exitTicket: [
-    "I understand list indexes start at 0.",
+    "I understand that a list holds records in order.",
     "I can represent tables of data as a list of dictionaries."
   ]
 };
 
-level2Lessons[1].depth = {
+level2Lessons[3].depth = {
   primaryConceptId: "py.if_else",
   secondaryConceptIds: ["py.comparison", "py.indentation.block"],
   maxNewConcepts: 3,
@@ -632,7 +1052,7 @@ level2Lessons[1].depth = {
   ]
 };
 
-level2Lessons[2].depth = {
+level2Lessons[4].depth = {
   primaryConceptId: "py.for_loop",
   secondaryConceptIds: ["py.accumulator", "py.loop_body"],
   maxNewConcepts: 3,
@@ -728,7 +1148,7 @@ level2Lessons[2].depth = {
   ]
 };
 
-level2Lessons[3].depth = {
+level2Lessons[5].depth = {
   primaryConceptId: "py.accumulator",
   secondaryConceptIds: ["py.for_loop", "py.if_else"],
   maxNewConcepts: 1,
@@ -742,6 +1162,16 @@ level2Lessons[3].depth = {
       commonMistake: "Forgetting to initialize all counts/totals before starting loop iteration.",
       repairHint: "Make sure all accumulator variables are initialized to 0 above the loop line.",
       usedIn: ["learn", "practice", "code_lab"]
+    },
+    {
+      conceptId: "py.f_string",
+      definition: "A string prefixed with f that embeds variable values inside {} placeholders.",
+      mentalModel: "Think of an f-string as a fill-in-the-blank sentence: {} marks the blanks and Python fills them in.",
+      syntaxShape: 'f"text {variable} more text"',
+      tinyExample: 'f"{topic}: {minutes} min"',
+      commonMistake: "Forgetting the f prefix, which makes the braces literal characters instead of variable slots.",
+      repairHint: "Add f before the opening quote: f\"{variable}\".",
+      usedIn: ["learn", "practice"]
     }
   ],
   codeWalkthrough: [
@@ -788,7 +1218,7 @@ level2Lessons[3].depth = {
   ]
 };
 
-level2Lessons[4].depth = {
+level2Lessons[6].depth = {
   primaryConceptId: "py.string",
   secondaryConceptIds: ["py.variable.assignment"],
   maxNewConcepts: 1,
@@ -856,60 +1286,195 @@ level2Lessons[4].depth = {
   ]
 };
 
+level2Lessons[7].depth = {
+  primaryConceptId: "py.module.guard",
+  secondaryConceptIds: ["py.if_else", "py.f_string", "py.module.guard.mechanics"],
+  maxNewConcepts: 1,
+  conceptCapsules: [
+    {
+      conceptId: "py.module.guard",
+      definition: "A conditional block that checks if __name__ equals '__main__' to separate importable code from direct-execution code.",
+      mentalModel: "Think of the module guard as a velvet rope: the reusable functions are the general admission area, and the guarded block is the VIP section that only opens when you run the file directly.",
+      syntaxShape: 'if __name__ == "__main__":\n    # code here runs only on direct execution',
+      tinyExample: 'if __name__ == "__main__":\n    print("Direct run only")',
+      commonMistake: "Using a single = instead of ==, or forgetting double underscores on both sides of __name__ and __main__.",
+      repairHint: "Verify exactly two underscores before and after both name and main: __name__ == '__main__'.",
+      usedIn: ["learn", "practice", "code_lab"]
+    },
+    {
+      conceptId: "py.module.guard.mechanics",
+      definition: "The __name__ variable is a string that Python sets to '__main__' when running a file directly, or to the module's name when imported.",
+      mentalModel: "Think of __name__ as a name tag Python attaches to every file. When you run a file directly, Python writes '__main__' on the tag. When another file imports it, Python writes the file's actual name on the tag instead.",
+      syntaxShape: "if __name__ == '__main__':",
+      tinyExample: "# In study_tracker.py:\nif __name__ == '__main__':\n    print('Running directly!')\nelse:\n    print(f'Imported as {__name__}')",
+      commonMistake: "Forgetting that __name__ is '__main__' only when run directly — imported code with the same guard will NOT execute the guarded block.",
+      repairHint: "Add a print(__name__) line before the guard to see what Python thinks the current file is named. If you see the module's filename, you're importing it.",
+      usedIn: ["learn", "practice", "code_lab"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-guard-1",
+      label: "Define reusable function",
+      codeFragment: "def total_minutes(sessions):\n    total = 0\n    for s in sessions:\n        total = total + s['minutes']\n    return total",
+      conceptIds: ["py.module.guard"],
+      explanation: "Defines a function at module level so it is available whether the file is imported or run directly.",
+      learnerShouldBeAbleToSay: "total_minutes is defined globally and can be imported by other files without triggering output"
+    },
+    {
+      id: "w-guard-2",
+      label: "Add the module guard",
+      codeFragment: 'if __name__ == "__main__":',
+      conceptIds: ["py.module.guard"],
+      explanation: "Checks whether this file is being run directly (__name__ is '__main__') or imported. Code inside only runs on direct execution.",
+      learnerShouldBeAbleToSay: "the guard condition checks if this is the main execution entry point"
+    },
+    {
+      id: "w-guard-3",
+      label: "Test code inside the guard",
+      codeFragment: '    data = [{"topic": "python", "minutes": 30}]\n    print(total_minutes(data))',
+      conceptIds: ["py.module.guard", "py.f_string"],
+      explanation: "Test or CLI code placed inside the guarded block stays safe from accidental execution during import.",
+      learnerShouldBeAbleToSay: "inside the guard I put test output that should not run when the module is imported"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-guard-1",
+      instruction: "Move the print statement outside the module guard so it runs on import.",
+      conceptIds: ["py.module.guard"],
+      targetCodeFragment: 'if __name__ == "__main__":\n    print(total_minutes(data))',
+      expectedObservation: "The print now runs when the file is imported into another module instead of staying silent.",
+      wrongTurnHint: "Unindent the print line so it is at the same level as the if, not inside its block."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-guard-1",
+      conceptIds: ["py.module.guard"],
+      brokenExample: "if __name__ = '__main__':",
+      symptom: "SyntaxError: invalid syntax",
+      likelyCause: "Using assignment operator = instead of comparison operator == in the guard condition.",
+      fixStrategy: "Replace = with ==: if __name__ == '__main__'."
+    },
+    {
+      id: "e-guard-2",
+      conceptIds: ["py.module.guard"],
+      brokenExample: "if _name_ == '__main__':",
+      symptom: "NameError: name '_name_' is not defined",
+      likelyCause: "Using single underscores instead of double underscores around name.",
+      fixStrategy: "Use two underscores on each side: __name__."
+    }
+  ],
+  codeLabBridge: {
+    story: "Build a module guard that wraps the Study Tracker's test code so the parsing function can be imported cleanly.",
+    usesConcepts: ["py.module.guard"],
+    learnerOwns: ["total_minutes"],
+    checkerOwns: ["module-guard-check"],
+    runExpectation: "prints passed"
+  },
+  understandingProofPrompt: "Why is it important to keep reusable function definitions outside the module guard block?",
+  exitTicket: [
+    "I can explain when and why to use the module guard pattern.",
+    "I know that __name__ changes based on how the file is executed."
+  ]
+};
+
 export const level2Quizzes: Quiz[] = [
-  checkpointQuiz(
-    "quiz-python-collections",
-    "lesson-python-collections",
-    "Collections Checkpoint",
-    "lists and dictionaries",
-    "Define lists of dictionaries to store repeated records with consistent field keys.",
-    "Write loose variables to hold values rather than collections.",
-    "Access dictionary fields using numerical index numbers directly.",
-    "Lists hold collections in order. Dictionaries group fields as key-value pairs.",
-    ["py.list.literal", "py.dict.literal", "py.record.list_of_dicts"]
+  codeReadingQuiz(
+    "quiz-python-lists",
+    "lesson-python-lists",
+    "Lists Checkpoint",
+    'topics = ["python", "git", "sql"]\nsecond = topics[1]',
+    "lists",
+    "topics[1] reads the second item 'git' because list indexes start at 0",
+    "topics[1] reads the first item 'python' because counting starts at 1",
+    "topics[1] causes an error because you cannot index a list",
+    "Python lists use zero-based indexing. Index 0 is the first element, index 1 is the second.",
+    ["py.list.literal"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
+    "quiz-python-dicts",
+    "lesson-python-dicts",
+    "Dicts Checkpoint",
+    'session = {"topic": "python", "minutes": 30}\ntopic = session["topic"]',
+    "dictionaries",
+    'session["topic"] accesses the value stored under the key "topic", which is "python"',
+    'session["topic"] accesses the value at position 0, which is "topic"',
+    'session["topic"] causes an error because you need an index number, not a key name',
+    "Dictionaries use key names, not positions. session['topic'] looks up the value stored under the key 'topic'.",
+    ["py.dict.literal"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-list-of-dicts",
+    "lesson-python-list-of-dicts",
+    "List of Dicts Checkpoint",
+    'sessions = [{"topic": "python", "minutes": 30}, {"topic": "git", "minutes": 15}]',
+    "lists of dictionaries",
+    "sessions[1] reads the second dictionary because list indexes start at 0",
+    "sessions[1] reads the first dictionary because counting starts at 1",
+    "sessions[1] causes an error because you cannot index a list of dictionaries",
+    "Python lists use zero-based indexing. Index 0 is the first element, index 1 is the second.",
+    ["py.record.list_of_dicts"]
+  ),
+  codeReadingQuiz(
     "quiz-python-decisions",
     "lesson-python-decisions",
     "Decisions Checkpoint",
-    "if/else conditional logic",
-    "Direct execution flow along branches using comparisons and indented blocks.",
-    "Format if/else statements without using colons or spaces.",
-    "Compare string characters using single equals assignment operators.",
-    "Conditional branches verify comparison queries, executing indented blocks.",
-    ["py.comparison", "py.if_else", "py.indentation.block"]
+    'if minutes >= 30:\n    label = "focus"\nelse:\n    label = "quick"',
+    "if/else decisions",
+    '30 is equal to 30, so minutes >= 30 is True and label becomes "focus"',
+    '30 is not greater than 30, so the condition is False and label becomes "quick"',
+    ">= only checks greater-than, not equality, so 30 triggers the else branch",
+    '>= means "greater than or equal to." 30 >= 30 is True, so the if branch runs.',
+    ["py.if_else", "py.comparison"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-loops",
     "lesson-python-loops",
     "Loops Checkpoint",
-    "for loop iteration",
-    "Iterate over lists of records to aggregate totals using accumulator patterns.",
-    "Reset totals inside loop blocks so calculations only return the last item.",
-    "Iterate across dictionary keys using mathematical division loops.",
-    "For loops iterate collections. Accumulators maintain totals outside loops.",
-    ["py.for_loop", "py.accumulator", "py.loop_body"]
+    'total_minutes = 0\nfor session in sessions:\n    total_minutes = total_minutes + session["minutes"]',
+    "for loops",
+    "total_minutes must start at 0 before the loop, or it resets on every pass",
+    "total_minutes should start at 0 inside the loop so each session has its own total",
+    "The loop only runs once over all sessions combined, not once per session",
+    "Initializing the accumulator inside the loop resets it to 0 on each pass. Only the last session's minutes would be counted.",
+    ["py.for_loop", "py.accumulator"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-foundation-capstone",
     "lesson-python-foundation-capstone",
     "Capstone Checkpoint",
-    "structured capstone scripts",
-    "Combine data structures, loops, comparisons, and accumulator counts into one summary.",
-    "Separate all variables so the final printed summary is a hardcoded literal string.",
-    "Write loops that never use conditional blocks or running counts.",
-    "Capstone scripts structure data sources, calculate logic, and present summaries.",
+    'for session in sessions:\n    total_minutes = total_minutes + session["minutes"]\n    if session["minutes"] >= 30:\n        focus_count = focus_count + 1',
+    "combining decisions and loops",
+    "The loop calculates both totals at once, which is more efficient than two separate loops",
+    "The if statement inside the loop would cause each session to be counted twice",
+    "The focus_count should be on a separate line outside the loop, not indented inside",
+    "Both accumulators update inside the same loop. The if condition only fires for sessions with 30 or more minutes.",
     ["py.accumulator", "py.for_loop", "py.if_else"]
   ),
-  checkpointQuiz(
+  codeReadingQuiz(
     "quiz-python-strings-cleanup",
     "lesson-python-strings-cleanup",
     "String Cleanup Checkpoint",
-    "string normalization methods",
-    "Clean messy string whitespace and letter casing to enable dependable database lookups.",
-    "Modify string characters in-place without saving method return values.",
-    "Parse text values into integers before stripping extra space characters.",
-    "String methods return copy results. strip() and lower() normalize text.",
-    ["py.string", "py.variable.assignment"]
+    'clean_topic = raw_topic.strip().lower()\nslug = clean_topic.replace(" ", "-")',
+    "string cleaning",
+    "`slug` replaces spaces with hyphens so the value is URL/filename-friendly",
+    "`slug` is another cleaned copy with spaces preserved",
+    "`slug` overwrites clean_topic with the original value",
+    "A slug is a filename-safe version: lowercase, no spaces, hyphens between words.",
+    ["py.string"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-module-guard",
+    "lesson-python-module-guard",
+    "Module Guard Checkpoint",
+    'def analyze(sessions):\n    return f"{len(sessions)} sessions tracked"\n\nif __name__ == "__main__":\n    data = [{"topic": "python", "minutes": 30}]\n    print(analyze(data))',
+    "module guard pattern",
+    "When imported, analyze() is available but nothing prints. When run directly, it prints the summary.",
+    "When imported, the file prints the summary because analyze() runs on import automatically.",
+    "The if __name__ condition prevents analyze() from being defined during import at all.",
+    "The guard `if __name__ == '__main__':` lets the function be imported without triggering the test code. Only direct execution runs the indented block.",
+    ["py.module.guard"]
   )
 ];
