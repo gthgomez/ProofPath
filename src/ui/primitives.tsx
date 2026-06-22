@@ -129,11 +129,11 @@ type RootNavItem = {
 };
 
 const rootNavItems: readonly RootNavItem[] = [
-  { href: "/", label: "Today", matches: ["/", "/readiness", "/review", "/weekly-plan"] },
-  { href: "/path", label: "Learn", matches: ["/path", "/lesson"] },
-  { href: "/projects", label: "Practice", matches: ["/projects", "/mission"] },
-  { href: "/evidence", label: "Portfolio", matches: ["/evidence"] },
-  { href: "/settings", label: "Settings", matches: ["/settings"] }
+  { href: "/", label: "\u{1F3E0} Today", matches: ["/", "/readiness", "/review", "/weekly-plan"] },
+  { href: "/path", label: "\u{1F4DA} Learn", matches: ["/path", "/lesson"] },
+  { href: "/projects", label: "\u{1F4BB} Practice", matches: ["/projects", "/mission"] },
+  { href: "/evidence", label: "\u{1F4C1} Portfolio", matches: ["/evidence"] },
+  { href: "/settings", label: "⚙️ Settings", matches: ["/settings"] }
 ];
 
 function showsBottomNavigation(pathname: string): boolean {
