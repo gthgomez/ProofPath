@@ -1,21 +1,19 @@
 import { Link, Redirect } from "expo-router";
 import type { ComponentProps, ReactElement } from "react";
-import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { contentPack } from "@/content/seed";
-import { getReviewCards, type ReviewCard } from "@/domain/review-queue";
+import { getReviewCards } from "@/domain/review-queue";
 import type { UserProgress } from "@/domain/types";
 import { getContentForRole, getNextLessonForRole, getNextMissionForRole, getTracksForRole, getPathNodes } from "@/domain/role-routing";
 import { getModulesForTrack, getLessonsForModule } from "@/domain/content";
-import { Badge, BodyText, ButtonShell, MutedText, Panel, SubPanel, Row, Screen, SectionTitle } from "@/ui/primitives";
+import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { colors, radius, semanticColors, spacing } from "@/ui/theme";
 import { useProgress } from "@/state/progress-provider";
 
 export default function DashboardScreen(): ReactElement {
-  const { error, isSaving, progress, readiness, roleTarget, dismissTour } = useProgress();
+  const { error, progress, readiness, roleTarget, dismissTour } = useProgress();
   const { isCheckingOnboarding, needsOnboarding } = useOnboardingGate();
-  const [showBrowseAreas, setShowBrowseAreas] = useState(false);
   const roleContent = getContentForRole(contentPack, roleTarget.id);
   const nextLesson = getNextLessonForRole(contentPack, progress);
   const nextMission = getNextMissionForRole(contentPack, progress);
@@ -68,47 +66,28 @@ export default function DashboardScreen(): ReactElement {
       ) : null}
 
       {!progress.profile.dashboardTourDismissed ? (
-        <Panel accessibilityLabel="Welcome onboarding tour">
+        <Panel accessibilityLabel="Welcome banner">
           <Row>
-            <Badge tone="blue">Welcome to CareerForge</Badge>
+            <Badge tone="blue">Welcome</Badge>
+            <MutedText style={{ flex: 1 }}>
+              Your daily dashboard — continue your lesson, track your streak, and review what you've learned.
+            </MutedText>
+            <ButtonShell
+              accessibilityHint="Dismisses welcome banner."
+              onPress={dismissTour}
+              size="compact"
+              tone="ink"
+              variant="tertiary"
+            >
+              ✕
+            </ButtonShell>
           </Row>
-          <SectionTitle>Your Career Prep Cockpit</SectionTitle>
-          <BodyText>Here is how the cockpit sections work together to build your readiness score:</BodyText>
-          <SubPanel>
-            <SectionTitle>📅 Today</SectionTitle>
-            <MutedText>Your daily 3-step action plan to keep momentum.</MutedText>
-          </SubPanel>
-          <SubPanel>
-            <SectionTitle>📚 Learn</SectionTitle>
-            <MutedText>Browse the full visual roadmap, track concepts, and lesson nodes.</MutedText>
-          </SubPanel>
-          <SubPanel>
-            <SectionTitle>🛠️ Build</SectionTitle>
-            <MutedText>Applied project missions that prove you can write and verify code.</MutedText>
-          </SubPanel>
-          <SubPanel>
-            <SectionTitle>💼 Portfolio</SectionTitle>
-            <MutedText>Accumulate repo links, test outputs, screenshots, and reflections.</MutedText>
-          </SubPanel>
-          <ButtonShell
-            accessibilityHint="Dismisses this welcome onboarding tour permanently."
-            onPress={dismissTour}
-            tone="blue"
-          >
-            Got it, dismiss
-          </ButtonShell>
         </Panel>
       ) : null}
 
       <Panel accessibilityLabel="Today dashboard">
-        <Row>
-          <Badge tone="rose">{roleTarget.title}</Badge>
-          <Badge tone="teal">{readiness.label}</Badge>
-          <Badge tone="blue">{readiness.score}% ready</Badge>
-          {isSaving ? <Badge tone="amber">saving</Badge> : null}
-        </Row>
-        <SectionTitle>Today's 3-step plan</SectionTitle>
-        <BodyText>CareerForge turns practice into work you can explain. Start with Learn, Build, and Portfolio; use Browse all areas when you need the full map.</BodyText>
+        <SectionTitle>Today's plan</SectionTitle>
+        <MutedText style={{ marginBottom: spacing.xs }}>{roleTarget.title} · {readiness.score}% ready</MutedText>
 
         {nextLesson ? (
           <TodayTask
@@ -170,24 +149,17 @@ export default function DashboardScreen(): ReactElement {
           />
         )}
         <View style={styles.readinessStrip}>
-          {readiness.breakdown.projectCompletion === 0 || readiness.breakdown.evidenceHygiene === 0 ? (
-            <View style={styles.capWarning} accessibilityLiveRegion="polite">
-              <Row>
-                <Badge tone="rose">readiness cap active</Badge>
-              </Row>
-              <Text style={styles.warningText}>
-                {readiness.breakdown.projectCompletion === 0
-                  ? "You are in Learning Mode. Project proof unlocks after Git Basics. For now, save a reflection or screenshot on your dashboard."
-                  : "Keep building your portfolio. Save a reflection or repo link on your completed work to increase your readiness score."}
-              </Text>
-            </View>
-          ) : null}
-          <MutedText>{readiness.nextAction}</MutedText>
-          <View style={styles.metricsGrid}>
-            <MetricTile label="days with portfolio work" value={proofStreak > 0 ? `${proofStreak}` : "0"} />
-            <MetricTile label="weekly tasks done" value={`${weeklyCompleted}/${weeklyTotal}`} />
-            <MetricTile label="recalls due" value={`${dueReviewCards.length}`} />
-          </View>
+          <Row>
+            <Text style={{ fontSize: 15, fontWeight: "600", color: colors.text }}>
+              Streak: {proofStreak > 0 ? `${proofStreak}d` : "0d"}
+            </Text>
+            <Text style={{ fontSize: 15, fontWeight: "600", color: colors.text }}>
+              Weekly: {weeklyCompleted}/{weeklyTotal}
+            </Text>
+            <Text style={{ fontSize: 15, fontWeight: "600", color: colors.text }}>
+              Review: {dueReviewCards.length}
+            </Text>
+          </Row>
           <Link href="/readiness" asChild>
             <ButtonShell accessibilityHint="Opens the score breakdown screen." size="compact" tone="teal" variant="secondary">
               {readiness.score}% ready — see breakdown
@@ -243,51 +215,7 @@ export default function DashboardScreen(): ReactElement {
         </Panel>
       ) : null}
 
-      <Panel accessibilityLabel="Browse all areas">
-        <SectionTitle>Browse all areas</SectionTitle>
-        <BodyText>The Today plan is the main path. Expand below to jump to lessons, missions, portfolio, or settings.</BodyText>
-        <ButtonShell
-          accessibilityHint={showBrowseAreas ? "Hides Learn, Build, Portfolio, and Settings shortcuts." : "Shows shortcuts to Learn, Build, Portfolio, and Settings."}
-          accessibilityState={{ expanded: showBrowseAreas }}
-          onPress={() => setShowBrowseAreas((current) => !current)}
-          tone="ink"
-          variant="secondary"
-        >
-          {showBrowseAreas ? "Hide areas" : "Show Learn, Build, Portfolio, Settings"}
-        </ButtonShell>
-        {showBrowseAreas ? (
-          <>
-            <RouteCard
-              actionLabel="Browse"
-              detail="See every lesson and module for this career path."
-              href="/path"
-              label="Learn"
-              tone="blue"
-            />
-            <RouteCard
-              actionLabel="Open"
-              detail="Portfolio missions that turn lessons into interview-ready work."
-              href="/projects"
-              label="Build"
-              tone="amber"
-            />
-            <RouteCard
-              actionLabel="Open"
-              detail="Saved repo links, check output, screenshots, notes, and reflections."
-              href="/evidence"
-              label="Portfolio"
-              tone="green"
-            />
-            <RouteCard
-              actionLabel="Change"
-              detail="Change your career path or reset local progress."
-              href="/settings"
-              label="Settings"
-              tone="ink"
-            />
-          </>
-        ) : null}
-      </Panel>
+
     </Screen>
   );
 }
@@ -314,45 +242,6 @@ function TodayTask({ actionLabel, badge, detail, href, title, tone }: TodayTaskP
       <Link href={href} asChild>
         <ButtonShell accessibilityHint={`Opens ${title}.`} size="compact" tone={tone}>{actionLabel}</ButtonShell>
       </Link>
-    </View>
-  );
-}
-
-function RouteCard({
-  actionLabel,
-  detail,
-  href,
-  label,
-  tone
-}: {
-  actionLabel: string;
-  detail: string;
-  href: ComponentProps<typeof Link>["href"];
-  label: string;
-  tone: "blue" | "teal" | "amber" | "rose" | "green" | "ink";
-}): ReactElement {
-  return (
-    <View style={styles.routeCard}>
-      <View style={styles.routeCopy}>
-        <Row>
-          <Badge tone={tone}>{label}</Badge>
-        </Row>
-        <MutedText>{detail}</MutedText>
-      </View>
-      <Link href={href} asChild>
-        <ButtonShell accessibilityHint={`Opens ${label}.`} size="compact" tone={tone} variant="secondary">
-          {actionLabel}
-        </ButtonShell>
-      </Link>
-    </View>
-  );
-}
-
-function MetricTile({ label, value }: { label: string; value: string }): ReactElement {
-  return (
-    <View style={styles.metricTile}>
-      <Text style={styles.metricValue}>{value}</Text>
-      <MutedText>{label}</MutedText>
     </View>
   );
 }
@@ -393,20 +282,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     paddingTop: spacing.sm
   },
-  capWarning: {
-    backgroundColor: colors.roseSoft,
-    borderColor: colors.roseMuted,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    padding: spacing.sm,
-    marginBottom: spacing.xs,
-    gap: spacing.xs
-  },
-  warningText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.roseStrong
-  },
   todayTask: {
     alignItems: "center",
     backgroundColor: colors.surfaceMuted,
@@ -420,38 +295,6 @@ const styles = StyleSheet.create({
   todayTaskCopy: {
     flex: 1,
     gap: spacing.xs
-  },
-  routeCard: {
-    alignItems: "center",
-    borderColor: colors.border,
-    borderTopWidth: 1,
-    flexDirection: "row",
-    gap: spacing.sm,
-    paddingTop: spacing.sm
-  },
-  routeCopy: {
-    flex: 1,
-    gap: spacing.xs
-  },
-  metricsGrid: {
-    flexDirection: "row",
-    gap: spacing.sm
-  },
-  metricTile: {
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flex: 1,
-    gap: spacing.xs,
-    padding: spacing.sm
-  },
-  metricValue: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: "900",
-    letterSpacing: 0,
-    lineHeight: 25
   },
   nodeListContainer: {
     gap: spacing.xs,
