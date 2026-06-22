@@ -7,7 +7,7 @@ import { evaluatePathProofGate, getFutureUnlocksForRole, getTracksForRole, getPa
 import type { Difficulty, Module, ProjectMission } from "@/domain/types";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
-import { colors, radius, semanticColors, spacing } from "@/ui/theme";
+import { colors, radius, spacing } from "@/ui/theme";
 import { useProgress } from "@/state/progress-provider";
 
 interface PlacementQuestion {
@@ -193,8 +193,7 @@ export default function LearningPathScreen(): ReactElement {
 
                 return filteredNodes.length === 0 ? (
                   <MutedText style={{ padding: spacing.md }}>No {difficultyFilter} items in this track.</MutedText>
-                ) : filteredNodes.map((node, index) => {
-                  const isLast = index === filteredNodes.length - 1;
+                ) : filteredNodes.map((node) => {
                   const isCompleted = node.status === "completed";
                   const isPlacedOut = node.status === "placed-out";
                   const isCurrent = node.status === "current";
@@ -216,41 +215,30 @@ export default function LearningPathScreen(): ReactElement {
                       {moduleChanged && nodeModule ? (
                         <ModuleHeader module={nodeModule} pathNodes={pathNodes} />
                       ) : null}
-                      <View style={styles.timelineNode}>
-                        {!isLast ? <View style={styles.lineConnector} /> : null}
-                        <View style={[
-                          styles.circleNode,
-                          isCompleted ? styles.circleCompleted : isPlacedOut ? styles.circlePlacedOut : isCurrent ? styles.circleCurrent : styles.circleLocked
-                        ]}>
-                          {isCompleted ? <Text style={styles.circleText}>✓</Text> : isPlacedOut ? <Text style={styles.circleTextPlacedOut}>—</Text> : null}
+                      <View style={styles.nodeRow}>
+                        <Text style={[styles.nodeStatusIcon, isCurrent && { color: colors.blue }]}>
+                          {isCompleted ? "✓" : isPlacedOut ? "—" : isCurrent ? "▸" : "·"}
+                        </Text>
+                        <View style={styles.nodeRowContent}>
+                          <Text style={[styles.nodeRowTitle, (isLocked || isPlacedOut) && { color: colors.muted }, isCurrent && { color: colors.blue, fontWeight: "700" }]}>
+                            {node.title}
+                          </Text>
                         </View>
-                        <View style={styles.nodeContent}>
-                          <SectionTitle style={styles.nodeTitleText}>
-                            {node.status === "placed-out" ? "— " : ""}{node.title}
-                          </SectionTitle>
-                          {isLocked ? (
+                        {isLocked ? (
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted }}>Locked</Text>
+                        ) : (
+                          <Link href={nodeHref} asChild>
                             <ButtonShell
-                              accessibilityHint="This item is locked until you complete the previous lessons."
+                              accessibilityHint={`Opens ${node.title}.`}
                               size="compact"
-                              disabled={true}
-                              tone="ink"
-                              variant="secondary"
+                              tone={isCompleted || isPlacedOut ? "ink" : isCurrent ? "blue" : "teal"}
+                              variant={isCurrent ? "primary" : "secondary"}
+                              style={{ flexGrow: 0, minWidth: 80 }}
                             >
-                              Locked
+                              {isCompleted || isPlacedOut ? "Review" : isCurrent ? "Continue" : "Start"}
                             </ButtonShell>
-                          ) : (
-                            <Link href={nodeHref} asChild>
-                              <ButtonShell
-                                accessibilityHint={`Opens ${node.title}.`}
-                                size="compact"
-                                tone={isCompleted || isPlacedOut ? "ink" : isCurrent ? "blue" : "teal"}
-                                variant={isCurrent || isCompleted || isPlacedOut ? "primary" : "secondary"}
-                              >
-                                {isCompleted || isPlacedOut ? "Review" : isCurrent ? "Continue" : "Start"}
-                              </ButtonShell>
-                            </Link>
-                          )}
-                        </View>
+                          </Link>
+                        )}
                       </View>
                     </View>
                   );
@@ -457,68 +445,25 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginVertical: spacing.sm
   },
-  timelineNode: {
-    flexDirection: "row",
-    minHeight: 100,
-    position: "relative"
-  },
-  lineConnector: {
-    width: 2,
-    backgroundColor: colors.border,
-    position: "absolute",
-    left: 11,
-    top: 24,
-    bottom: -16,
-    zIndex: 1
-  },
-  circleNode: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
+  nodeRow: {
     alignItems: "center",
-    justifyContent: "center",
-    zIndex: 2,
-    backgroundColor: colors.surface
+    flexDirection: "row",
+    gap: spacing.sm,
+    paddingVertical: spacing.sm
   },
-  circleCompleted: {
-    borderColor: semanticColors.success,
-    backgroundColor: semanticColors.success
-  },
-  circleCurrent: {
-    borderColor: colors.blue,
-    backgroundColor: colors.surface
-  },
-  circleLocked: {
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceMuted
-  },
-  circlePlacedOut: {
-    borderColor: colors.border,
-    borderStyle: "dashed",
-    backgroundColor: colors.surfaceMuted
-  },
-  circleText: {
-    color: colors.surface,
-    fontSize: 12,
-    fontWeight: "bold",
-    lineHeight: 14
-  },
-  circleTextPlacedOut: {
+  nodeStatusIcon: {
     color: colors.muted,
-    fontSize: 12,
-    fontWeight: "bold",
-    lineHeight: 14
+    fontSize: 16,
+    fontWeight: "700",
+    width: 20,
+    textAlign: "center" as const
   },
-  nodeContent: {
-    flex: 1,
-    marginLeft: 16,
-    gap: spacing.xs,
-    paddingBottom: spacing.md
+  nodeRowContent: {
+    flex: 1
   },
-  nodeTitleText: {
-    fontSize: 15,
-    marginVertical: 2
+  nodeRowTitle: {
+    color: colors.text,
+    fontSize: 15
   },
   overlayContainer: {
     ...StyleSheet.absoluteFillObject,
