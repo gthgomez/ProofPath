@@ -233,10 +233,7 @@ function TodayTask({ actionLabel, badge, detail, href, title, tone }: TodayTaskP
   return (
     <View style={styles.todayTask}>
       <View style={styles.todayTaskCopy}>
-        <Row>
-          <Badge tone={tone}>{badge}</Badge>
-        </Row>
-        <SectionTitle>{title}</SectionTitle>
+        <SectionTitle>{badge}: {title}</SectionTitle>
         <MutedText>{detail}</MutedText>
       </View>
       <Link href={href} asChild>

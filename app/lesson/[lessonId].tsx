@@ -10,7 +10,7 @@ import { CodeWalkthrough } from "@/ui/code-walkthrough";
 import { GuidedEditList } from "@/ui/guided-edit-list";
 import { ErrorClinic } from "@/ui/error-clinic";
 import { CodeLabBridge } from "@/ui/code-lab-bridge";
-import { Badge, BodyText, ButtonShell, MutedText, Panel, ProgressBar, Row, Screen, SectionTitle, StickyActionBar, SubPanel } from "@/ui/primitives";
+import { BodyText, ButtonShell, MutedText, Panel, ProgressBar, Row, Screen, SectionTitle, StickyActionBar, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
 import { colors, radius, spacing } from "@/ui/theme";
@@ -20,7 +20,9 @@ import { getMissionProofChecklist } from "@/domain/progress";
 
 const beginnerPythonSupportLessonIds = new Set([
   "lesson-python-values",
-  "lesson-python-collections",
+  "lesson-python-lists",
+  "lesson-python-dicts",
+  "lesson-python-list-of-dicts",
   "lesson-python-decisions",
   "lesson-python-loops",
   "lesson-python-foundation-capstone",
@@ -140,9 +142,11 @@ export default function LessonDetailScreen(): ReactElement {
   const moduleItem = contentPack.modules.find((candidate) => candidate.id === lesson.moduleId);
   const moduleLessonIds = moduleItem?.lessonIds ?? [];
   const lessonPosition = moduleLessonIds.indexOf(lesson.id);
+  const prevLessonId = lessonPosition > 0 ? moduleLessonIds[lessonPosition - 1] : undefined;
+  const prevLesson = prevLessonId ? findLesson(contentPack, prevLessonId) : undefined;
   const nextLessonId = lessonPosition >= 0 ? moduleLessonIds[lessonPosition + 1] : undefined;
   const nextLesson = nextLessonId ? findLesson(contentPack, nextLessonId) : undefined;
-  const fluencyRepTone = opensBeginnerPythonSupport ? "green" : "teal";
+  const parentTrack = moduleItem?.trackId ? contentPack.tracks.find((t) => t.id === moduleItem.trackId) : undefined;
   const fluencyRepLabel = opensBeginnerPythonSupport ? "guided reps" : "optional reps";
   
   const workflow = deriveLessonWorkflow({
@@ -175,7 +179,7 @@ export default function LessonDetailScreen(): ReactElement {
 
   return (
     <Screen
-      eyebrow="Lesson"
+      eyebrow={moduleItem && parentTrack ? `${parentTrack.title} > ${moduleItem.title}` : "Lesson"}
       stickyAction={(
         <StickyActionBar accessibilityLabel="Persistent lesson action">
           <ButtonShell
@@ -229,14 +233,51 @@ export default function LessonDetailScreen(): ReactElement {
           </Text>
         </Row>
         <Row>
-          <Badge tone="blue">{lesson.difficulty}</Badge>
-          <Badge tone="teal">{lesson.estimatedMinutes} min</Badge>
-          <Badge tone="amber">{lesson.workshop.language}</Badge>
-          {moduleItem && lessonPosition >= 0 ? <Badge tone="blue">part {lessonPosition + 1}/{moduleLessonIds.length}</Badge> : null}
-          {lessonDone ? <Badge tone="green">complete</Badge> : null}
+          <Text style={{ fontSize: 15, fontWeight: "600", color: colors.text }}>
+            {lesson.difficulty} · {lesson.estimatedMinutes} min · {lesson.workshop.language}
+          </Text>
+          {lessonDone ? <Text style={{ fontSize: 13, fontWeight: "700", color: colors.emerald }}>Complete</Text> : null}
         </Row>
         <ProgressBar label="Lesson progress" value={lessonProgressPercent} />
       </Panel>
+
+      {/* Lesson Navigation — Previous / Next lesson */}
+      {prevLesson || nextLesson ? (
+        <Panel style={styles.navPanel}>
+          <Row style={{ justifyContent: "space-between", width: "100%" }}>
+            {prevLesson ? (
+              <ButtonShell
+                accessibilityHint={`Go to previous lesson: ${prevLesson.title}`}
+                onPress={() => {
+                  router.push({ pathname: "/lesson/[lessonId]", params: { lessonId: prevLesson.id } });
+                  setCurrentStep("understand");
+                }}
+                size="compact"
+                tone="ink"
+                variant="secondary"
+                style={{ flex: 1, marginRight: spacing.xs }}
+              >
+                ← Previous
+              </ButtonShell>
+            ) : <View style={{ flex: 1 }} />}
+            {nextLesson ? (
+              <ButtonShell
+                accessibilityHint={`Go to next lesson: ${nextLesson.title}`}
+                onPress={() => {
+                  router.push({ pathname: "/lesson/[lessonId]", params: { lessonId: nextLesson.id } });
+                  setCurrentStep("understand");
+                }}
+                size="compact"
+                tone="blue"
+                variant="secondary"
+                style={{ flex: 1, marginLeft: spacing.xs }}
+              >
+                Next →
+              </ButtonShell>
+            ) : <View style={{ flex: 1 }} />}
+          </Row>
+        </Panel>
+      ) : null}
 
       {/* Understand Step Content */}
       {currentStep === "understand" && (
@@ -260,9 +301,9 @@ export default function LessonDetailScreen(): ReactElement {
               <SectionTitle>Why this lesson exists</SectionTitle>
               <BodyText>{lesson.workshop.synopsis}</BodyText>
               <SectionTitle>Before you start</SectionTitle>
-              <Row style={styles.badgeRow}>
+              <Row style={{ gap: spacing.xs, marginVertical: spacing.xs }}>
                 {lesson.workshop.tools.map((tool) => (
-                  <Badge key={tool} tone="teal">{tool}</Badge>
+                  <Text key={tool} style={{ fontSize: 13, fontWeight: "700", color: colors.teal, borderColor: colors.border, borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>{tool}</Text>
                 ))}
               </Row>
               
@@ -317,10 +358,6 @@ export default function LessonDetailScreen(): ReactElement {
       {/* Experiment Step Content */}
       {currentStep === "experiment" && (
         <Panel>
-          <Row>
-            <Badge tone="blue">Step 2</Badge>
-            <Badge tone="green">practice first</Badge>
-          </Row>
           {lesson.depth ? (
             <>
               <CodeWalkthrough notes={lesson.depth.codeWalkthrough} />
@@ -423,9 +460,9 @@ export default function LessonDetailScreen(): ReactElement {
               {lesson.workshop.practiceReps && lesson.workshop.practiceReps.length > 0 ? (
                 <SubPanel style={styles.repsPanel}>
                   <Row>
-                    <Badge tone={fluencyRepTone}>{fluencyRepLabel}</Badge>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: colors.teal }}>{fluencyRepLabel}</Text>
                   </Row>
-                  <SectionTitle>Fluency reps</SectionTitle>
+                  <SectionTitle>Practice variations</SectionTitle>
                   <BodyText>
                     {opensBeginnerPythonSupport
                       ? "Do these small variations before the checkpoint so the syntax becomes familiar instead of one copied answer."
@@ -445,10 +482,9 @@ export default function LessonDetailScreen(): ReactElement {
                     const repKey = `rep-${repIndex}`;
                     return (
                       <View key={`${lesson.id}-practice-rep-${repIndex}`} style={styles.repBlock}>
-                        <Row>
-                          <Badge tone="teal">rep {repIndex + 1}</Badge>
-                          <Badge tone="blue">same idea, new data</Badge>
-                        </Row>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.teal }}>
+                          Rep {repIndex + 1} · same idea, new data
+                        </Text>
                         <SectionTitle>Starter code</SectionTitle>
                         <TextInput
                           multiline
@@ -519,11 +555,6 @@ export default function LessonDetailScreen(): ReactElement {
       {/* Apply Step Content (display: none/flex to preserve editor states) */}
       <View style={{ display: currentStep === "apply" ? "flex" : "none" }}>
         <Panel>
-          <Row>
-            <Badge tone="blue">Step 3</Badge>
-            <Badge tone={miniProjectDone ? "green" : "amber"}>{miniProjectDone ? "check passed" : "code lab"}</Badge>
-            <Badge tone="teal">offline check</Badge>
-          </Row>
           {lesson.depth ? (
             <CodeLabBridge bridge={lesson.depth.codeLabBridge} />
           ) : (
@@ -558,11 +589,7 @@ export default function LessonDetailScreen(): ReactElement {
           />
           {latestPassingCheckRun ? (
             <SubPanel accessibilityLabel="Code Lab check passed" accessibilityLiveRegion="polite">
-              <Row>
-                <Badge tone="green">Check passed</Badge>
-                <Badge tone="amber">Mission closer</Badge>
-              </Row>
-              <SectionTitle>Add evidence now</SectionTitle>
+              <SectionTitle>✓ Check passed — add evidence</SectionTitle>
               <BodyText>{lesson.workshop.miniProject.expectedEvidence}</BodyText>
               <MutedText>{lesson.workshop.miniProject.projectConnection}</MutedText>
               <Link href="/evidence" asChild>
@@ -610,15 +637,10 @@ export default function LessonDetailScreen(): ReactElement {
         <View>
           {/* Recall Cards */}
           <Panel>
-            <Row>
-              <Badge tone="blue">Recall cards</Badge>
-            </Row>
+            <SectionTitle>Recall</SectionTitle>
             <BodyText>Use these prompts to keep the idea available without rereading everything.</BodyText>
             {lesson.workshop.recallCards.map((card) => (
               <SubPanel key={card.id}>
-                <Row>
-                  <Badge tone="teal">{card.type}</Badge>
-                </Row>
                 <SectionTitle>{card.prompt}</SectionTitle>
                 <MutedText>{card.answerHint}</MutedText>
               </SubPanel>
@@ -632,13 +654,7 @@ export default function LessonDetailScreen(): ReactElement {
           {/* Quiz (Checkpoints) */}
           {quiz ? (
             <Panel>
-              <Row>
-                <Badge tone="blue">Checkpoint</Badge>
-                <Badge tone={quizDone ? "green" : "amber"}>{quizDone ? "passed" : `${quiz.passingScore}% target`}</Badge>
-                {latestQuizAttempt ? <Badge tone={latestQuizAttempt.passed ? "green" : "rose"}>{latestQuizAttempt.score}% last</Badge> : null}
-                <Badge tone="blue">{answeredCount}/{quiz.questions.length} answered</Badge>
-              </Row>
-              <SectionTitle>After coding: {quiz.title}</SectionTitle>
+              <SectionTitle>{quiz.title}</SectionTitle>
               <BodyText>Use this checkpoint to confirm the idea before you build. The quiz is a quick readiness check for the project.</BodyText>
               {latestQuizAttempt ? (
                 <View style={styles.statusBlock}>
@@ -652,14 +668,10 @@ export default function LessonDetailScreen(): ReactElement {
               ) : null}
               {quiz.questions.map((question, questionIndex) => (
                 <View key={question.id} style={styles.questionBlock}>
-                  <Row>
-                    <Badge tone="teal">Question {questionIndex + 1}/{quiz.questions.length}</Badge>
-                    {latestQuizAttempt ? (
-                      <Badge tone={latestQuizAttempt.selectedChoiceIndexes[questionIndex] === question.correctChoiceIndex ? "green" : "rose"}>
-                        {latestQuizAttempt.selectedChoiceIndexes[questionIndex] === question.correctChoiceIndex ? "correct" : "review"}
-                      </Badge>
-                    ) : null}
-                  </Row>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.teal }}>
+                    Question {questionIndex + 1}/{quiz.questions.length}
+                    {latestQuizAttempt ? latestQuizAttempt.selectedChoiceIndexes[questionIndex] === question.correctChoiceIndex ? " ✓" : " ✗" : null}
+                  </Text>
                   <BodyText>{question.prompt}</BodyText>
                   {question.choices.map((choice, choiceIndex) => {
                     const submittedChoiceIndex = latestQuizAttempt?.selectedChoiceIndexes[questionIndex];
@@ -709,12 +721,6 @@ export default function LessonDetailScreen(): ReactElement {
 
           {/* Lesson Completion Summary */}
           <Panel>
-            <Row>
-              <Badge tone="blue">Summary</Badge>
-              <Badge tone={quizDone ? "green" : "amber"}>{quizDone ? "quiz passed" : "quiz required"}</Badge>
-              <Badge tone={miniProjectDone ? "green" : "amber"}>{miniProjectDone ? "project complete" : "project required"}</Badge>
-              {lessonDone ? <Badge tone="green">lesson complete</Badge> : null}
-            </Row>
             <SectionTitle>Lesson progress</SectionTitle>
             <BodyText>
               {lessonDone
@@ -726,13 +732,14 @@ export default function LessonDetailScreen(): ReactElement {
             <BodyText>{lesson.desktopTask}</BodyText>
             <MutedText>{lesson.evidencePrompt}</MutedText>
             <MutedText>{lesson.workshop.reflectionPrompt}</MutedText>
-            <SubPanel accessibilityLabel="Lesson progress requirements">
-              <Row>
-                <Badge tone={miniProjectDone ? "green" : "rose"}>{miniProjectDone ? "Code Lab passed" : "Code Lab required"}</Badge>
-                <Badge tone={quizDone ? "green" : "rose"}>{quizDone ? "Checkpoint passed" : "Checkpoint required"}</Badge>
-              </Row>
+            <View style={styles.statusBlock} accessibilityLabel="Lesson progress requirements">
+              <MutedText>
+                {miniProjectDone ? "✓ Code complete" : "○ Code required"}
+                {" · "}
+                {quizDone ? "✓ Quiz passed" : "○ Quiz required"}
+              </MutedText>
               <MutedText>{lessonDone ? "Review is now scheduled for this lesson." : "Complete the missing activity above to finish the lesson."}</MutedText>
-            </SubPanel>
+            </View>
 
             {/* Stepper Navigation */}
             <Row style={styles.navRow}>
@@ -769,10 +776,6 @@ export default function LessonDetailScreen(): ReactElement {
 
         return (
           <Panel>
-            <Row>
-              <Badge tone="blue">Step 5</Badge>
-              <Badge tone={lessonDone ? "green" : "amber"}>{lessonDone ? "Complete" : "Evidence checklist"}</Badge>
-            </Row>
             <SectionTitle>Document your proof</SectionTitle>
             <BodyText>
               To complete the lesson and build portfolio credibility, save your proof. Prefill your passing verifier logs directly into the evidence tracker.
@@ -793,13 +796,8 @@ export default function LessonDetailScreen(): ReactElement {
                 </BodyText>
                 {checklist.map((item) => (
                   <Row key={item.id} style={{ marginVertical: 2, alignItems: "center" }}>
-                    <View style={{ marginRight: 8 }}>
-                      <Badge tone={item.complete ? "green" : "ink"}>
-                        {item.complete ? "✓" : "✗"}
-                      </Badge>
-                    </View>
-                    <Text style={{ fontSize: 13, color: item.complete ? colors.text : colors.muted }}>
-                      {item.label} {item.required ? "(Required)" : ""}
+                    <Text style={{ fontSize: 13, color: item.complete ? colors.emerald : colors.muted }}>
+                      {item.complete ? "✓" : "○"} {item.label}{item.required ? " (Required)" : ""}
                     </Text>
                   </Row>
                 ))}
@@ -850,10 +848,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     gap: spacing.xs,
     marginBottom: spacing.xs
-  },
-  badgeRow: {
-    gap: spacing.xs,
-    marginVertical: spacing.xs
   },
   questionBlock: {
     borderColor: colors.border,
@@ -911,6 +905,11 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: colors.text,
     textAlign: "center"
+  },
+  navPanel: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs
   },
   navRow: {
     flexDirection: "row",

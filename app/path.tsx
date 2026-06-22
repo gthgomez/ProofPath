@@ -3,8 +3,8 @@ import { StyleSheet, Text, View } from "react-native";
 import { Link, Redirect } from "expo-router";
 import { contentPack } from "@/content/seed";
 import { getLessonsForModule, getModulesForTrack } from "@/domain/content";
-import { evaluatePathProofGate, getFutureUnlocksForRole, getTracksForRole, getPathNodes, type FutureUnlockLabel } from "@/domain/role-routing";
-import type { ProjectMission } from "@/domain/types";
+import { evaluatePathProofGate, getFutureUnlocksForRole, getTracksForRole, getPathNodes } from "@/domain/role-routing";
+import type { Difficulty, Module, ProjectMission } from "@/domain/types";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { colors, radius, semanticColors, spacing } from "@/ui/theme";
@@ -32,6 +32,7 @@ export default function LearningPathScreen(): ReactElement {
   const { isCheckingOnboarding, needsOnboarding } = useOnboardingGate();
   const [placementState, setPlacementState] = useState<PlacementState | null>(null);
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
+  const [difficultyFilter, setDifficultyFilter] = useState<Difficulty | "all">("all");
 
   const startPlacement = (trackId: string, trackTitle: string) => {
     const trackModules = getModulesForTrack(contentPack, trackId);
@@ -111,24 +112,21 @@ export default function LearningPathScreen(): ReactElement {
 
       {proofGate ? (
         <Panel>
-          <Row>
-            <Badge tone={proofGate.complete ? "green" : "amber"}>
-              {proofGate.completedMissionCount}/{proofGate.requiredMissionCount} projects
-            </Badge>
-            <Badge tone={proofGate.complete ? "green" : "ink"}>
-              {proofGate.complete ? "Gate complete" : "Readiness gate"}
-            </Badge>
-          </Row>
           <SectionTitle>{proofGate.gate.title}</SectionTitle>
           <BodyText>{proofGate.gate.summary}</BodyText>
+          <MutedText>
+            {proofGate.completedMissionCount}/{proofGate.requiredMissionCount} projects complete
+            {proofGate.complete ? " ✓" : ""}
+          </MutedText>
           <View style={styles.unlockGrid}>
             {proofGate.missions.map((mission) => (
               <SubPanel key={mission.missionId}>
-                <Row>
-                  <Badge tone={mission.complete ? "green" : "ink"}>{mission.complete ? "complete" : "needed"}</Badge>
-                  <Badge tone="teal">{mission.checklist.filter((item) => item.complete).length}/{mission.checklist.length} checks</Badge>
-                </Row>
-                <SectionTitle>{mission.title}</SectionTitle>
+                <SectionTitle>
+                  {mission.complete ? "✓ " : ""}{mission.title}
+                </SectionTitle>
+                <MutedText>
+                  {mission.checklist.filter((item) => item.complete).length}/{mission.checklist.length} checks
+                </MutedText>
               </SubPanel>
             ))}
           </View>
@@ -137,11 +135,8 @@ export default function LearningPathScreen(): ReactElement {
               <SectionTitle style={styles.futureTitle}>Future paths</SectionTitle>
               {futureUnlocks.map((unlock) => (
                 <SubPanel key={unlock.id}>
-                  <Row>
-                    <Badge tone={unlockBadgeTone(unlock.label)}>{unlock.label}</Badge>
-                    <Badge tone="teal">{unlock.kind}</Badge>
-                  </Row>
                   <SectionTitle>{unlock.title}</SectionTitle>
+                  <MutedText>{unlock.label} · {unlock.kind}</MutedText>
                 </SubPanel>
               ))}
             </View>
@@ -154,10 +149,6 @@ export default function LearningPathScreen(): ReactElement {
 
         return (
           <Panel key={track.id}>
-            <Row>
-              <Badge>{track.roleTargets[0] || "Foundations"}</Badge>
-              <Badge tone="teal">{track.moduleIds.length} modules</Badge>
-            </Row>
             <SectionTitle>{track.title}</SectionTitle>
             <MutedText style={styles.trackSummary}>{track.summary}</MutedText>
             {!pathNodes.every((node) => node.status === "completed" || node.status === "placed-out") ? (
@@ -172,71 +163,99 @@ export default function LearningPathScreen(): ReactElement {
                 Placement: Test out of this track
               </ButtonShell>
             ) : (
-              <Row style={{ marginBottom: spacing.sm }}>
-                <Badge tone="green">Track completed</Badge>
-              </Row>
+              <MutedText style={{ marginBottom: spacing.sm }}>All lessons complete</MutedText>
             )}
 
+            {/* Difficulty filter pills */}
+            <Row style={styles.filterRow}>
+              {(["all", "foundation", "applied", "portfolio"] as const).map((level) => (
+                <ButtonShell
+                  key={level}
+                  accessibilityHint={level === "all" ? "Show all difficulty levels" : `Show only ${level} lessons`}
+                  onPress={() => setDifficultyFilter(level)}
+                  size="compact"
+                  selected={difficultyFilter === level}
+                  tone={difficultyFilter === level ? "blue" : "ink"}
+                  variant={difficultyFilter === level ? "primary" : "tertiary"}
+                  style={styles.filterPill}
+                >
+                  {level === "all" ? "All" : level.charAt(0).toUpperCase() + level.slice(1)}
+                </ButtonShell>
+              ))}
+            </Row>
+
             <View style={styles.nodeListContainer}>
-              {pathNodes.map((node, index) => {
-                const isLast = index === pathNodes.length - 1;
-                const isCompleted = node.status === "completed";
-                const isPlacedOut = node.status === "placed-out";
-                const isCurrent = node.status === "current";
-                const isLocked = node.status === "locked" || node.status === "upcoming";
-
-                const nodeHref = node.type === "mission"
-                  ? { pathname: "/mission/[missionId]" as const, params: { missionId: node.id } }
-                  : { pathname: "/lesson/[lessonId]" as const, params: { lessonId: node.id } };
-
-                return (
-                  <View key={node.id} style={styles.timelineNode}>
-                    {!isLast ? <View style={styles.lineConnector} /> : null}
-                    <View style={[
-                      styles.circleNode,
-                      isCompleted ? styles.circleCompleted : isPlacedOut ? styles.circlePlacedOut : isCurrent ? styles.circleCurrent : styles.circleLocked
-                    ]}>
-                      {isCompleted ? <Text style={styles.circleText}>✓</Text> : isPlacedOut ? <Text style={styles.circleTextPlacedOut}>—</Text> : null}
-                    </View>
-                    <View style={styles.nodeContent}>
-                      <Row>
-                        <Badge tone={isCompleted ? "green" : isCurrent ? "blue" : "ink"}>
-                          {node.status === "placed-out" ? "placed out" : node.type}
-                        </Badge>
-                        {node.estimatedMinutes ? (
-                          <Badge tone="teal">{node.estimatedMinutes} min</Badge>
-                        ) : null}
-                        {node.language ? (
-                          <Badge tone="amber">{node.language}</Badge>
-                        ) : null}
-                      </Row>
-                      <SectionTitle style={styles.nodeTitleText}>{node.title}</SectionTitle>
-                      {isLocked ? (
-                        <ButtonShell
-                          accessibilityHint="This item is locked until you complete the previous lessons."
-                          size="compact"
-                          disabled={true}
-                          tone="ink"
-                          variant="secondary"
-                        >
-                          Locked
-                        </ButtonShell>
-                      ) : (
-                        <Link href={nodeHref} asChild>
-                          <ButtonShell
-                            accessibilityHint={`Opens ${node.title}.`}
-                            size="compact"
-                            tone={isCompleted || isPlacedOut ? "ink" : isCurrent ? "blue" : "teal"}
-                            variant={isCurrent || isCompleted || isPlacedOut ? "primary" : "secondary"}
-                          >
-                            {isCompleted || isPlacedOut ? "Review" : isCurrent ? "Continue" : "Start"}
-                          </ButtonShell>
-                        </Link>
-                      )}
-                    </View>
-                  </View>
+              {(() => {
+                const filteredNodes = pathNodes.filter(
+                  (node) => difficultyFilter === "all" || node.difficulty === difficultyFilter
                 );
-              })}
+                let lastModuleId: string | undefined;
+
+                return filteredNodes.length === 0 ? (
+                  <MutedText style={{ padding: spacing.md }}>No {difficultyFilter} items in this track.</MutedText>
+                ) : filteredNodes.map((node, index) => {
+                  const isLast = index === filteredNodes.length - 1;
+                  const isCompleted = node.status === "completed";
+                  const isPlacedOut = node.status === "placed-out";
+                  const isCurrent = node.status === "current";
+                  const isLocked = node.status === "locked" || node.status === "upcoming";
+
+                  // Module grouping header
+                  const nodeModule = getModuleForNode(node, contentPack);
+                  const moduleChanged = nodeModule && nodeModule.id !== lastModuleId;
+                  if (nodeModule) {
+                    lastModuleId = nodeModule.id;
+                  }
+
+                  const nodeHref = node.type === "mission"
+                    ? { pathname: "/mission/[missionId]" as const, params: { missionId: node.id } }
+                    : { pathname: "/lesson/[lessonId]" as const, params: { lessonId: node.id } };
+
+                  return (
+                    <View key={node.id}>
+                      {moduleChanged && nodeModule ? (
+                        <ModuleHeader module={nodeModule} pathNodes={pathNodes} />
+                      ) : null}
+                      <View style={styles.timelineNode}>
+                        {!isLast ? <View style={styles.lineConnector} /> : null}
+                        <View style={[
+                          styles.circleNode,
+                          isCompleted ? styles.circleCompleted : isPlacedOut ? styles.circlePlacedOut : isCurrent ? styles.circleCurrent : styles.circleLocked
+                        ]}>
+                          {isCompleted ? <Text style={styles.circleText}>✓</Text> : isPlacedOut ? <Text style={styles.circleTextPlacedOut}>—</Text> : null}
+                        </View>
+                        <View style={styles.nodeContent}>
+                          <SectionTitle style={styles.nodeTitleText}>
+                            {node.status === "placed-out" ? "— " : ""}{node.title}
+                          </SectionTitle>
+                          {isLocked ? (
+                            <ButtonShell
+                              accessibilityHint="This item is locked until you complete the previous lessons."
+                              size="compact"
+                              disabled={true}
+                              tone="ink"
+                              variant="secondary"
+                            >
+                              Locked
+                            </ButtonShell>
+                          ) : (
+                            <Link href={nodeHref} asChild>
+                              <ButtonShell
+                                accessibilityHint={`Opens ${node.title}.`}
+                                size="compact"
+                                tone={isCompleted || isPlacedOut ? "ink" : isCurrent ? "blue" : "teal"}
+                                variant={isCurrent || isCompleted || isPlacedOut ? "primary" : "secondary"}
+                              >
+                                {isCompleted || isPlacedOut ? "Review" : isCurrent ? "Continue" : "Start"}
+                              </ButtonShell>
+                            </Link>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  );
+                });
+              })()}
             </View>
           </Panel>
         );
@@ -374,16 +393,31 @@ export default function LearningPathScreen(): ReactElement {
   );
 }
 
-function unlockBadgeTone(label: FutureUnlockLabel): "blue" | "teal" | "amber" | "rose" | "green" | "ink" {
-  if (label === "Roadmap") {
-    return "blue";
+function getModuleForNode(node: { id: string; type: string }, content: typeof contentPack): Module | undefined {
+  if (node.type === "lesson") {
+    return content.modules.find((m) => m.lessonIds.includes(node.id));
   }
-
-  if (label === "Coming later") {
-    return "ink";
+  if (node.type === "mission") {
+    return content.modules.find((m) => m.projectMissionIds.includes(node.id));
   }
+  return undefined;
+}
 
-  return "amber";
+function ModuleHeader({ module: mod, pathNodes }: { module: Module; pathNodes: ReturnType<typeof getPathNodes> }): ReactElement {
+  const moduleNodeCount = pathNodes.filter((n) => {
+    const m = getModuleForNode(n, contentPack);
+    return m?.id === mod.id;
+  }).length;
+  const completedCount = pathNodes.filter((n) => {
+    const m = getModuleForNode(n, contentPack);
+    return m?.id === mod.id && n.status === "completed";
+  }).length;
+  return (
+    <View style={styles.moduleHeader}>
+      <SectionTitle style={styles.moduleHeaderTitle}>{mod.title}</SectionTitle>
+      <MutedText>{mod.summary} · {completedCount}/{moduleNodeCount} lessons</MutedText>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -396,6 +430,28 @@ const styles = StyleSheet.create({
   },
   trackSummary: {
     marginBottom: spacing.md
+  },
+  filterRow: {
+    marginVertical: spacing.sm,
+    gap: spacing.xs
+  },
+  filterPill: {
+    flexGrow: 0,
+    minWidth: 0,
+    paddingHorizontal: spacing.sm
+  },
+  moduleHeader: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+    padding: spacing.md
+  },
+  moduleHeaderTitle: {
+    fontSize: 15
   },
   nodeListContainer: {
     gap: spacing.xs,
