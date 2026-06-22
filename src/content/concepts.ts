@@ -211,6 +211,14 @@ export const conceptRegistry: ConceptDefinition[] = [
     introducedLevel: 1
   },
 
+  {
+    id: "py.method",
+    label: "Methods",
+    category: "python",
+    description: "Call built-in actions on values using dot notation.",
+    introducedLevel: 1
+  },
+
   // Level 2: Decisions, Loops, Collections
   {
     id: "py.comparison",
@@ -273,6 +281,27 @@ export const conceptRegistry: ConceptDefinition[] = [
     label: "Dictionary Key Lookup",
     category: "python",
     description: "Retrieve values using specific keys.",
+    introducedLevel: 2
+  },
+  {
+    id: "py.dict.get_set",
+    label: "Dictionary Get and Set",
+    category: "python",
+    description: "Assign keys and use default retrieval.",
+    introducedLevel: 2
+  },
+  {
+    id: "py.module.guard",
+    label: "Module Guard Pattern",
+    category: "python",
+    description: "Use if __name__ == '__main__': to separate run-now code from reusable imports.",
+    introducedLevel: 2
+  },
+  {
+    id: "py.module.guard.mechanics",
+    label: "Module Guard Mechanics",
+    category: "python",
+    description: "Understand __name__ and __main__ dunders behind the if __name__ == '__main__': guard.",
     introducedLevel: 2
   },
   {
@@ -441,6 +470,13 @@ export const conceptRegistry: ConceptDefinition[] = [
     introducedLevel: 4
   },
   {
+    id: "debug.regression",
+    label: "Regression Assertions",
+    category: "debugging",
+    description: "Write assertions that prove a fix works and catch the bug if it returns.",
+    introducedLevel: 4
+  },
+  {
     id: "py.raise",
     label: "Raising exceptions",
     category: "python",
@@ -466,6 +502,13 @@ export const conceptRegistry: ConceptDefinition[] = [
     label: "Assertions",
     category: "testing",
     description: "Use assert to encode logic invariants.",
+    introducedLevel: 4
+  },
+  {
+    id: "debug.breakpoint.basic",
+    label: "Breakpoint Debugger",
+    category: "debugging",
+    description: "Use Python's built-in breakpoint() to pause execution and inspect variables interactively.",
     introducedLevel: 4
   },
   {
@@ -523,9 +566,9 @@ export const conceptRegistry: ConceptDefinition[] = [
     id: "py.open.read",
     label: "File Opening",
     category: "files",
-    description: "Open files for reading or writing.",
+    description: "Open files for reading or writing (raw open() mechanics). Prefer py.file.input for the safe with-statement pattern.",
     introducedLevel: 5
-  },
+  }, // DEPRECATED — use py.file.input
   {
     id: "py.with_statement",
     label: "Context Managers",
@@ -537,9 +580,9 @@ export const conceptRegistry: ConceptDefinition[] = [
     id: "files.input_text",
     label: "Reading File Contents",
     category: "files",
-    description: "Load content from raw text streams.",
+    description: "Load content from raw text streams. Prefer py.file.input for file-based reading.",
     introducedLevel: 5
-  },
+  }, // DEPRECATED — use py.file.input
   {
     id: "py.csv",
     label: "CSV Handling",
@@ -559,13 +602,6 @@ export const conceptRegistry: ConceptDefinition[] = [
     label: "JSON Handling",
     category: "files",
     description: "Import and use the JSON library module.",
-    introducedLevel: 5
-  },
-  {
-    id: "py.json.dumps_loads",
-    label: "JSON Serialization",
-    category: "files",
-    description: "Call json.loads and json.dumps.",
     introducedLevel: 5
   },
   {
@@ -589,7 +625,7 @@ export const conceptRegistry: ConceptDefinition[] = [
     label: "Imports",
     category: "project",
     description: "Use import to include modules.",
-    introducedLevel: 6
+    introducedLevel: 5
   },
   {
     id: "py.module.local",
@@ -647,6 +683,48 @@ export const conceptRegistry: ConceptDefinition[] = [
     description: "Upload code to remote GitHub repos.",
     introducedLevel: 6
   },
+  {
+    id: "git.branch.create",
+    label: "Git Branching",
+    category: "git",
+    description: "Create and name branches to isolate work on different features or fixes.",
+    introducedLevel: 6
+  },
+  {
+    id: "git.branch.switch",
+    label: "Git Branch Switch",
+    category: "git",
+    description: "Switch between branches using git checkout or git switch to change working context.",
+    introducedLevel: 6
+  },
+  {
+    id: "git.branch.merge",
+    label: "Git Merge",
+    category: "git",
+    description: "Use git merge to combine changes from one branch into another.",
+    introducedLevel: 6
+  },
+  {
+    id: "github.pull_request.create",
+    label: "GitHub Pull Request Creation",
+    category: "git",
+    description: "Open a pull request on GitHub to propose changes and request review.",
+    introducedLevel: 6
+  },
+  {
+    id: "github.pull_request.review",
+    label: "GitHub Pull Request Review",
+    category: "git",
+    description: "Review a pull request: read diff, leave comments, and approve or request changes.",
+    introducedLevel: 6
+  },
+  {
+    id: "github.pull_request.merge",
+    label: "GitHub Pull Request Merge",
+    category: "git",
+    description: "Merge an approved pull request into the target branch and delete the feature branch.",
+    introducedLevel: 6
+  },
 
   // Level 7: Type Hints, Dataclasses, Validation
   {
@@ -678,34 +756,42 @@ export const conceptRegistry: ConceptDefinition[] = [
     introducedLevel: 7
   },
 
+  {
+    id: "py.testing.mock",
+    label: "Mocking in Tests",
+    category: "testing",
+    description: "Replace real dependencies with controlled test doubles using unittest.mock.patch.",
+    introducedLevel: 7
+  },
+
   // Level 8: SQLite & APIs
   {
     id: "py.sqlite",
     label: "SQLite Integration",
     category: "data",
     description: "Import sqlite3 module.",
-    introducedLevel: 8
+    introducedLevel: 7
   },
   {
     id: "py.sqlite.query",
     label: "SQL Queries",
     category: "data",
     description: "Execute parameterized query statements.",
-    introducedLevel: 8
+    introducedLevel: 7
   },
   {
     id: "py.api.client",
     label: "API Clients",
     category: "api",
     description: "Request data from external services.",
-    introducedLevel: 8
+    introducedLevel: 7
   },
   {
     id: "py.http.status",
     label: "HTTP Status Codes",
     category: "api",
     description: "Evaluate response codes like 200 or 404.",
-    introducedLevel: 8
+    introducedLevel: 7
   },
   {
     id: "py.api.retry",
@@ -714,15 +800,29 @@ export const conceptRegistry: ConceptDefinition[] = [
     description: "Implement simple retry loops.",
     introducedLevel: 8
   },
+  {
+    id: "py.api.rate_limit",
+    label: "Rate Limiting",
+    category: "api",
+    description: "Handle API rate limits with exponential backoff and Retry-After headers.",
+    introducedLevel: 8
+  },
+  {
+    id: "py.api.cache",
+    label: "Caching Strategies",
+    category: "api",
+    description: "Cache API responses with TTL to reduce calls and handle stale data.",
+    introducedLevel: 8
+  },
+  {
+    id: "py.api.circuit_breaker",
+    label: "Circuit Breaker Pattern",
+    category: "api",
+    description: "Fail fast after consecutive failures with half-open recovery state.",
+    introducedLevel: 8
+  },
 
   // Level 9: Logging, Config, Secrets, CI
-  {
-    id: "py.logging",
-    label: "Logging basics",
-    category: "ops",
-    description: "Print diagnostic runs using logging module.",
-    introducedLevel: 9
-  },
   {
     id: "py.config.env",
     label: "Environment variables",
@@ -737,20 +837,340 @@ export const conceptRegistry: ConceptDefinition[] = [
     description: "Automate code verifications on push requests.",
     introducedLevel: 9
   },
+  {
+    id: "py.secrets.env",
+    label: "Secrets Management",
+    category: "ops",
+    description: "Load secrets from environment variables, never hardcode credentials.",
+    introducedLevel: 9
+  },
+  {
+    id: "ops.deploy.strategies",
+    label: "Deployment Strategies",
+    category: "ops",
+    description: "Understand blue-green, canary, and rollback deployment patterns.",
+    introducedLevel: 9
+  },
+  {
+    id: "ops.monitoring.basics",
+    label: "Monitoring Basics",
+    category: "ops",
+    description: "Set up structured logging, health checks, and alert thresholds.",
+    introducedLevel: 9
+  },
 
-  // Level 10: Capstone
+  // Level 10 reserved for future capstone concepts
   {
     id: "ops.architecture.note",
     label: "Architecture Notes",
     category: "ops",
     description: "Explain software structure decisions.",
-    introducedLevel: 10
+    introducedLevel: 7
   },
   {
     id: "evidence.portfolio",
     label: "Portfolio evidence",
     category: "evidence",
     description: "Provide senior review ready evidence of final capstones.",
-    introducedLevel: 10
+    introducedLevel: 7
+  },
+
+  // Level 5: File I/O and CLI
+  {
+    id: "py.file.input",
+    label: "File Input",
+    category: "python",
+    description: "Read text files using open() and with statement.",
+    introducedLevel: 5,
+    aliases: ["py.open.read", "files.input_text"]
+  },
+  {
+    id: "py.parser.separation",
+    label: "Parser Separation",
+    category: "python",
+    description: "Keep file reading separate from parsing logic for testability.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.test.assertions",
+    label: "Test Assertions",
+    category: "python",
+    description: "Write assert statements in test functions to verify behavior.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.test.failures",
+    label: "Test Failure Behavior",
+    category: "python",
+    description: "Write tests that prove rejection behavior, not just happy paths.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.cli.arguments",
+    label: "CLI Arguments",
+    category: "python",
+    description: "Parse command-line arguments using argparse.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.argparse.parser",
+    label: "Argparse Parser",
+    category: "python",
+    description: "Build ArgumentParser with description, flags, types, and defaults.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.cli.file_backed",
+    label: "File-Backed CLI",
+    category: "python",
+    description: "Wire CLI argument to a file parser so the script accepts real input.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.cli.integration",
+    label: "CLI Integration",
+    category: "python",
+    description: "Connect CLI argument parsing to file reading and report generation.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.cli.help_defaults",
+    label: "CLI Help and Defaults",
+    category: "python",
+    description: "Add help text, default values, and choices to argparse arguments.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.cli.constraints",
+    label: "CLI Constraints",
+    category: "python",
+    description: "Validate CLI input using choices= and type= in argparse.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.file.output",
+    label: "File Output",
+    category: "python",
+    description: "Write results to a file using open() in write mode.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.cli.artifacts",
+    label: "CLI Artifacts",
+    category: "python",
+    description: "Produce output files from a CLI script.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.report.rejections",
+    label: "Rejection Report",
+    category: "python",
+    description: "Collect and display rows that failed parsing.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.report.row_numbers",
+    label: "Row-Numbered Report",
+    category: "python",
+    description: "Include original row numbers in rejection reports.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.proof.readme",
+    label: "README Proof",
+    category: "evidence",
+    description: "Document project purpose, usage, and evidence in a README.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.proof.gaps",
+    label: "Evidence Gaps",
+    category: "evidence",
+    description: "Identify missing evidence before submitting portfolio work.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.gate.review",
+    label: "Core Review Gate",
+    category: "evidence",
+    description: "Validate architecture, commands, and evidence before advancing.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.gate.architecture",
+    label: "Architecture Gate",
+    category: "evidence",
+    description: "Explain the CLI → parser → report structure in plain terms.",
+    introducedLevel: 5
+  },
+
+  // Level 6: Professional Python
+  {
+    id: "py.structure.package",
+    label: "Package Structure",
+    category: "python",
+    description: "Organise Python code into modules and packages with __init__.py.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.structure.boundaries",
+    label: "Module Boundaries",
+    category: "python",
+    description: "Separate domain logic, I/O, and CLI into distinct modules.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.dataclass.model",
+    label: "Dataclass Model",
+    category: "python",
+    description: "Use @dataclass to define typed data models with field annotations.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.dataclass.validation",
+    label: "Dataclass Validation",
+    category: "python",
+    description: "Add __post_init__ validation to dataclass models.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.json.dumps",
+    label: "JSON Serialisation",
+    category: "python",
+    description: "Serialise Python objects to JSON strings using json.dumps.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.json.loads",
+    label: "JSON Deserialisation",
+    category: "python",
+    description: "Parse JSON strings into Python objects using json.loads.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.logging",
+    label: "Logging basics",
+    category: "ops",
+    description: "Print diagnostic runs using logging module.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.logging.warning",
+    label: "Logging Warnings",
+    category: "python",
+    description: "Use logging.warning() and logging.error() for structured diagnostics.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.errors.custom",
+    label: "Custom Errors",
+    category: "python",
+    description: "Define custom exception classes by subclassing Exception.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.pytest.fixtures",
+    label: "Pytest Fixtures",
+    category: "python",
+    description: "Use @pytest.fixture to share test setup across test functions.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.pytest.smoke",
+    label: "Smoke Tests",
+    category: "python",
+    description: "Write end-to-end smoke tests that verify the full CLI output.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.pytest.parametrize",
+    label: "Pytest Parametrize",
+    category: "testing",
+    description: "Use @pytest.mark.parametrize to run the same test function with multiple input-output pairs.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.pytest.raises",
+    label: "Pytest Raises",
+    category: "testing",
+    description: "Use pytest.raises() to assert that a specific exception is raised during execution.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.env.virtual",
+    label: "Virtual Environments",
+    category: "ops",
+    description: "Isolate project dependencies using python -m venv, activate, and pip freeze.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.metadata.pyproject",
+    label: "pyproject.toml Metadata",
+    category: "python",
+    description: "Define project name, version, and dependencies in pyproject.toml.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.metadata.dependencies",
+    label: "Dependency Declarations",
+    category: "python",
+    description: "List runtime dependencies in pyproject.toml.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.packaging.scripts",
+    label: "Packaging Scripts",
+    category: "python",
+    description: "Declare CLI entry points using [project.scripts] in pyproject.toml.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.packaging.install",
+    label: "Editable Install",
+    category: "python",
+    description: "Install a package in editable mode using pip install -e .",
+    introducedLevel: 6
+  },
+  {
+    id: "py.config.loader",
+    label: "Config Loader",
+    category: "python",
+    description: "Load configuration from files or environment variables at startup.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.config.merge",
+    label: "Config Merging",
+    category: "python",
+    description: "Merge config file values with CLI argument overrides.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.ci.precommit",
+    label: "Pre-commit Hooks",
+    category: "ops",
+    description: "Configure pre-commit to run linters and formatters on every commit.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.ci.workflow",
+    label: "CI Workflow",
+    category: "ops",
+    description: "Define a GitHub Actions workflow that runs tests on push.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.gate.professional",
+    label: "Professional Review Gate",
+    category: "evidence",
+    description: "Validate professional packaging, CI, and config before advancing.",
+    introducedLevel: 6
+  },
+  {
+    id: "py.gate.matrix",
+    label: "Review Matrix",
+    category: "evidence",
+    description: "Map each layer to evidence, risk, and improvement decision.",
+    introducedLevel: 6
   }
 ];

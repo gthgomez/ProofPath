@@ -48,7 +48,7 @@ const pythonModule = {
 const pythonLessons = pythonModule.lessonIds.map((id) => contentPack.lessons.find((l) => l.id === id)!).filter(Boolean);
 const pythonProfessionalModule = contentPack.modules.find((moduleItem) => moduleItem.id === "module-python-professional")!;
 const pythonProfessionalLessons = getLessonsForModule(contentPack, pythonProfessionalModule.id);
-const pythonIntegrationModule = contentPack.modules.find((moduleItem) => moduleItem.id === "module-python-integration")!;
+const pythonIntegrationModule = contentPack.modules.find((moduleItem) => moduleItem.id === "module-python-dashboard")!;
 const pythonIntegrationLessons = getLessonsForModule(contentPack, pythonIntegrationModule.id);
 const cliMission = contentPack.projectMissions.find((mission) => mission.id === "mission-cli-study-tracker")!;
 
@@ -58,11 +58,13 @@ describe("learning path state model", () => {
 
     expect(arcs.map((arc) => arc.title)).toEqual([
       "Python Basics",
-      "Clean and Validate Data",
-      "Build a Real CLI",
-      "Package for Review"
+      "Variables and Output",
+      "Collections and Control Flow",
+      "Functions",
+      "Debugging and Assertions",
+      "File I/O and CLI"
     ]);
-    expect(arcs.flatMap((arc) => arc.lessonIndexes)).toHaveLength(17);
+    expect(arcs.flatMap((arc) => arc.lessonIndexes)).toHaveLength(39);
   });
 
   it("groups Python Professional and Integration into depth arcs", () => {
@@ -78,8 +80,8 @@ describe("learning path state model", () => {
 
     expect(integrationArcs.map((arc) => arc.title)).toEqual([
       "Validation and Services",
-      "Persistence and APIs",
-      "Integration Review"
+      "Persistence, APIs, and Mocks",
+      "Dashboard Build and Review"
     ]);
     expect(integrationArcs.flatMap((arc) => arc.lessonIndexes)).toHaveLength(pythonIntegrationLessons.length);
   });

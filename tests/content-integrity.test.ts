@@ -84,7 +84,9 @@ describe("content pack", () => {
   it("gives the first Python arc explicit next-line code shapes", () => {
     const firstPythonArcLessonIds = [
       "lesson-python-values",
-      "lesson-python-collections",
+      "lesson-python-lists",
+      "lesson-python-dicts",
+      "lesson-python-list-of-dicts",
       "lesson-python-decisions",
       "lesson-python-loops",
       "lesson-python-foundation-capstone",

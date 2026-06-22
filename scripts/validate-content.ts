@@ -740,7 +740,34 @@ for (const lesson of contentPack.lessons) {
     }
   }
   }
-  
+
+  // --- RULE GROUP N: Practice Rep Tier Coverage (Levels 2+) ---
+  for (const lesson of contentPack.lessons) {
+    if (lesson.curriculum?.deprecated) continue;
+    const level = lesson.curriculum?.level ?? 0;
+    if (level < 2) continue;
+
+    const allReps = lesson.workshop.practiceReps ?? [];
+
+    for (const [repIndex, rep] of allReps.entries()) {
+      if (!rep.tier) {
+        errors.push(`Rule Group N: Lesson '${lesson.id}' practice rep ${repIndex + 1} is missing a tier field`);
+      }
+    }
+
+    // Check all 3 tiers are represented across the reps
+    const tiers = new Set(allReps.map((r) => r.tier));
+    if (!tiers.has("replicate")) {
+      errors.push(`Rule Group N: Lesson '${lesson.id}' lacks a replicate-tier practice rep`);
+    }
+    if (!tiers.has("diagnose")) {
+      errors.push(`Rule Group N: Lesson '${lesson.id}' lacks a diagnose-tier practice rep`);
+    }
+    if (!tiers.has("synthesize")) {
+      errors.push(`Rule Group N: Lesson '${lesson.id}' lacks a synthesize-tier practice rep`);
+    }
+  }
+
   // --- SURFACE CLASSIFICATION HELPERS ---
   function stripComments(code: string): string {
     return code
@@ -1112,10 +1139,10 @@ for (const lesson of contentPack.lessons) {
         }
       }
       // arithmetic
-      if (/\b\d+\s*[+\-*\/]\s*\d+\b|\b[a-zA-Z_][a-zA-Z0-9_]*\s*[+\-*\/]\s*[a-zA-Z0-9_]+\b/.test(strippedFull)) {
-        if (!taughtSoFar.has("py.arithmetic.add") && !taughtSoFar.has("py.arithmetic.multiply") &&
-            !lesson.curriculum.teaches.includes("py.arithmetic.add") && !lesson.curriculum.teaches.includes("py.arithmetic.multiply") &&
-            !lesson.curriculum.requires.includes("py.arithmetic.add") && !lesson.curriculum.requires.includes("py.arithmetic.multiply")) {
+      if (/\b\d+\s*[+\-*\/]\s*\d+\b|\b[a-zA-Z_][a-zA-Z0-9_]*\s+[+\-*\/]\s+[a-zA-Z0-9_]+\b/.test(strippedFull)) {
+        if (!taughtSoFar.has("py.arithmetic.add") && !taughtSoFar.has("py.arithmetic.multiply") && !taughtSoFar.has("py.arithmetic") &&
+            !lesson.curriculum.teaches.includes("py.arithmetic.add") && !lesson.curriculum.teaches.includes("py.arithmetic.multiply") && !lesson.curriculum.teaches.includes("py.arithmetic") &&
+            !lesson.curriculum.requires.includes("py.arithmetic.add") && !lesson.curriculum.requires.includes("py.arithmetic.multiply") && !lesson.curriculum.requires.includes("py.arithmetic")) {
           warnings.push(`Lesson '${lesson.id}' uses arithmetic operators before the arithmetic lesson`);
         }
       }
