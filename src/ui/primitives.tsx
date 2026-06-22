@@ -22,7 +22,7 @@ export function Screen({
   eyebrow,
   action,
   backHref,
-  backLabel = "Back",
+  backLabel,
   children,
   showBack,
   stickyAction
@@ -49,7 +49,7 @@ export function Screen({
           <View style={styles.headerText}>
             {shouldShowBack || action ? (
               <View style={styles.headerControls}>
-                {shouldShowBack ? <BackButton fallbackHref={backHref ?? getFallbackBackHref(pathname)} label={backLabel} /> : null}
+                {shouldShowBack ? <BackButton fallbackHref={backHref ?? getFallbackBackHref(pathname)} label={backLabel ?? getBackLabel(pathname)} /> : null}
                 {action}
               </View>
             ) : null}
@@ -116,6 +116,12 @@ function getFallbackBackHref(pathname: string): Href {
   return "/";
 }
 
+function getBackLabel(pathname: string): string {
+  if (pathname.startsWith("/lesson/")) return "Back to Path";
+  if (pathname.startsWith("/mission/")) return "Back to Projects";
+  return "Back";
+}
+
 type RootNavItem = {
   href: Href;
   label: string;
@@ -125,7 +131,7 @@ type RootNavItem = {
 const rootNavItems: readonly RootNavItem[] = [
   { href: "/", label: "Today", matches: ["/", "/readiness", "/review", "/weekly-plan"] },
   { href: "/path", label: "Learn", matches: ["/path", "/lesson"] },
-  { href: "/projects", label: "Build", matches: ["/projects", "/mission"] },
+  { href: "/projects", label: "Practice", matches: ["/projects", "/mission"] },
   { href: "/evidence", label: "Portfolio", matches: ["/evidence"] },
   { href: "/settings", label: "Settings", matches: ["/settings"] }
 ];

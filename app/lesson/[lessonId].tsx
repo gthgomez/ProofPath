@@ -396,7 +396,7 @@ export default function LessonDetailScreen(): ReactElement {
 
           {/* Code Lab / mini-project section */}
           <Panel>
-            <SectionTitle>Code Lab</SectionTitle>
+            <SectionTitle>Code project</SectionTitle>
             {lesson.depth ? (
               <CodeLabBridge bridge={lesson.depth.codeLabBridge} />
             ) : (
@@ -448,7 +448,7 @@ export default function LessonDetailScreen(): ReactElement {
         <View>
           {/* Recall cards */}
           <Panel>
-            <SectionTitle>Recall</SectionTitle>
+            <SectionTitle>Review</SectionTitle>
             <BodyText>Use these prompts to keep the idea available without rereading everything.</BodyText>
             {lesson.workshop.recallCards.map((card) => (
               <SubPanel key={card.id}>
