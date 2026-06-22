@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { deriveLessonWorkflow } from "@/domain/lesson-workflow";
 
 describe("deriveLessonWorkflow", () => {
-  it("starts at understand and CTA points to practice/experiment", () => {
+  it("starts at read and CTA points to code", () => {
     const workflow = deriveLessonWorkflow({
-      currentStep: "understand",
+      currentStep: "read",
       miniProjectDone: false,
       quizDone: false,
       lessonDone: false,
@@ -12,22 +12,21 @@ describe("deriveLessonWorkflow", () => {
       nextLessonId: "lesson-2",
     });
 
-    expect(workflow.currentStep).toBe("understand");
+    expect(workflow.currentStep).toBe("read");
     expect(workflow.cta.action).toBe("navigate");
     if (workflow.cta.action === "navigate") {
-      expect(workflow.cta.targetStep).toBe("experiment");
+      expect(workflow.cta.targetStep).toBe("code");
     }
-    expect(workflow.cta.label).toBe("Continue to Practice");
+    expect(workflow.cta.label).toBe("Continue to code");
     expect(workflow.cta.disabled).toBe(false);
-    expect(workflow.unlockedSteps).toContain("understand");
-    expect(workflow.unlockedSteps).toContain("experiment");
-    expect(workflow.unlockedSteps).toContain("apply");
-    expect(workflow.unlockedSteps).not.toContain("checkpoint");
+    expect(workflow.unlockedSteps).toContain("read");
+    expect(workflow.unlockedSteps).toContain("code");
+    expect(workflow.unlockedSteps).not.toContain("check");
   });
 
-  it("points to apply from experiment step", () => {
+  it("shows complete-message CTA on code step when miniProject is not done", () => {
     const workflow = deriveLessonWorkflow({
-      currentStep: "experiment",
+      currentStep: "code",
       miniProjectDone: false,
       quizDone: false,
       lessonDone: false,
@@ -35,36 +34,16 @@ describe("deriveLessonWorkflow", () => {
       nextLessonId: "lesson-2",
     });
 
-    expect(workflow.currentStep).toBe("experiment");
-    expect(workflow.cta.action).toBe("navigate");
-    if (workflow.cta.action === "navigate") {
-      expect(workflow.cta.targetStep).toBe("apply");
-    }
-    expect(workflow.cta.label).toBe("Continue to Code Lab");
-    expect(workflow.cta.disabled).toBe(false);
-  });
-
-  it("keeps CTA on Run Code Lab if miniProjectDone is false", () => {
-    const workflow = deriveLessonWorkflow({
-      currentStep: "apply",
-      miniProjectDone: false,
-      quizDone: false,
-      lessonDone: false,
-      hasQuiz: true,
-      nextLessonId: "lesson-2",
-    });
-
-    expect(workflow.currentStep).toBe("apply");
-    expect(workflow.cta.label).toBe("Run Code Lab");
-    // Action is idle because the runner handles execution, it's not a navigation action.
+    expect(workflow.currentStep).toBe("code");
+    expect(workflow.cta.label).toBe("Complete the Code Lab");
     expect(workflow.cta.action).toBe("idle");
-    expect(workflow.unlockedSteps).not.toContain("checkpoint");
+    expect(workflow.unlockedSteps).not.toContain("check");
     expect(workflow.canNavigateForward).toBe(false);
   });
 
-  it("keeps CTA on Run Code Lab even if quiz is somehow done but mini-project is not done", () => {
+  it("keeps CTA idle even if quiz is somehow done but mini-project is not", () => {
     const workflow = deriveLessonWorkflow({
-      currentStep: "apply",
+      currentStep: "code",
       miniProjectDone: false,
       quizDone: true,
       lessonDone: false,
@@ -72,15 +51,15 @@ describe("deriveLessonWorkflow", () => {
       nextLessonId: "lesson-2",
     });
 
-    expect(workflow.currentStep).toBe("apply");
-    expect(workflow.cta.label).toBe("Run Code Lab");
+    expect(workflow.currentStep).toBe("code");
+    expect(workflow.cta.label).toBe("Complete the Code Lab");
     expect(workflow.cta.action).toBe("idle");
-    expect(workflow.unlockedSteps).not.toContain("checkpoint");
+    expect(workflow.unlockedSteps).not.toContain("check");
   });
 
-  it("advances CTA to checkpoint once miniProjectDone is true", () => {
+  it("advances CTA to check once miniProjectDone is true", () => {
     const workflow = deriveLessonWorkflow({
-      currentStep: "apply",
+      currentStep: "code",
       miniProjectDone: true,
       quizDone: false,
       lessonDone: false,
@@ -88,19 +67,19 @@ describe("deriveLessonWorkflow", () => {
       nextLessonId: "lesson-2",
     });
 
-    expect(workflow.currentStep).toBe("apply");
+    expect(workflow.currentStep).toBe("code");
     expect(workflow.cta.action).toBe("navigate");
     if (workflow.cta.action === "navigate") {
-      expect(workflow.cta.targetStep).toBe("checkpoint");
+      expect(workflow.cta.targetStep).toBe("check");
     }
-    expect(workflow.cta.label).toBe("Take checkpoint");
-    expect(workflow.unlockedSteps).toContain("checkpoint");
+    expect(workflow.cta.label).toBe("Take quiz");
+    expect(workflow.unlockedSteps).toContain("check");
     expect(workflow.canNavigateForward).toBe(true);
   });
 
-  it("shows Answer checkpoint CTA when on checkpoint step and quiz not yet completed", () => {
+  it("shows Answer all questions CTA on check step when quiz not yet completed", () => {
     const workflow = deriveLessonWorkflow({
-      currentStep: "checkpoint",
+      currentStep: "check",
       miniProjectDone: true,
       quizDone: false,
       lessonDone: false,
@@ -109,16 +88,15 @@ describe("deriveLessonWorkflow", () => {
       allQuestionsAnswered: false,
     });
 
-    expect(workflow.currentStep).toBe("checkpoint");
+    expect(workflow.currentStep).toBe("check");
     expect(workflow.cta.action).toBe("submit-quiz");
-    expect(workflow.cta.label).toBe("Answer checkpoint");
+    expect(workflow.cta.label).toBe("Answer all questions");
     expect(workflow.cta.disabled).toBe(true);
-    expect(workflow.unlockedSteps).not.toContain("evidence");
   });
 
-  it("enables Submit checkpoint CTA when all questions are answered on checkpoint step", () => {
+  it("enables Submit quiz CTA when all questions are answered on check step", () => {
     const workflow = deriveLessonWorkflow({
-      currentStep: "checkpoint",
+      currentStep: "check",
       miniProjectDone: true,
       quizDone: false,
       lessonDone: false,
@@ -127,15 +105,15 @@ describe("deriveLessonWorkflow", () => {
       allQuestionsAnswered: true,
     });
 
-    expect(workflow.currentStep).toBe("checkpoint");
+    expect(workflow.currentStep).toBe("check");
     expect(workflow.cta.action).toBe("submit-quiz");
-    expect(workflow.cta.label).toBe("Submit checkpoint");
+    expect(workflow.cta.label).toBe("Submit quiz");
     expect(workflow.cta.disabled).toBe(false);
   });
 
-  it("shows Save evidence CTA once quiz is done on checkpoint step", () => {
+  it("shows Next lesson CTA once quiz is done on check step when next lesson exists", () => {
     const workflow = deriveLessonWorkflow({
-      currentStep: "checkpoint",
+      currentStep: "check",
       miniProjectDone: true,
       quizDone: true,
       lessonDone: false,
@@ -143,36 +121,18 @@ describe("deriveLessonWorkflow", () => {
       nextLessonId: "lesson-2",
     });
 
-    expect(workflow.currentStep).toBe("checkpoint");
-    expect(workflow.cta.action).toBe("navigate");
-    if (workflow.cta.action === "navigate") {
-      expect(workflow.cta.targetStep).toBe("evidence");
-    }
-    expect(workflow.cta.label).toBe("Save evidence");
-    expect(workflow.unlockedSteps).toContain("evidence");
-  });
-
-  it("shows Next lesson CTA on evidence step when lesson is completed and next exists", () => {
-    const workflow = deriveLessonWorkflow({
-      currentStep: "evidence",
-      miniProjectDone: true,
-      quizDone: true,
-      lessonDone: true,
-      hasQuiz: true,
-      nextLessonId: "lesson-2",
-    });
-
-    expect(workflow.currentStep).toBe("evidence");
+    expect(workflow.currentStep).toBe("check");
     expect(workflow.cta.action).toBe("next-lesson");
     if (workflow.cta.action === "next-lesson") {
       expect(workflow.cta.lessonId).toBe("lesson-2");
     }
+    expect(workflow.cta.label).toBe("Next lesson");
     expect(workflow.cta.disabled).toBe(false);
   });
 
-  it("shows Module complete CTA on evidence step when lesson is completed and no next exists", () => {
+  it("shows Module complete CTA on check step when lesson is complete and no next exists", () => {
     const workflow = deriveLessonWorkflow({
-      currentStep: "evidence",
+      currentStep: "check",
       miniProjectDone: true,
       quizDone: true,
       lessonDone: true,
@@ -180,8 +140,9 @@ describe("deriveLessonWorkflow", () => {
       nextLessonId: undefined,
     });
 
-    expect(workflow.currentStep).toBe("evidence");
+    expect(workflow.currentStep).toBe("check");
     expect(workflow.cta.action).toBe("module-complete");
+    expect(workflow.cta.label).toBe("Module complete");
     expect(workflow.cta.disabled).toBe(false);
   });
 });

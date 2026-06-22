@@ -1,14 +1,11 @@
 export type LessonWorkflowStep =
-  | "understand"    // Learn content — theory, synopsis, worked example
-  | "experiment"    // Practice — starter code, predictions, fluency reps
-  | "apply"         // Code Lab — write code, run checks
-  | "checkpoint"    // Quiz + recall cards
-  | "evidence";     // Post-completion evidence capture prompt
+  | "read"    // Learn content — concept capsules, synopsis, examples
+  | "code"    // Practice + Code Lab — walkthrough, starter code, mini-project
+  | "check";  // Quiz + evidence capture
 
 export type LessonWorkflowCta =
   | { action: "navigate"; targetStep: LessonWorkflowStep; label: string; tone: "blue" | "green" | "amber" | "ink"; disabled: boolean }
   | { action: "submit-quiz"; label: string; tone: "blue" | "green" | "amber" | "ink"; disabled: boolean }
-  | { action: "open-evidence"; label: string; tone: "blue" | "green" | "amber" | "ink"; disabled: boolean }
   | { action: "next-lesson"; label: string; lessonId: string; tone: "blue" | "green" | "amber" | "ink"; disabled: boolean }
   | { action: "module-complete"; label: string; tone: "blue" | "green" | "amber" | "ink"; disabled: boolean }
   | { action: "idle"; label: string; tone: "blue" | "green" | "amber" | "ink"; disabled: boolean };
@@ -16,7 +13,7 @@ export type LessonWorkflowCta =
 export interface LessonWorkflowResult {
   currentStep: LessonWorkflowStep;
   stepIndex: number;         // 0-based index
-  totalSteps: number;        // always 5
+  totalSteps: number;        // always 3
   completedSteps: LessonWorkflowStep[];
   unlockedSteps: LessonWorkflowStep[];
   cta: LessonWorkflowCta;
@@ -25,11 +22,9 @@ export interface LessonWorkflowResult {
 }
 
 export const STEPS: LessonWorkflowStep[] = [
-  "understand",
-  "experiment",
-  "apply",
-  "checkpoint",
-  "evidence"
+  "read",
+  "code",
+  "check"
 ];
 
 export function deriveLessonWorkflow(input: {
@@ -45,67 +40,49 @@ export function deriveLessonWorkflow(input: {
   const stepIndex = STEPS.indexOf(currentStep);
 
   // Determine unlocked steps
-  const unlockedSteps: LessonWorkflowStep[] = ["understand", "experiment", "apply"];
+  const unlockedSteps: LessonWorkflowStep[] = ["read", "code"];
   if (miniProjectDone) {
-    unlockedSteps.push("checkpoint");
-  }
-  if (miniProjectDone && (quizDone || !hasQuiz)) {
-    unlockedSteps.push("evidence");
+    unlockedSteps.push("check");
   }
 
   // Determine completed steps
-  const completedSteps: LessonWorkflowStep[] = ["understand", "experiment"];
+  const completedSteps: LessonWorkflowStep[] = ["read"];
   if (miniProjectDone) {
-    completedSteps.push("apply");
+    completedSteps.push("code");
   }
   if (quizDone || !hasQuiz) {
-    completedSteps.push("checkpoint");
-  }
-  // Evidence is considered completed if the lesson is fully complete/done
-  if (lessonDone) {
-    completedSteps.push("evidence");
+    completedSteps.push("check");
   }
 
   // Determine CTA
   let cta: LessonWorkflowCta = { action: "idle", label: "Loading", tone: "ink", disabled: true };
 
-  if (currentStep === "understand") {
-    cta = { action: "navigate", targetStep: "experiment", label: "Continue to Practice", tone: "blue", disabled: false };
-  } else if (currentStep === "experiment") {
-    cta = { action: "navigate", targetStep: "apply", label: "Continue to Code Lab", tone: "blue", disabled: false };
-  } else if (currentStep === "apply") {
+  if (currentStep === "read") {
+    cta = { action: "navigate", targetStep: "code", label: "Continue to code", tone: "blue", disabled: false };
+  } else if (currentStep === "code") {
     if (!miniProjectDone) {
-      cta = { action: "idle", label: "Run Code Lab", tone: "blue", disabled: true };
+      cta = { action: "idle", label: "Complete the Code Lab", tone: "blue", disabled: true };
     } else {
-      cta = { action: "navigate", targetStep: "checkpoint", label: "Take checkpoint", tone: "blue", disabled: false };
+      cta = { action: "navigate", targetStep: "check", label: "Take quiz", tone: "blue", disabled: false };
     }
-  } else if (currentStep === "checkpoint") {
+  } else if (currentStep === "check") {
     if (hasQuiz && !quizDone) {
       cta = {
         action: "submit-quiz",
-        label: allQuestionsAnswered ? "Submit checkpoint" : "Answer checkpoint",
+        label: allQuestionsAnswered ? "Submit quiz" : "Answer all questions",
         tone: allQuestionsAnswered ? "amber" : "blue",
         disabled: !allQuestionsAnswered
       };
     } else {
-      // Quiz is done or no quiz
-      cta = { action: "navigate", targetStep: "evidence", label: "Save evidence", tone: "green", disabled: false };
-    }
-  } else if (currentStep === "evidence") {
-    if (lessonDone) {
       if (nextLessonId) {
         cta = { action: "next-lesson", label: "Next lesson", lessonId: nextLessonId, tone: "green", disabled: false };
       } else {
         cta = { action: "module-complete", label: "Module complete", tone: "green", disabled: false };
       }
-    } else {
-      // This case should rarely happen as checkpoint/codelab should both be complete
-      cta = { action: "idle", label: "Complete activities first", tone: "ink", disabled: true };
     }
   }
 
   const canNavigateBack = stepIndex > 0;
-  // Can only navigate forward manually if the next step is unlocked
   const canNavigateForward = stepIndex < STEPS.length - 1 && unlockedSteps.includes(STEPS[stepIndex + 1]);
 
   return {
