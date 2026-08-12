@@ -12,6 +12,7 @@
     "report:content": "tsx scripts/report-content.ts",
     "scan:redaction": "tsx scripts/scan-sandbox-redaction.ts",
     "verify": "npm run validate:content && npm run report:content && npm run scan:redaction && npm run typecheck && npm run test",
+    "capture:plan-evidence": "pwsh -File scripts/capture-verify-evidence.ps1",
     "prepare:sandbox-assets": "node scripts/copy-sandbox-assets.js",
     "postinstall": "node scripts/copy-sandbox-assets.js",
     "build:android:preview": "eas build --platform android --profile preview",

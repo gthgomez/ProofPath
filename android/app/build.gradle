@@ -4,21 +4,38 @@ apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
+// Configuration-cache safe external resolutions (Gradle 9+ requirement).
+// We only run node for the two things Expo customizes (entry point + bundler CLI).
+// reactNativeDir / codegenDir / hermesCommand now use the RN Gradle plugin's built-in
+// defaults or static relative paths (no external process needed).
+// See: https://docs.gradle.org/9.0.0/userguide/configuration_cache_requirements.html#config_cache:requirements:external_processes
+def entryFilePath = providers.exec {
+    workingDir(rootDir)
+    commandLine("node", "-e", "require('expo/scripts/resolveAppEntry')", projectRoot, "android", "absolute")
+}.standardOutput.asText.get().trim()
+
+def expoCliPackagePath = providers.exec {
+    workingDir(rootDir)
+    commandLine("node", "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })")
+}.standardOutput.asText.get().trim()
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
 react {
-    entryFile = file(["node", "-e", "require('expo/scripts/resolveAppEntry')", projectRoot, "android", "absolute"].execute(null, rootDir).text.trim())
-    reactNativeDir = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
-    hermesCommand = new File(["node", "--print", "require.resolve('hermes-compiler/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/hermesc/%OS-BIN%/hermesc"
-    codegenDir = new File(["node", "--print", "require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
+    // Expo-specific entry resolution (supports expo-router, app.config, etc.)
+    entryFile = file(entryFilePath)
 
     enableBundleCompression = (findProperty('android.enableBundleCompression') ?: false).toBoolean()
-    // Use Expo CLI to bundle the app, this ensures the Metro config
-    // works correctly with Expo projects.
-    cliFile = new File(["node", "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })"].execute(null, rootDir).text.trim())
+
+    // Use Expo CLI + export:embed so the Metro config from Expo works for native builds.
+    cliFile = new File(expoCliPackagePath)
     bundleCommand = "export:embed"
+
+    // The following are intentionally left to the React Native Gradle plugin defaults:
+    //   reactNativeDir, codegenDir, hermesCommand
+    // They are correctly auto-detected for a standard layout + hermes-compiler package.
 
     /* Folders */
      //   The root of your project, i.e. where "package.json" lives. Default is '../..'
