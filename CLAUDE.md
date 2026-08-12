@@ -15,7 +15,7 @@ TypeScript 5.9 (strict) · React Native 0.83 / Expo SDK 55 · Expo Router (file-
 ## Startup Sequence
 
 1. Read this file
-2. Read `PROJECT_CONTEXT.md` (directory map + content rules)
+2. Read `PROJECT_CONTEXT.md` (project context + content rules)
 3. Read root `PROJECT_CONTEXT.md` for workspace-wide context
 4. Read `tasks/lessons.md` if it exists — apply learned patterns
 

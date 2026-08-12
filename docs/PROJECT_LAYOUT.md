@@ -40,15 +40,19 @@ CareerForgeMobile/
 │   │   └── progress-shell.native.tsx
 │   │
 │   ├── storage/                — Persistence layer
-│   │   └── progress-store.ts   — Direct SQLite local-first data store
+│   │   ├── types.ts            — Portable ProgressStore abstraction
+│   │   ├── progress-store.ts   — Direct SQLite local-first data store
+│   │   ├── sqlite-store.ts     — SQLite-backed ProgressStore (native)
+│   │   └── local-store.ts      — localStorage-backed ProgressStore (web)
 │   │
 │   ├── content/                — Curriculum content datasets (TypeScript data)
 │   │   ├── seed.ts             — Content pack: assembles tracks, modules, lessons, quizzes, missions
 │   │   ├── concepts.ts         — Concept registry (~130+ knowledge nodes)
+│   │   ├── progress.ts         — Demo progress fixture data
 │   │   ├── roles.ts            — Career path definitions (4 role targets)
 │   │   └── python/             — Modular Python curriculum by level
 │   │       ├── shared.ts       — Shared helpers (proofLesson, checkpointQuiz, workshop)
-│   │       └── level-0.ts through level-7.ts
+│   │       └── level-0.ts through level-9.ts
 │   │
 │   ├── sandbox/                — Code execution engines
 │   │   ├── runner.ts           — Core execution pipeline (Python/Pyodide, SQL/sql.js, TS)
@@ -61,7 +65,7 @@ CareerForgeMobile/
 │   ├── ui/                     — Reusable UI components
 │   │   ├── theme.ts            — Color palette and theme tokens
 │   │   ├── primitives.tsx      — Base UI primitives (Button, Card, Panel, etc.)
-│   │   ├── code-lab.tsx / .native.tsx / .shared.ts / bridge.tsx — Code Lab editor
+│   │   ├── code-lab.tsx / .native.tsx / .shared.ts / code-lab-bridge.tsx — Code Lab editor
 │   │   ├── code-terminal.tsx   — Terminal emulator component
 │   │   ├── code-problems.tsx   — Problem diagnostic display
 │   │   ├── code-walkthrough.tsx — Walkthrough/guided steps
@@ -80,11 +84,18 @@ CareerForgeMobile/
 │   ├── report-content.ts       — Deterministic curriculum audit report
 │   ├── scan-sandbox-redaction.ts — Code Lab template policy checks
 │   ├── python-depth-audit.ts   — Python lesson depth coverage analysis
-│   └── copy-sandbox-assets.js  — Pyodide/sql.js WASM asset bundler
+│   ├── copy-sandbox-assets.js  — Pyodide/sql.js WASM asset bundler
+│   ├── generate-careerforge-icon.ps1 — App icon generation script
+│   └── capture-verify-evidence.ps1   — Verification evidence capture
 │
 ├── tests/                      — Vitest test suite (19 test files)
 ├── android/                    — Expo-managed Android native project (auto-generated)
+├── docs/                       — Project docs (layout map, roadmaps, audit reports)
+├── assets/                     — App icon assets
+├── public/                     — Static web assets (Pyodide/sql.js WASM)
 ├── app.json                    — Expo app manifest
+├── babel.config.js             — Babel/Expo transpilation config
+├── eas.json                    — EAS build config
 ├── package.json                — npm scripts and dependencies
 ├── tsconfig.json               — TypeScript config (strict, `@/` → `src/`)
 └── vitest.config.ts            — Vitest runner config
