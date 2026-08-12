@@ -50,8 +50,17 @@ export function createNativeWebViewRunnerHtml(): string {
 
     function stripTypeScript(code) {
       return code
-        .replace(/type\\s+\\w+\\s*=\\s*\\{[\\s\\S]*?\\};/g, "")
-        .replace(/interface\\s+\\w+\\s*\\{[\\s\\S]*?\\}/g, "")
+        // Remove multi-line type aliases: type X = { ... };
+        .replace(/type\\s+\\w+\\s*(<[\\w\\s,]+>)?\\s*=\\s*\\{[\\s\\S]*?\\};?/g, "")
+        // Remove single-line type aliases: type X = string | number;
+        .replace(/type\\s+\\w+\\s*(<[\\w\\s,]+>)?\\s*=\\s*[^;]+;/g, "")
+        // Remove interfaces: interface X { ... }
+        .replace(/interface\\s+\\w+\\s*(<[\\w\\s,]+>)?\\s*\\{[\\s\\S]*?\\}/g, "")
+        // Remove generic parameters on functions: function f<T>(...) -> function f(...)
+        .replace(/<[A-Za-z_$][A-Za-z0-9_$<>,\\s[\\]|]*>\\s*(?=\\()/g, "")
+        // Remove type assertions: as TypeName
+        .replace(/\\s+as\\s+[A-Za-z_$][A-Za-z0-9_$<>,\\s[\\]|]*/g, "")
+        // Remove variable type declarations: let/const/var x: Type = ...
         .replace(/:\\s*[A-Za-z_$][A-Za-z0-9_$<>,\\s[\\]|]*(?=\\s*[=,);])/g, "");
     }
 
@@ -165,8 +174,9 @@ export function createNativeWebViewRunnerHtml(): string {
 
       if (request.runMode === "run_file") {
         try {
-          const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode);
-          runner(sandboxConsole);
+          const shadowedGlobals = ["window", "document", "globalThis", "self", "parent", "top", "ReactNativeWebView", "postMessage", "fetch", "XMLHttpRequest", "WebSocket", "localStorage", "sessionStorage", "indexedDB"];
+          const runner = Function.apply(null, ["console"].concat(shadowedGlobals).concat("\\"use strict\\";\\n" + runtimeCode));
+          runner.apply(null, [sandboxConsole].concat(shadowedGlobals.map(function() { return null; })));
         } catch (error) {
           stderr.push(error instanceof Error ? error.message : String(error));
         }
@@ -179,8 +189,9 @@ export function createNativeWebViewRunnerHtml(): string {
         const stdoutStart = stdout.length;
 
         try {
-          const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code);
-          runner(sandboxConsole);
+          const shadowedGlobals = ["window", "document", "globalThis", "self", "parent", "top", "ReactNativeWebView", "postMessage", "fetch", "XMLHttpRequest", "WebSocket", "localStorage", "sessionStorage", "indexedDB"];
+          const runner = Function.apply(null, ["console"].concat(shadowedGlobals).concat("\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code));
+          runner.apply(null, [sandboxConsole].concat(shadowedGlobals.map(function() { return null; })));
           const output = stdout.slice(stdoutStart).join("\\n");
           if (!includesAll(output, test.expectedOutputIncludes)) {
             throw new Error("Output missing");
@@ -312,23 +323,54 @@ export function createNativeWebViewRunnerHtml(): string {
       const startedAt = Date.now();
       const spec = request.spec;
       const SQL = await getSqlRuntime();
-      const db = new SQL.Database();
       const stdout = [];
       const stderr = [];
       const testResults = [];
       const tests = spec.visibleTests.concat(spec.hiddenTests || []);
 
-      if (spec.setupCode) {
-        db.run(spec.setupCode);
+      let dbBinary;
+      try {
+        const setupDb = new SQL.Database();
+        if (spec.setupCode) {
+          setupDb.run(spec.setupCode);
+        }
+        dbBinary = setupDb.export();
+        setupDb.close();
+      } catch (error) {
+        const guidance = "SQL Database Setup Error: " + (error instanceof Error ? error.message : String(error));
+        return {
+          id: "code-run-" + request.lessonId + "-" + request.now.replace(/[^0-9]/g, ""),
+          lessonId: request.lessonId,
+          language: spec.language,
+          runMode: request.runMode || "run_checks",
+          codeSnapshot: request.code,
+          stdout: "",
+          stderr: guidance,
+          passed: false,
+          score: 0,
+          runtimeMs: 0,
+          testResults: tests.map((test, index) => ({
+            id: test.id,
+            name: test.name,
+            passed: false,
+            visible: index < spec.visibleTests.length,
+            message: "Setup failed: " + guidance
+          })),
+          createdAt: request.now
+        };
       }
 
       if (request.runMode === "run_file") {
+        let db;
         try {
+          db = new SQL.Database(dbBinary);
           const result = db.exec(request.code);
           const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\\n");
           stdout.push(output);
         } catch (error) {
           stderr.push(error instanceof Error ? error.message : String(error));
+        } finally {
+          if (db) db.close();
         }
         return buildAttempt(request, startedAt, stdout.filter(Boolean), stderr, testResults);
       }
@@ -336,10 +378,19 @@ export function createNativeWebViewRunnerHtml(): string {
       for (let index = 0; index < tests.length; index += 1) {
         const test = tests[index];
         const visible = index < spec.visibleTests.length;
+        let db;
 
         try {
+          db = new SQL.Database(dbBinary);
           const result = db.exec(request.code);
-          const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\\n");
+          
+          let output = "";
+          if (test.code && test.code.trim().length > 0) {
+            const testResult = db.exec(test.code);
+            output = testResult.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\\n");
+          } else {
+            output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\\n");
+          }
           stdout.push(output);
 
           if (!includesAll(output, test.expectedOutputIncludes)) {
@@ -355,6 +406,8 @@ export function createNativeWebViewRunnerHtml(): string {
             visible,
             message: formatSandboxFailureMessage(error, spec.language)
           });
+        } finally {
+          if (db) db.close();
         }
       }
 

@@ -203,6 +203,12 @@ function parseJavaScriptDiagnostics(message: string, language: RunnerLanguage): 
   const label = language === "typescript" ? "TypeScript" : "JavaScript";
   const diagnostics: ProblemDiagnostic[] = [];
 
+  const lineMatch = /<anonymous>:(\d+)/i.exec(message) ?? /line (\d+)/i.exec(message);
+  const knownLine = lineMatch?.[1] ? Number(lineMatch[1]) : undefined;
+  const location = knownLine && Number.isInteger(knownLine) && knownLine > 0
+    ? { line: knownLine, confidence: "known" as const }
+    : { confidence: "unknown" as const };
+
   if (/SyntaxError/i.test(message)) {
     diagnostics.push({
       id: `${language}-syntax-error`,
@@ -211,7 +217,7 @@ function parseJavaScriptDiagnostics(message: string, language: RunnerLanguage): 
       message: firstMatchingLine(message, /SyntaxError/i) ?? `${label} SyntaxError`,
       beginnerExplanation: `${label} could not parse the code. Check brackets, quotes, commas, and parentheses near the changed line.`,
       rawDetail: message,
-      confidence: "unknown"
+      ...location
     });
   }
 
@@ -223,7 +229,7 @@ function parseJavaScriptDiagnostics(message: string, language: RunnerLanguage): 
       message: firstMatchingLine(message, /ReferenceError/i) ?? `${label} ReferenceError`,
       beginnerExplanation: `${label} looked for a name that does not exist in the current code. Check spelling and declaration order.`,
       rawDetail: message,
-      confidence: "unknown"
+      ...location
     });
   }
 
@@ -235,7 +241,7 @@ function parseJavaScriptDiagnostics(message: string, language: RunnerLanguage): 
       message: firstMatchingLine(message, /TypeError/i) ?? `${label} TypeError`,
       beginnerExplanation: `${label} tried to use a value in a way it does not support. Check the value shape before calling methods or reading fields.`,
       rawDetail: message,
-      confidence: "unknown"
+      ...location
     });
   }
 

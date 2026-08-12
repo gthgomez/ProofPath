@@ -20,9 +20,11 @@ interface CapturedConsole {
 }
 
 type SqlJsModule = {
-  Database: new () => {
+  Database: new (data?: Uint8Array) => {
     run: (sql: string) => void;
     exec: (sql: string) => Array<{ columns: string[]; values: unknown[][] }>;
+    export: () => Uint8Array;
+    close: () => void;
   };
 };
 
@@ -125,8 +127,17 @@ function timeoutAfter(timeoutMs: number): Promise<never> {
 
 function stripTypeScript(code: string): string {
   return code
-    .replace(/type\s+\w+\s*=\s*\{[\s\S]*?\};/g, "")
-    .replace(/interface\s+\w+\s*\{[\s\S]*?\}/g, "")
+    // Remove multi-line type aliases: type X = { ... };
+    .replace(/type\s+\w+\s*(<[\w\s,]+>)?\s*=\s*\{[\s\S]*?\};?/g, "")
+    // Remove single-line type aliases: type X = string | number;
+    .replace(/type\s+\w+\s*(<[\w\s,]+>)?\s*=\s*[^;]+;/g, "")
+    // Remove interfaces: interface X { ... }
+    .replace(/interface\s+\w+\s*(<[\w\s,]+>)?\s*\{[\s\S]*?\}/g, "")
+    // Remove generic parameters on functions: function f<T>(...) -> function f(...)
+    .replace(/<[A-Za-z_$][A-Za-z0-9_$<>,\s[\]|]*>\s*(?=\()/g, "")
+    // Remove type assertions: as TypeName
+    .replace(/\s+as\s+[A-Za-z_$][A-Za-z0-9_$<>,\s[\]|]*/g, "")
+    // Remove variable type declarations: let/const/var x: Type = ...
     .replace(/:\s*[A-Za-z_$][A-Za-z0-9_$<>,\s[\]|]*(?=\s*[=,);])/g, "");
 }
 
@@ -191,8 +202,9 @@ self.onmessage = (event) => {
 
   if (runMode === "run_file") {
     try {
-      const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode);
-      runner(sandboxConsole);
+      const shadowedGlobals = ["window", "document", "globalThis", "self", "parent", "top", "ReactNativeWebView", "postMessage", "fetch", "XMLHttpRequest", "WebSocket", "localStorage", "sessionStorage", "indexedDB"];
+      const runner = Function.apply(null, ["console"].concat(shadowedGlobals).concat("\\"use strict\\";\\n" + runtimeCode));
+      runner.apply(null, [sandboxConsole].concat(shadowedGlobals.map(function() { return null; })));
       self.postMessage({
         stdout: stdout.join("\\n"),
         stderr: stderr.join("\\n"),
@@ -214,8 +226,9 @@ self.onmessage = (event) => {
     const stdoutStart = stdout.length;
 
     try {
-      const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code);
-      runner(sandboxConsole);
+      const shadowedGlobals = ["window", "document", "globalThis", "self", "parent", "top", "ReactNativeWebView", "postMessage", "fetch", "XMLHttpRequest", "WebSocket", "localStorage", "sessionStorage", "indexedDB"];
+      const runner = Function.apply(null, ["console"].concat(shadowedGlobals).concat("\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code));
+      runner.apply(null, [sandboxConsole].concat(shadowedGlobals.map(function() { return null; })));
       const output = stdout.slice(stdoutStart).join("\\n");
       if (!includesAll(output, test.expectedOutputIncludes)) {
         throw new Error("Output missing");
@@ -289,8 +302,9 @@ async function runJavaScriptInProcess(spec: LessonRunnerSpec, runtimeCode: strin
 
   if (runMode === "run_file") {
     try {
-      const runner = new Function("console", `"use strict";\n${runtimeCode}`);
-      runner(sandboxConsole);
+      const shadowedGlobals = ["window", "document", "globalThis", "self", "parent", "top", "ReactNativeWebView", "postMessage", "fetch", "XMLHttpRequest", "WebSocket", "localStorage", "sessionStorage", "indexedDB"];
+      const runner = Function.apply(null, ["console", ...shadowedGlobals, `"use strict";\n${runtimeCode}`]) as (...args: unknown[]) => void;
+      runner(sandboxConsole, ...shadowedGlobals.map(() => null));
     } catch (error) {
       captured.stderr.push(error instanceof Error ? error.message : String(error));
     }
@@ -306,8 +320,9 @@ async function runJavaScriptInProcess(spec: LessonRunnerSpec, runtimeCode: strin
     const stdoutStart = captured.stdout.length;
 
     try {
-      const runner = new Function("console", `"use strict";\n${runtimeCode}\n${test.code}`);
-      runner(sandboxConsole);
+      const shadowedGlobals = ["window", "document", "globalThis", "self", "parent", "top", "ReactNativeWebView", "postMessage", "fetch", "XMLHttpRequest", "WebSocket", "localStorage", "sessionStorage", "indexedDB"];
+      const runner = Function.apply(null, ["console", ...shadowedGlobals, `"use strict";\n${runtimeCode}\n${test.code}`]) as (...args: unknown[]) => void;
+      runner(sandboxConsole, ...shadowedGlobals.map(() => null));
       const output = captured.stdout.slice(stdoutStart).join("\n");
       if (!includesAll(output, test.expectedOutputIncludes)) {
         throw new Error("Output missing");
@@ -473,21 +488,48 @@ async function getSqlJs(): Promise<SqlJsModule> {
 
 async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
   const SQL = await getSqlJs();
-  const db = new SQL.Database();
   const testResults: CodeRunTestResult[] = [];
   const stdout: string[] = [];
   const stderr: string[] = [];
 
-  if (spec.setupCode) {
-    db.run(spec.setupCode);
+  let dbBinary: Uint8Array | undefined;
+  try {
+    const setupDb = new SQL.Database();
+    if (spec.setupCode) {
+      setupDb.run(spec.setupCode);
+    }
+    dbBinary = setupDb.export();
+    setupDb.close();
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    return {
+      stdout: "",
+      stderr: `SQL Database Setup Error: ${errMsg}`,
+      testResults: [...spec.visibleTests, ...spec.hiddenTests].map((test, index) => ({
+        id: test.id,
+        name: test.name,
+        passed: false,
+        visible: index < spec.visibleTests.length,
+        message: `Setup failed: ${errMsg}`
+      }))
+    };
   }
 
   for (const [index, test] of [...spec.visibleTests, ...spec.hiddenTests].entries()) {
     const visible = index < spec.visibleTests.length;
+    let db;
 
     try {
+      db = new SQL.Database(dbBinary);
       const result = db.exec(code);
-      const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n");
+      
+      let output = "";
+      if (test.code && test.code.trim().length > 0) {
+        const testResult = db.exec(test.code);
+        output = testResult.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n");
+      } else {
+        output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n");
+      }
       stdout.push(output);
 
       if (!includesAll(output, test.expectedOutputIncludes)) {
@@ -497,6 +539,10 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
     } catch (error) {
       stderr.push(error instanceof Error ? error.message : normalizeOutput(error));
       testResults.push(failResult(test, visible, error, spec.language));
+    } finally {
+      if (db) {
+        db.close();
+      }
     }
   }
 
@@ -509,11 +555,12 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
 
 async function runSqlFile(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
   const SQL = await getSqlJs();
-  const db = new SQL.Database();
+  let db;
   const stdout: string[] = [];
   const stderr: string[] = [];
 
   try {
+    db = new SQL.Database();
     if (spec.setupCode) {
       db.run(spec.setupCode);
     }
@@ -522,6 +569,10 @@ async function runSqlFile(spec: LessonRunnerSpec, code: string): Promise<Pick<Co
     stdout.push(result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n"));
   } catch (error) {
     stderr.push(error instanceof Error ? error.message : String(error));
+  } finally {
+    if (db) {
+      db.close();
+    }
   }
 
   return {

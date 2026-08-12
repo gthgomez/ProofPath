@@ -4,9 +4,11 @@ declare module "sql.js" {
   }
 
   export interface SqlJsStatic {
-    Database: new () => {
+    Database: new (data?: Uint8Array) => {
       run: (sql: string) => void;
       exec: (sql: string) => Array<{ columns: string[]; values: unknown[][] }>;
+      export: () => Uint8Array;
+      close: () => void;
     };
   }
 
