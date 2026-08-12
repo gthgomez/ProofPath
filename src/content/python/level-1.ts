@@ -1,5 +1,5 @@
 import type { Lesson, LessonPracticeBlock, Quiz } from "@/domain/types";
-import { proofLesson, checkpointQuiz, codeReadingQuiz } from "./shared";
+import { proofLesson, codeReadingQuiz, lessonRecallCards, lessonMisconceptionChecks } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Practice rep pools
@@ -219,7 +219,7 @@ const literalsLesson = proofLesson({
   evidencePrompt: "Write down one string, one integer, and one boolean from memory, and state what makes each different.",
   language: "Python",
   tools: ["Python 3", "print output"],
-  synopsis: "You are seeing the raw material Python works with before any names are attached.",
+  synopsis: "What would you type to tell Python 'this is text' vs 'this is a number'?",
   prerequisites: ["No prior Python knowledge required.", "Be ready to view text outputs in the terminal."],
   testingFocus: "Use type() to confirm each value has the expected type.",
   objective: "Identify and distinguish strings, integers, and booleans by sight.",
@@ -394,7 +394,7 @@ const assignmentLesson = proofLesson({
   evidencePrompt: "Record the file path, output, and one reason why you chose each variable name.",
   language: "Python",
   tools: ["Python 3", "terminal", "print output"],
-  synopsis: "You are learning the single most important Python move: give a value a name you can use again.",
+  synopsis: "How do you save a value so you can use it again later?",
   prerequisites: ["Know what strings, integers, and booleans are (previous lesson).", "Be ready to edit variables on the left and right of =."],
   testingFocus: "The tests check that each variable exists and holds the right type.",
   objective: "Assign a string, integer, and boolean to named variables.",
@@ -552,7 +552,7 @@ const printValuesLesson = proofLesson({
   evidencePrompt: "Record the exact terminal output and explain what changed when you updated one variable's value.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning how to make your program visible: every value you name can be printed.",
+  synopsis: "You have a variable — how do you see what's inside it?",
   prerequisites: ["Know how to assign a variable (previous lesson).", "Know how running scripts produces output in the terminal."],
   testingFocus: "The test confirms the output matches the stored values, not a hardcoded string.",
   objective: "Use print() to display the value of a variable.",
@@ -591,7 +591,7 @@ const printValuesLesson = proofLesson({
   ],
   curriculum: {
     level: 1,
-    sequence: 4,
+    sequence: 3,
     version: "1.0.0",
     lessonKind: "run_file",
     teaches: ["py.print.variable"],
@@ -653,7 +653,7 @@ printValuesLesson.depth = {
     story: "Print each session variable so the user can inspect the data before it is processed.",
     usesConcepts: ["py.print.variable"],
     learnerOwns: ["topic", "minutes"],
-    checkerOwns: ["print-values-displayed"],
+    checkerOwns: ["print-values-types-correct"],
     runExpectation: "prints passed"
   },
   understandingProofPrompt: "Without running code, what does print('minutes') display? What does print(minutes) display? Why are they different?",
@@ -682,7 +682,7 @@ const numbersLesson = proofLesson({
   evidencePrompt: "Record the calculation, the result, and explain what // does differently from /.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning Python arithmetic: how to combine numbers to produce a new result.",
+  synopsis: "What happens when you tell Python to add, subtract, or multiply numbers?",
   prerequisites: ["Know how to assign an integer (lesson-python-assignment).", "Be ready to write basic math expressions."],
   testingFocus: "The test checks that the computed total equals the sum of the inputs.",
   objective: "Calculate a total using integer arithmetic and store the result.",
@@ -815,7 +815,7 @@ const stringsLesson = proofLesson({
   evidencePrompt: "Record the original string, the cleaned string, and what .strip() removed.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning how to work with text: join it, clean it, and measure it.",
+  synopsis: "Your text has extra spaces and mixed case — how do you clean it up?",
   prerequisites: ["Know how to assign a string variable (lesson-python-assignment).", "Understand how variables are lookup targets."],
   testingFocus: "The test checks that the cleaned string matches the expected value exactly.",
   objective: "Join strings and apply .strip() and .lower() to normalise input.",
@@ -955,7 +955,7 @@ const fstringsLesson = proofLesson({
   evidencePrompt: "Record the summary string and explain what each {} was replaced with.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning f-strings: the cleanest way to build readable output from variable values.",
+  synopsis: "What if you could embed a variable right inside a sentence without stopping and starting?",
   prerequisites: ["Know how to assign strings and integers (lessons 2–5).", "Know how to use print() to output results."],
   testingFocus: "The test checks that the output contains the variable values, not literal placeholder text.",
   objective: "Use an f-string to build a multiline session summary.",
@@ -998,11 +998,11 @@ const fstringsLesson = proofLesson({
   ],
   curriculum: {
     level: 1,
-    sequence: 3,
+    sequence: 4,
     version: "1.0.0",
     lessonKind: "run_file",
     teaches: ["py.f_string"],
-    requires: ["py.variable.assignment", "py.string"],
+    requires: ["py.variable.assignment", "py.string", "py.print.variable"],
     visibleCodeConcepts: ["py.f_string"],
     quizConcepts: ["py.f_string"],
     usesButDoesNotTeach: ["py.assertion", "py.dict.literal"],
@@ -1075,6 +1075,215 @@ fstringsLesson.depth = {
   exitTicket: [
     "I can write an f-string that embeds two or more variables.",
     "I know the f prefix is required and {} marks variable slots."
+  ]
+};
+
+fstringsLesson.workshop.commonMistakes = [
+  "Forgetting the f prefix before the quote",
+  "Putting { or } literally without doubling to {{ and }}"
+];
+
+// ---------------------------------------------------------------------------
+// Micro-lesson 7 — String Indexing & Slicing (run_file)
+// ---------------------------------------------------------------------------
+
+const stringIndexPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: 'language = "python"\nfirst = language[0]\nprint("First character is")\nprint(first)',
+    expectedOutput: "First character is\np",
+    checkYourAnswer: "language[0] gives the character at position 0, the first character 'p'. Python counts positions starting from 0.",
+    tier: "replicate"
+  },
+  {
+    starterCode: 'language = "python"\n# Fix this slice so it prints "yth" instead of "yt"\nchunk = language[1:3]\nprint("The correct slice result is")\nprint(chunk)',
+    expectedOutput: "The correct slice result is\nyth",
+    checkYourAnswer: "language[1:3] gives positions 1 and 2 (end is exclusive). To include index 3, use language[1:4].",
+    tier: "diagnose"
+  },
+  {
+    starterCode: '# Extract initials from "Grace Hopper"\nfull_name = "Grace Hopper"\nfirst_initial = full_name[0]\n# Access the last initial (the character right after the space)\n# Change the 0 to the correct index to get "H"\nlast_initial = full_name[0]\nprint(first_initial + last_initial)',
+    expectedOutput: "Combined initials output:\nGH",
+    checkYourAnswer: "Count positions from 0: G(0), r(1), a(2), c(3), e(4), space(5), H(6). Change full_name[0] to full_name[6] to get 'H'.",
+    tier: "synthesize"
+  }
+];
+
+const stringIndexLesson = proofLesson({
+  id: "lesson-python-string-indexing",
+  moduleId: "module-python-core",
+  slug: "python-string-indexing",
+  title: "String Indexing & Slicing",
+  summary: "Access individual characters by position and extract substrings using bracket notation.",
+  bodyMarkdown: "Strings are sequences of characters. Each character has a position called an index, starting at 0. Use square brackets to access any character: text[0] gets the first character, text[1] the second, and so on. You can also count from the end with negative indices: text[-1] is the last character. To extract a substring (a slice), use colon syntax: text[start:end] gives the characters from start up to (but not including) end.",
+  estimatedMinutes: 8,
+  difficulty: "foundation",
+  skillIds: ["skill-python-basics"],
+  quizId: "quiz-python-string-indexing",
+  desktopTask: "Access the first and last character of a string, then extract a three-character slice from the middle.",
+  evidencePrompt: "Record the string, the index you used for each access, and the printed output for both single characters and the slice.",
+  language: "Python",
+  tools: ["Python 3", "terminal"],
+  synopsis: "How do you grab just the first letter or the file extension from a string?",
+  prerequisites: ["Know what a string is (lesson-python-strings).", "Be ready to count positions starting from 0."],
+  testingFocus: "The tests check that you accessed the correct positions using bracket notation.",
+  objective: "Access individual characters and extract substrings using bracket notation.",
+  whyItMatters: "The Study Tracker parses file extensions from filenames and validates role prefixes by checking specific character positions.",
+  coreConcept: "Each character in a string has an index (position number) starting at 0. Square brackets [index] access one character. A slice [start:end] returns characters from start to end-1. Negative indices count from the end: -1 is the last character.",
+  workedExample: 'text = "python", text[0] returns "p", text[2] returns "t", text[-1] returns "n", text[0:4] returns "pyth".',
+  guidedExercise: "Assign a string, access the first and last character using positive and negative indices, then extract a three-character slice from the middle.",
+  missionConnection: "The Study Tracker parses file extensions from filenames using slice syntax and validates role prefixes by checking the first character.",
+  reflectionPrompt: "Why does text[:3] give the same result as text[0:3]? What does text[3:] give, and how does omitting start or end change the behavior?",
+  practiceStarter: 'text = "python"\nprint("First char:")\nprint(text[0])\nprint("Last char:")\nprint(text[-1])\nprint("Slice 0:3:")\nprint(text[0:3])',
+  practiceExpected: "First char:\np\nLast char:\nn\nSlice 0:3:\npyt",
+  practiceCheck: "text[0] gives the first character. text[-1] gives the last character. text[0:3] gives positions 0, 1, and 2 (the end index is exclusive).",
+  practiceReps: stringIndexPracticeReps,
+  miniTitle: "Initial Extractor",
+  miniGoal: "Extract initials from a full name using string indexing and slicing.",
+  miniSteps: [
+    "Assign a full name string like 'Ada Lovelace'",
+    "Access the first character with [0]",
+    "Find the character after the space using its index",
+    "Print both initials together"
+  ],
+  miniDeliverables: [
+    "Python file extracting initials from a name",
+    "Printed output showing both initials",
+    "One sentence explaining how negative indexing could simplify the extraction"
+  ],
+  verifierCommand: "python initials.py",
+  expectedEvidence: "Terminal output showing the two initials printed without spaces, plus a brief note on negative indexing.",
+  projectConnection: "The Study Tracker uses string indexing to parse initials and short codes from user input.",
+  requiredCodeIncludes: ["[", "]", "print"],
+  requiredOutputIncludes: ["GH", "csv"],
+  runnerLanguage: "python",
+  runnerStarterCode: 'filename = "report.csv"\n# Use slicing to extract the file extension "csv"\n# Hint: the dot (.) is at position 6\nextension = ""\nprint(extension)',
+  runnerTestCode: [
+    "assert '.' in filename, 'filename should include a dot'",
+    "assert extension == 'csv', 'extension should be csv'",
+    "print('passed')"
+  ].join("\n"),
+  hiddenTests: [
+    {
+      id: "extension-extracted",
+      name: "File extension extracted correctly",
+      code: "assert filename[-3:] == 'csv', 'extension should be last 3 chars'\nassert extension == filename[-3:], 'extension should match filename slice'"
+    }
+  ],
+  curriculum: {
+    level: 1,
+    sequence: 7,
+    version: "1.0.0",
+    lessonKind: "run_file",
+    teaches: ["py.string.index"],
+    requires: ["py.string"],
+    visibleCodeConcepts: ["py.string.index"],
+    quizConcepts: ["py.string.index"],
+    usesButDoesNotTeach: ["py.assertion", "py.list.literal", "py.csv"],
+    proofOutputs: ["terminal_stdout", "auto_code_run"]
+  }
+});
+
+// Override misconception checks with concept-specific ones
+stringIndexLesson.workshop.commonMistakes = [
+  "Accessing index 0 thinking it gives the 'first' item after index 1",
+  "Forgetting slices are end-exclusive"
+];
+stringIndexLesson.workshop.misconceptionChecks = lessonMisconceptionChecks(
+  stringIndexLesson.workshop.commonMistakes
+);
+
+// Custom recall cards with generative prompt, concept mistake, and transfer context
+stringIndexLesson.workshop.recallCards = lessonRecallCards({
+  objective: stringIndexLesson.workshop.objective,
+  coreConcept: stringIndexLesson.workshop.coreConcept,
+  guidedExercise: stringIndexLesson.workshop.guidedExercise,
+  missionConnection: stringIndexLesson.workshop.missionConnection,
+  generativePrompt: "What happens when you access text[5] on a 5-character string? Why? What about text[5:10] on that same string?",
+  conceptMistake: "off-by-one",
+  transferContext: "the login validation step reads the first 3 characters of the user role"
+});
+
+stringIndexLesson.depth = {
+  primaryConceptId: "py.string.index",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
+  conceptCapsules: [
+    {
+      conceptId: "py.string.index",
+      definition: "Access individual characters by position using bracket notation, and extract substrings with slice syntax.",
+      mentalModel: "Think of a string as a row of numbered lockers. Each locker holds one character. The first locker is number 0.",
+      syntaxShape: "text[0] gets first char, text[-1] gets last char, text[1:4] gets chars at positions 1, 2, 3",
+      tinyExample: '"python"[0] returns "p"',
+      commonMistake: "Off-by-one errors: forgetting that indices start at 0 and slice ends are exclusive.",
+      repairHint: "Count from 0, not 1. For a slice, the end index is the first position NOT included.",
+      usedIn: ["learn", "practice", "code_lab"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-si-1",
+      label: "Slice from start to end",
+      codeFragment: 'text = "python"\ntext[1:4]',
+      conceptIds: ["py.string.index"],
+      explanation: "text[1:4] returns characters at positions 1, 2, and 3 — 'y', 't', 'h' — but NOT position 4 ('o'). The end is exclusive.",
+      learnerShouldBeAbleToSay: "text[1:4] gives characters at indices 1 up to but not including 4"
+    },
+    {
+      id: "w-si-2",
+      label: "Negative index access",
+      codeFragment: 'text = "python"\ntext[-1]',
+      conceptIds: ["py.string.index"],
+      explanation: "text[-1] counts from the end. -1 is the last character 'n', -2 is the second-last 'o', and so on.",
+      learnerShouldBeAbleToSay: "Negative indices count backward from the end of the string, starting at -1"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-si-1",
+      instruction: "Fix the slice so it prints the first three characters instead of the last three.",
+      conceptIds: ["py.string.index"],
+      targetCodeFragment: 'text = "python"\nchunk = text[-3:]',
+      expectedObservation: "The output changes from 'hon' to 'pyt'.",
+      wrongTurnHint: "Use text[0:3] to get the first three characters. The start index 0 is the first character."
+    },
+    {
+      id: "g-si-2",
+      instruction: "Fix the negative index so it accesses the second-to-last character, not the last.",
+      conceptIds: ["py.string.index"],
+      targetCodeFragment: 'text = "python"\nprint(text[-1])',
+      expectedObservation: "The output changes from 'n' to 'o'.",
+      wrongTurnHint: "text[-1] is the last character. text[-2] is the second-to-last."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-si-1",
+      conceptIds: ["py.string.index"],
+      brokenExample: 'text = "python"\nprint(text[10])',
+      symptom: "IndexError: string index out of range",
+      likelyCause: "The index 10 is beyond the last character. 'python' only has indices 0 through 5.",
+      fixStrategy: "Check that the index is less than the string length. 'python' has length 6, so valid indices are 0 to 5."
+    },
+    {
+      id: "e-si-2",
+      conceptIds: ["py.string.index"],
+      brokenExample: 'text = "python"\nprint(text[0:0])',
+      symptom: "Prints an empty line instead of characters.",
+      likelyCause: "The slice start equals the slice end, so no characters are included.",
+      fixStrategy: "Make the end index larger than the start index. For the first character, use text[0:1]."
+    }
+  ],
+  codeLabBridge: {
+    story: "The Study Tracker needs to extract the file extension from a filename like 'report.csv' to decide which parser to use. You will extract 'csv' using slice syntax.",
+    usesConcepts: ["py.string.index"],
+    learnerOwns: ["filename", "extension"],
+    checkerOwns: ["extension-extracted"],
+    runExpectation: "prints extension passed"
+  },
+  understandingProofPrompt: "What happens when you access text[5] on a 5-character string like 'hello'? Why? Is there a difference between text[5:10] on that same string and text[5:]?",
+  exitTicket: [
+    "I can access a character at any position using positive and negative indices.",
+    "I can extract a substring using slice syntax with start and end."
   ]
 };
 
@@ -1200,10 +1409,11 @@ deprecatedValuesLesson.depth = {
 export const level1Lessons: Lesson[] = [
   literalsLesson,
   assignmentLesson,
-  fstringsLesson,
   printValuesLesson,
+  fstringsLesson,
   numbersLesson,
-  stringsLesson
+  stringsLesson,
+  stringIndexLesson
 ];
 
 /** Kept in the content pack so old learner progress IDs still resolve. */
@@ -1288,11 +1498,24 @@ export const level1Quizzes: Quiz[] = [
     'f"{variable}" replaces {variable} with its current value. Without the f prefix, Python treats {topic} as literal text.',
     ["py.f_string"]
   ),
-  // Deprecated quiz — kept so old quiz attempt IDs still resolve
-  checkpointQuiz(
+  codeReadingQuiz(
+    "quiz-python-string-indexing",
+    "lesson-python-string-indexing",
+    "String Indexing Checkpoint",
+    'language = "python"\nfirst = language[0]\nprint(first)',
+    "accessing characters by position",
+    "Square brackets with a position number access one character.",
+    "language[0] returns a list of all characters from the start.",
+    "language[0] returns the integer position of character p in the string.",
+    "language[0] with the string 'python' returns 'p' because indexing starts at position 0.",
+    ["py.string.index"]
+  ),
+  // 5Q quiz (was checkpoint, now codeReadingQuiz for uniform 5Q + bias resistance)
+  codeReadingQuiz(
     "quiz-python-values",
     "lesson-python-values",
-    "Variables and Formatting Checkpoint (Deprecated)",
+    "Variables and Formatting Checkpoint",
+    'topic = "python"\nminutes = 42\nprint(f"{topic} study: {minutes} minutes")',
     "variables and text formatting",
     "Assign variables and combine values into multiline strings using f-string syntax.",
     "Build summaries using loose literal string inputs without saving them in variables.",

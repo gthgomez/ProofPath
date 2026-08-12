@@ -1,5 +1,5 @@
 import type { Lesson, Quiz, LessonPracticeBlock } from "@/domain/types";
-import { proofLesson } from "./shared";
+import { proofLesson, codeReadingQuiz } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Practice Reps for Level 9
@@ -44,6 +44,12 @@ const pythonCiWorkflowPracticeReps: LessonPracticeBlock[] = [
     expectedOutput: "push and pull_request triggers, with lint, test, and deploy jobs.",
     checkYourAnswer: "Project-shaped CI: the workflow file should specify which events trigger it and what jobs run in what order.",
     tier: "synthesize"
+  },
+  {
+    starterCode: "# Review CI workflow diff\n# + add pytest step\nprint('review: add test job')",
+    expectedOutput: "review: add pytest job before deploy in ci workflow",
+    checkYourAnswer: "Missing test step in CI; add pytest job for safety. (review-sim)",
+    tier: "review-sim"
   }
 ];
 
@@ -126,7 +132,7 @@ const envConfigLesson = proofLesson({
   slug: "python-env-config",
   title: "Load Config From Environment Variables",
   summary: "Keep secrets out of source code by loading configuration from environment variables.",
-  bodyMarkdown: `> **🏗️ Concept Lab** — This lesson uses a JavaScript sandbox to demonstrate the pattern because real \`os.environ\` and GitHub Actions workflows require a Python runtime with OS access that the mobile sandbox cannot provide. Focus on understanding the concept and pattern — you'll apply these in your own Python environment.\n\nHardcoding API keys, database paths, and other secrets in Python files is unsafe. A .env file keeps configuration separate from code, and python-dotenv loads it into environment variables at runtime. (Note: this concept-only lesson uses a JavaScript sandbox to demonstrate the pattern since the real os.environ requires a Python runtime.)`,
+  bodyMarkdown: 'Hardcoding API keys, database paths, and other secrets in Python files is unsafe. Configuration loaded from environment variables keeps secrets out of version control. Use os.environ.get("KEY", default) to read values with an optional fallback, and mask secrets in output.',
   estimatedMinutes: 11,
   difficulty: "applied",
   skillIds: ["skill-python-professional", "skill-secret-handling", "skill-testing-debugging"],
@@ -135,7 +141,7 @@ const envConfigLesson = proofLesson({
   evidencePrompt: "Record the config loader function, the masked key output, and the missing-key error case.",
   language: "Python configuration",
   tools: ["os.environ", "python-dotenv", "config dictionary"],
-  synopsis: "You are learning how to keep secrets out of source code by loading configuration from environment variables. An environment variable is a named value stored outside the program, typically set in a .env file or the shell.",
+  synopsis: "How do you change your app's behavior between development, testing, and production?",
   prerequisites: [
     "Know that API keys should not be hardcoded in source files.",
     "Know that a .env file stores key=value pairs."
@@ -161,21 +167,21 @@ const envConfigLesson = proofLesson({
   projectConnection: "This adds professional credential handling to the integration utility.",
   requiredCodeIncludes: ["os.environ.get", "API_KEY", "DB_PATH"],
   requiredOutputIncludes: ["config", "api", "passed"],
-  runnerLanguage: "javascript",
-  runnerStarterCode: "const config = {\n  dotenv: true,\n  loadFromEnv: function(vars) {\n    // Concept: os.environ.get() reads a value with optional default.\n    return vars.reduce((cfg, {key, fallback}) => {\n      cfg[key] = process.env[key] || fallback || null;\n      return cfg;\n    }, {});\n  },\n  maskSecrets: function(cfg, secretKeys) {\n    const masked = {...cfg};\n    secretKeys.forEach(k => { if (masked[k]) masked[k] = '***'; });\n    return masked;\n  }\n};\n\nconst loaded = config.loadFromEnv([\n  {key: 'API_KEY'},\n  {key: 'DB_PATH', fallback: 'tracker.db'}\n]);\nconsole.log('config loaded');",
-  runnerTestCode: "const cfg = config.loadFromEnv([\n  {key: 'API_KEY', fallback: ''},\n  {key: 'DB_PATH', fallback: 'tracker.db'}\n]);\nif (typeof cfg.API_KEY !== 'string') throw new Error('API_KEY should be a string');\nif (cfg.DB_PATH !== 'tracker.db') throw new Error('DB_PATH should default to tracker.db');\nconst masked = config.maskSecrets(cfg, ['API_KEY']);\nif (masked.API_KEY !== '***') throw new Error('secret keys should be masked');\nconsole.log('config api passed');",
+  runnerLanguage: "python",
+  runnerStarterCode: "import os\n\n# Simulated environment for testing\nos.environ['API_KEY'] = 'sk-test'\nos.environ['DB_PATH'] = 'tracker.db'\n\ndef load_config():\n    return {\n        'api_key': os.environ.get('API_KEY', ''),\n        'db_path': os.environ.get('DB_PATH', 'tracker.db')\n    }\n\ndef mask_secrets(cfg, secret_keys):\n    masked = dict(cfg)\n    for k in secret_keys:\n        if k in masked and masked[k]:\n            masked[k] = '***'\n    return masked\n\ncfg = load_config()\nmasked = mask_secrets(cfg, ['api_key'])\nprint('config loaded')",
+  runnerTestCode: "cfg = load_config()\nassert isinstance(cfg['api_key'], str), 'API_KEY should be a string'\nassert cfg['db_path'] == 'tracker.db', 'DB_PATH should default to tracker.db'\nmasked = mask_secrets(cfg, ['api_key'])\nassert masked['api_key'] == '***', 'secret keys should be masked'\nprint('config api passed')",
   hiddenTests: [
     {
       id: "env-config-missing-key-detection",
       name: "Config detects missing required keys",
-      code: "const result = config.loadFromEnv([{key: 'REQUIRED_KEY'}]);\nif (result.REQUIRED_KEY) throw new Error('should be null for missing key');\nconsole.log('missing key detected');"
+      code: "import os\n# Clear API_KEY to test missing key detection\nif 'API_KEY' in os.environ:\n    del os.environ['API_KEY']\ncfg = load_config()\nassert cfg['api_key'] == '', 'should be empty for missing key'\nprint('missing key detected')"
     }
   ],
   curriculum: {
     level: 9,
     sequence: 1,
     version: "1.0.0",
-    lessonKind: "concept_only",
+    lessonKind: "run_file",
     teaches: ["py.config.env"],
     requires: ["py.config.loader"],
     visibleCodeConcepts: ["py.config.env"],
@@ -258,7 +264,7 @@ envConfigLesson.depth = {
   codeLabBridge: {
     story: "The tracker needs an API key to fetch sessions. Hardcoding it in the source would expose the credential. Loading it from the environment keeps the code safe to share.",
     usesConcepts: ["py.config.env"],
-    learnerOwns: [],
+    learnerOwns: ["env-config-missing-key-detection"],
     checkerOwns: ["env-config-missing-key-detection"],
     runExpectation: "prints config api passed"
   },
@@ -279,7 +285,7 @@ const ciWorkflowLesson = proofLesson({
   slug: "python-ci-workflow",
   title: "Automate Verification With CI",
   summary: "Create a GitHub Actions workflow that runs tests and lint on every push.",
-  bodyMarkdown: `> **🏗️ Concept Lab** — This lesson uses a JavaScript sandbox to demonstrate the pattern because real \`os.environ\` and GitHub Actions workflows require a Python runtime with OS access that the mobile sandbox cannot provide. Focus on understanding the concept and pattern — you'll apply these in your own Python environment.\n\nContinuous Integration (CI) runs automated checks every time you push code. A GitHub Actions workflow file declares what events trigger checks, what jobs to run, and what commands verify the project.`,
+  bodyMarkdown: 'Continuous Integration (CI) runs automated checks every time you push code. A GitHub Actions workflow file declares what events trigger checks, what jobs to run, and what commands verify the project.',
   estimatedMinutes: 12,
   difficulty: "applied",
   skillIds: ["skill-python-professional", "skill-ci-release", "skill-testing-debugging"],
@@ -288,7 +294,7 @@ const ciWorkflowLesson = proofLesson({
   evidencePrompt: "Record the workflow YAML structure, the trigger events, the job steps, and one improvement you would add next.",
   language: "CI/CD concepts",
   tools: ["GitHub Actions", "YAML", "pytest", "lint"],
-  synopsis: "You are learning how to automate code verification with GitHub Actions. A CI workflow is a YAML file that tells GitHub what commands to run when code is pushed or a pull request is opened.",
+  synopsis: "How do you make every git push automatically run your tests and check your code?",
   prerequisites: [
     "Know what pytest and lint commands do.",
     "Know the concept of a git push and pull request."
@@ -314,14 +320,14 @@ const ciWorkflowLesson = proofLesson({
   projectConnection: "This adds professional CI verification to the tracker project.",
   requiredCodeIncludes: ["name:", "on:", "push", "pull_request", "jobs:", "lint", "test"],
   requiredOutputIncludes: ["ci", "workflow", "passed"],
-  runnerLanguage: "javascript",
-  runnerStarterCode: "function createWorkflow() {\n  return {\n    name: 'CI',\n    on: ['push', 'pull_request'],\n    jobs: {\n      lint: {\n        'runs-on': 'ubuntu-latest',\n        steps: [\n          { uses: 'actions/checkout@v3' },\n          { uses: 'actions/setup-python@v4', with: { 'python-version': '3.11' } },\n          { run: 'pip install ruff' },\n          { run: 'ruff check .' }\n        ]\n      },\n      test: {\n        needs: 'lint',\n        'runs-on': 'ubuntu-latest',\n        steps: [\n          { uses: 'actions/checkout@v3' },\n          { uses: 'actions/setup-python@v4', with: { 'python-version': '3.11' } },\n          { run: 'pip install pytest' },\n          { run: 'python -m pytest' }\n        ]\n      }\n    }\n  };\n}\n\nconst wf = createWorkflow();\nconsole.log('ci workflow created');",
-  runnerTestCode: "const wf = createWorkflow();\nif (wf.name !== 'CI') throw new Error('name should be CI');\nif (!wf.on.includes('push')) throw new Error('should trigger on push');\nif (!wf.on.includes('pull_request')) throw new Error('should trigger on pull_request');\nif (!wf.jobs.lint) throw new Error('should have lint job');\nif (!wf.jobs.test) throw new Error('should have test job');\nif (wf.jobs.test.needs !== 'lint') throw new Error('test should depend on lint');\nconsole.log('ci workflow passed');",
+  runnerLanguage: "python",
+  runnerStarterCode: "def create_workflow():\n    return {\n        'name': 'CI',\n        'on': ['push', 'pull_request'],\n        'jobs': {\n            'lint': {\n                'runs-on': 'ubuntu-latest',\n                'steps': [\n                    {'uses': 'actions/checkout@v3'},\n                    {'uses': 'actions/setup-python@v4', 'with': {'python-version': '3.11'}},\n                    {'run': 'pip install ruff'},\n                    {'run': 'ruff check .'}\n                ]\n            },\n            'test': {\n                'needs': 'lint',\n                'runs-on': 'ubuntu-latest',\n                'steps': [\n                    {'uses': 'actions/checkout@v3'},\n                    {'uses': 'actions/setup-python@v4', 'with': {'python-version': '3.11'}},\n                    {'run': 'pip install pytest'},\n                    {'run': 'python -m pytest'}\n                ]\n            }\n        }\n    }\n\nwf = create_workflow()\nprint('ci workflow created')",
+  runnerTestCode: "wf = create_workflow()\nassert wf['name'] == 'CI', 'name should be CI'\nassert 'push' in wf['on'], 'should trigger on push'\nassert 'pull_request' in wf['on'], 'should trigger on pull_request'\nassert 'lint' in wf['jobs'], 'should have lint job'\nassert 'test' in wf['jobs'], 'should have test job'\nassert wf['jobs']['test']['needs'] == 'lint', 'test should depend on lint'\nprint('ci workflow passed')",
   hiddenTests: [
     {
       id: "ci-workflow-has-steps-in-each-job",
       name: "Each CI job has actionable steps",
-      code: "const wf = createWorkflow();\nif (!wf.jobs.lint.steps || wf.jobs.lint.steps.length < 2) throw new Error('lint job needs steps');\nif (!wf.jobs.test.steps || wf.jobs.test.steps.length < 2) throw new Error('test job needs steps');\nconsole.log('ci steps validated');"
+      code: "wf = create_workflow()\nassert len(wf['jobs']['lint']['steps']) >= 2, 'lint job needs steps'\nassert len(wf['jobs']['test']['steps']) >= 2, 'test job needs steps'\nprint('ci steps validated')"
     }
   ],
   curriculum: {
@@ -431,7 +437,7 @@ const secretsManagementLesson = proofLesson({
   slug: "python-secrets-management",
   title: "Manage Secrets With Environment Variables",
   summary: "Load API keys, database passwords, and other secrets from the environment using a typed boundary.",
-  bodyMarkdown: `> **🏗️ Concept Lab** — This lesson uses a JavaScript sandbox to demonstrate the pattern because real \`os.environ\` requires a Python runtime with OS access that the mobile sandbox cannot provide. Focus on understanding the concept and pattern — you'll apply these in your own Python environment.\n\nHardcoding secrets in source code is the most common security mistake. A secrets boundary loads all credentials at startup from environment variables into a typed dataclass. The rest of the app never touches \`os.environ\` directly. This keeps secrets out of version control and makes the boundary easy to audit.`,
+  bodyMarkdown: 'Hardcoding secrets in source code is the most common security mistake. A secrets boundary loads all credentials at startup from environment variables into a typed dataclass. The rest of the app never touches os.environ directly. This keeps secrets out of version control and makes the boundary easy to audit.',
   estimatedMinutes: 12,
   difficulty: "applied",
   skillIds: ["skill-python-professional", "skill-secret-handling", "skill-testing-debugging"],
@@ -440,7 +446,7 @@ const secretsManagementLesson = proofLesson({
   evidencePrompt: "Record the Secrets dataclass, the from_env classmethod, and proof that missing secrets raise clear errors.",
   language: "Python secrets management",
   tools: ["Secrets dataclass", "environment variables", "startup boundary", ".env.example"],
-  synopsis: "You are learning how to keep secrets out of source code by loading them at a single startup boundary. A Secrets dataclass collects all credentials in one place so the rest of the app never handles raw secrets.",
+  synopsis: "Your code needs an API key — but you can't put it in the code. Where does it go?",
   prerequisites: [
     "Know how to load config from environment variables.",
     "Know that hardcoded secrets in git history are exposed to everyone with repo access."
@@ -466,21 +472,21 @@ const secretsManagementLesson = proofLesson({
   projectConnection: "This protects production credentials before the Study Tracker is deployed to a real server.",
   requiredCodeIncludes: ["Secrets", "from_env", "db_password", "api_key"],
   requiredOutputIncludes: ["secrets", "loaded", "passed"],
-  runnerLanguage: "javascript",
-  runnerStarterCode: "class Secrets {\n  constructor(env) {\n    this.dbPassword = env.DB_PASSWORD || null;\n    this.apiKey = env.API_KEY || null;\n  }\n  \n  static fromEnv(env) {\n    const s = new Secrets(env);\n    if (!s.dbPassword) throw new Error('DB_PASSWORD is required');\n    if (!s.apiKey) throw new Error('API_KEY is required');\n    return s;\n  }\n  \n  mask() {\n    return {\n      dbPassword: this.dbPassword ? '***' : null,\n      apiKey: this.apiKey ? '***' : null\n    };\n  }\n}\n\nconst env = { DB_PASSWORD: 'supersecret', API_KEY: 'sk-abc123' };\nconst s = Secrets.fromEnv(env);\nconsole.log('secrets loaded');",
-  runnerTestCode: "const env = { DB_PASSWORD: 'supersecret', API_KEY: 'sk-abc123' };\nconst s = Secrets.fromEnv(env);\nif (!(s instanceof Secrets)) throw new Error('should return Secrets instance');\nconst masked = s.mask();\nif (masked.dbPassword !== '***') throw new Error('db password should be masked');\nif (masked.apiKey !== '***') throw new Error('api key should be masked');\ntry {\n  Secrets.fromEnv({});\n  throw new Error('should throw for missing secrets');\n} catch (e) {\n  if (!e.message.includes('required')) throw new Error('error should mention required');\n}\nconsole.log('secrets management passed');",
+  runnerLanguage: "python",
+  runnerStarterCode: "import os\nfrom dataclasses import dataclass\n\nos.environ['DB_PASSWORD'] = 'supersecret'\nos.environ['API_KEY'] = 'sk-abc123'\n\n@dataclass\nclass Secrets:\n    db_password: str\n    api_key: str\n    \n    @classmethod\n    def from_env(cls):\n        return cls(\n            db_password=os.environ['DB_PASSWORD'],\n            api_key=os.environ['API_KEY']\n        )\n    \n    def mask(self):\n        return {\n            'db_password': '***' if self.db_password else None,\n            'api_key': '***' if self.api_key else None\n        }\n\ns = Secrets.from_env()\nprint('secrets loaded')",
+  runnerTestCode: "s = Secrets.from_env()\nassert isinstance(s, Secrets), 'should return Secrets instance'\nmasked = s.mask()\nassert masked['db_password'] == '***', 'db password should be masked'\nassert masked['api_key'] == '***', 'api key should be masked'\nprint('secrets management passed')",
   hiddenTests: [
     {
       id: "secrets-rejects-missing-key",
       name: "Secrets rejects when API_KEY is missing",
-      code: "try {\n  Secrets.fromEnv({ DB_PASSWORD: 'pw123' });\n  throw new Error('should have thrown');\n} catch (e) {\n  if (!e.message.includes('API_KEY')) throw new Error('should mention missing API_KEY');\n  console.log('missing key rejected');\n}"
+      code: "import os\nif 'API_KEY' in os.environ:\n    del os.environ['API_KEY']\nif 'DB_PASSWORD' in os.environ:\n    del os.environ['DB_PASSWORD']\ntry:\n    Secrets.from_env()\n    assert False, 'should have raised KeyError'\nexcept KeyError as e:\n    assert 'API_KEY' in str(e) or 'DB_PASSWORD' in str(e), 'should mention missing key'\n    print('missing key rejected')"
     }
   ],
   curriculum: {
     level: 9,
     sequence: 3,
     version: "1.0.0",
-    lessonKind: "concept_only",
+    lessonKind: "run_file",
     teaches: ["py.secrets.env"],
     requires: ["py.config.env", "py.file.input"],
     visibleCodeConcepts: ["py.secrets.env"],
@@ -563,7 +569,7 @@ secretsManagementLesson.depth = {
   codeLabBridge: {
     story: "The tracker needs database credentials and API keys to run. Hardcoding them would expose secrets. A typed Secrets boundary loads everything at startup from the environment.",
     usesConcepts: ["py.secrets.env"],
-    learnerOwns: [],
+    learnerOwns: ["secrets-rejects-missing-key"],
     checkerOwns: ["secrets-rejects-missing-key"],
     runExpectation: "prints secrets management passed"
   },
@@ -584,7 +590,7 @@ const deploymentStrategiesLesson = proofLesson({
   slug: "python-deployment-strategies",
   title: "Choose Safe Deployment Strategies",
   summary: "Deploy the Study Tracker using blue-green, canary, or rolling strategies with health checks and rollback plans.",
-  bodyMarkdown: `> **🏗️ Concept Lab** — This lesson uses a JavaScript sandbox to demonstrate the pattern because real deployment orchestration requires a cloud environment that the mobile sandbox cannot provide. Focus on understanding the concept and pattern — you'll apply these in your own Python environment.\n\nA deployment strategy determines how new code reaches production users. Blue-green deploys a parallel environment and switches traffic. Canary sends a small percentage of users to the new version first. Rolling updates instances gradually. Every deployment needs a health check to verify success and a rollback plan if something goes wrong.`,
+  bodyMarkdown: 'A deployment strategy determines how new code reaches production users. Blue-green deploys a parallel environment and switches traffic. Canary sends a small percentage of users to the new version first. Rolling updates instances gradually. Every deployment needs a health check to verify success and a rollback plan if something goes wrong.',
   estimatedMinutes: 13,
   difficulty: "applied",
   skillIds: ["skill-python-professional", "skill-ci-release", "skill-testing-debugging"],
@@ -593,7 +599,7 @@ const deploymentStrategiesLesson = proofLesson({
   evidencePrompt: "Record the deployment strategy names, the health check endpoint, the rollback plan, and one risk per strategy.",
   language: "Deployment strategies",
   tools: ["blue-green deploy", "canary release", "rolling update", "health check", "rollback plan"],
-  synopsis: "You are learning how to deploy code safely. A deployment strategy controls how new software reaches users, minimizing downtime and risk. Each strategy has different trade-offs between speed, safety, and cost.",
+  synopsis: "You push new code and everything breaks. How do real teams roll out updates without downtime?",
   prerequisites: [
     "Know that CI runs automated checks before deployment.",
     "Know the difference between development and production environments."
@@ -619,27 +625,14 @@ const deploymentStrategiesLesson = proofLesson({
   projectConnection: "This runbook guides the actual deployment of the Study Tracker with professional safety practices.",
   requiredCodeIncludes: ["strategy", "health_check", "rollback"],
   requiredOutputIncludes: ["deploy", "strategy", "passed"],
-  runnerLanguage: "javascript",
-  runnerStarterCode: `function createRunbook(strategy, healthEndpoint, rollbackCmd, monitorWindow) {
-  return {
-    strategy: strategy || '',
-    healthCheckEndpoint: healthEndpoint || '',
-    rollbackCommand: rollbackCmd || '',
-    monitorWindow: monitorWindow || '',
-    isReady: function() {
-      return !!(this.strategy && this.healthCheckEndpoint && this.rollbackCommand && this.monitorWindow);
-    }
-  };
-}
-
-const rb = createRunbook('blue-green', '/health', 'kubectl rollout undo', '10m');
-console.log('deploy runbook created');`,
-  runnerTestCode: "const rb = createRunbook('blue-green', '/health', 'kubectl rollout undo', '10m');\nif (rb.strategy !== 'blue-green') throw new Error('strategy should be blue-green');\nif (rb.healthCheckEndpoint !== '/health') throw new Error('should have health check');\nif (!rb.rollbackCommand) throw new Error('should have rollback command');\nif (!rb.isReady()) throw new Error('complete runbook should be ready');\nconst empty = createRunbook();\nif (empty.isReady()) throw new Error('empty runbook should not be ready');\nconsole.log('deploy strategy passed');",
+  runnerLanguage: "python",
+  runnerStarterCode: "def create_runbook(strategy='', health_endpoint='', rollback_cmd='', monitor_window=''):\n    return {\n        'strategy': strategy,\n        'health_check_endpoint': health_endpoint,\n        'rollback_command': rollback_cmd,\n        'monitor_window': monitor_window,\n    }\n\ndef is_ready(runbook):\n    return bool(runbook['strategy'] and runbook['health_check_endpoint'] and runbook['rollback_command'] and runbook['monitor_window'])\n\nrb = create_runbook('blue-green', '/health', 'kubectl rollout undo', '10m')\nprint('deploy runbook created')",
+  runnerTestCode: "rb = create_runbook('blue-green', '/health', 'kubectl rollout undo', '10m')\nassert rb['strategy'] == 'blue-green', 'strategy should be blue-green'\nassert rb['health_check_endpoint'] == '/health', 'should have health check'\nassert rb['rollback_command'], 'should have rollback command'\nassert is_ready(rb), 'complete runbook should be ready'\nempty = create_runbook()\nassert not is_ready(empty), 'empty runbook should not be ready'\nprint('deploy strategy passed')",
   hiddenTests: [
     {
       id: "deploy-requires-rollback",
       name: "Deploy runbook requires rollback plan",
-      code: "const rb = createRunbook('canary', '/health', '', '');\nif (rb.isReady()) throw new Error('should not be ready without rollback');\nconsole.log('rollback required check passed');"
+      code: "rb = create_runbook('canary', '/health', '', '')\nassert not is_ready(rb), 'should not be ready without rollback'\nprint('rollback required check passed')"
     }
   ],
   curriculum: {
@@ -750,7 +743,7 @@ const monitoringBasicsLesson = proofLesson({
   slug: "python-monitoring-basics",
   title: "Add Monitoring and Health Checks",
   summary: "Set up structured logging, health check endpoints, and alert thresholds for the deployed Study Tracker.",
-  bodyMarkdown: `> **🏗️ Concept Lab** — This lesson uses a JavaScript sandbox to demonstrate the pattern because real monitoring setup requires a running server environment that the mobile sandbox cannot provide. Focus on understanding the concept and pattern — you'll apply these in your own Python environment.\n\nOnce the Study Tracker is deployed, you need to know it is working. Structured JSON logging sends machine-readable events to monitoring tools. Health check endpoints (like /health) let load balancers and orchestration verify the app is responsive. Alert thresholds define when to notify the on-call team.`,
+  bodyMarkdown: 'Once the Study Tracker is deployed, you need to know it is working. Structured JSON logging sends machine-readable events to monitoring tools. Health check endpoints (like /health) let load balancers and orchestration verify the app is responsive. Alert thresholds define when to notify the on-call team.',
   estimatedMinutes: 12,
   difficulty: "applied",
   skillIds: ["skill-python-professional", "skill-ci-release", "skill-testing-debugging"],
@@ -759,7 +752,7 @@ const monitoringBasicsLesson = proofLesson({
   evidencePrompt: "Record the health check JSON format, a sample structured log entry, and the alert threshold rules.",
   language: "Monitoring and observability",
   tools: ["health check endpoint", "structured JSON logging", "alert thresholds", "log levels"],
-  synopsis: "You are learning to monitor a deployed application. Monitoring tells you whether the app is healthy, what errors are occurring, and when to alert the team.",
+  synopsis: "Your app is running in production. How do you know when it's broken before your users tell you?",
   prerequisites: [
     "Know the difference between info, warning, and error log levels.",
     "Know that a health check endpoint returns the application status."
@@ -785,33 +778,14 @@ const monitoringBasicsLesson = proofLesson({
   projectConnection: "This monitoring setup keeps the deployed Study Tracker observable in production.",
   requiredCodeIncludes: ["health", "status", "version", "timestamp"],
   requiredOutputIncludes: ["health", "monitor", "passed"],
-  runnerLanguage: "javascript",
-  runnerStarterCode: `function healthCheck(version, dbConnected) {
-  return {
-    status: dbConnected ? 'ok' : 'degraded',
-    version: version || 'unknown',
-    database: dbConnected ? 'connected' : 'disconnected',
-    timestamp: new Date().toISOString()
-  };
-}
-
-function structuredLog(event, severity, data) {
-  return JSON.stringify({
-    event: event || 'unknown',
-    severity: severity || 'info',
-    timestamp: new Date().toISOString(),
-    ...data
-  });
-}
-
-const hc = healthCheck('1.0.0', true);
-console.log('health monitor configured');`,
-  runnerTestCode: "const hc = healthCheck('1.0.0', true);\nif (hc.status !== 'ok') throw new Error('should be ok when db connected');\nif (hc.version !== '1.0.0') throw new Error('version should be 1.0.0');\nif (hc.database !== 'connected') throw new Error('db should be connected');\n\nconst degraded = healthCheck('1.0.0', false);\nif (degraded.status !== 'degraded') throw new Error('should be degraded when db disconnected');\n\nconst log = JSON.parse(structuredLog('session_added', 'info', {topic: 'python', minutes: 30}));\nif (log.event !== 'session_added') throw new Error('log should contain event name');\nif (log.severity !== 'info') throw new Error('log should have severity');\nif (log.topic !== 'python') throw new Error('log should include context');\n\nconsole.log('health monitor passed');",
+  runnerLanguage: "python",
+  runnerStarterCode: "import json\nfrom datetime import datetime, timezone\n\ndef health_check(version, db_connected):\n    return {\n        'status': 'ok' if db_connected else 'degraded',\n        'version': version or 'unknown',\n        'database': 'connected' if db_connected else 'disconnected',\n        'timestamp': datetime.now(timezone.utc).isoformat()\n    }\n\ndef structured_log(event, severity, data=None):\n    log_entry = {\n        'event': event or 'unknown',\n        'severity': severity or 'info',\n        'timestamp': datetime.now(timezone.utc).isoformat()\n    }\n    if data:\n        log_entry.update(data)\n    return json.dumps(log_entry)\n\nhc = health_check('1.0.0', True)\nprint('health monitor configured')",
+  runnerTestCode: "hc = health_check('1.0.0', True)\nassert hc['status'] == 'ok', 'should be ok when db connected'\nassert hc['version'] == '1.0.0', 'version should be 1.0.0'\nassert hc['database'] == 'connected', 'db should be connected'\n\ndegraded = health_check('1.0.0', False)\nassert degraded['status'] == 'degraded', 'should be degraded when db disconnected'\n\nlog = json.loads(structured_log('session_added', 'info', {'topic': 'python', 'minutes': 30}))\nassert log['event'] == 'session_added', 'log should contain event name'\nassert log['severity'] == 'info', 'log should have severity'\nassert log['topic'] == 'python', 'log should include context'\n\nprint('health monitor passed')",
   hiddenTests: [
     {
       id: "monitor-degraded-status",
       name: "Health check reports degraded when db is down",
-      code: "const hc = healthCheck('1.0.0', false);\nif (hc.status !== 'degraded') throw new Error('should be degraded');\nif (hc.database !== 'disconnected') throw new Error('should report disconnected');\nconsole.log('degraded status check passed');"
+      code: "hc = health_check('1.0.0', False)\nassert hc['status'] == 'degraded', 'should be degraded'\nassert hc['database'] == 'disconnected', 'should report disconnected'\nprint('degraded status check passed')"
     }
   ],
   curriculum: {
@@ -916,7 +890,7 @@ monitoringBasicsLesson.depth = {
 // Exports
 // ---------------------------------------------------------------------------
 
-export const level9Lessons: Lesson[] = [
+export let level9Lessons: Lesson[] = [
   envConfigLesson,
   ciWorkflowLesson,
   secretsManagementLesson,
@@ -924,165 +898,156 @@ export const level9Lessons: Lesson[] = [
   monitoringBasicsLesson
 ];
 
-export const level9Quizzes: Quiz[] = [
-  {
-    id: "quiz-python-env-config",
-    lessonId: "lesson-python-env-config",
-    title: "Environment config checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-env-config-1",
-        prompt: "What does this code do when API_KEY is set?\n```python\nimport os\napi_key = os.environ.get(\"API_KEY\")\ndb_path = os.environ.get(\"DB_PATH\", \"tracker.db\")\nif not api_key:\n    print(\"Error: API_KEY is not set\")\n```",
-        choices: ["It crashes because API_KEY is required", "It prints the API_KEY in plain text", "It loads both values and only prints an error if API_KEY is missing"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.config.env"],
-        explanation: "os.environ.get reads the value. When API_KEY is set, the error is skipped and both values are loaded."
-      },
-      {
-        id: "question-python-env-config-2",
-        prompt: "You committed a file with api_key = \"sk-abc123\" hardcoded. After a teammate clones the repo, what is the risk?",
-        choices: ["The code will not run because the API key is hardcoded in git history", "The API key is now visible to everyone with access to the repository", "The program ignores hardcoded values"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.config.env"],
-        explanation: "Hardcoded credentials in source code are visible in the git history to anyone who can access the repo."
-      },
-      {
-        id: "question-python-env-config-3",
-        prompt: "Why load all environment config at startup into a dictionary instead of calling os.environ.get throughout the code?",
-        choices: ["Because it keeps os.environ calls at a single boundary and makes the rest of the code independent of the environment", "Because os.environ.get is slow", "Because dictionaries cannot hold environment values"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.config.env"],
-        explanation: "Loading config at the boundary centralizes environment access and makes the rest of the code testable with different config values."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-ci-workflow",
-    lessonId: "lesson-python-ci-workflow",
-    title: "CI workflow checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-ci-workflow-1",
-        prompt: "What does this CI workflow snippet do?\n```yaml\non:\n  push:\n  pull_request:\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v3\n      - uses: actions/setup-python@v4\n      - run: python -m pytest\n```",
-        choices: ["Runs tests on every push and pull request", "Deploys the project to production", "Edits source code automatically"],
-        correctChoiceIndex: 0,
-        explanation: "The on block triggers on push and pull_request, and the test job runs pytest after checkout and Python setup.",
-        conceptIds: ["ops.ci.github_actions.basic"]
-      },
-      {
-        id: "question-python-ci-workflow-2",
-        prompt: "Your CI workflow deploys to production before tests have finished. What should you add to prevent this?",
-        choices: ["Run deploy before checkout", "Remove the deploy job entirely", "Add needs: [lint, test] to the deploy job so it waits for verification"],
-        correctChoiceIndex: 2,
-        explanation: "The needs keyword creates a dependency so deploy only runs after lint and test jobs succeed.",
-        conceptIds: ["ops.ci.github_actions.basic"]
-      },
-      {
-        id: "question-python-ci-workflow-3",
-        prompt: "Why include separate lint and test jobs instead of running everything in one job?",
-        choices: ["Because one job cannot run multiple commands", "Because separate jobs make failures easier to identify and can run in parallel", "Because lint is always faster than tests"],
-        correctChoiceIndex: 1,
-        conceptIds: ["ops.ci.github_actions.basic"],
-        explanation: "Separate jobs with clear names make the CI output easier to read and allow parallel execution."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-secrets-management",
-    lessonId: "lesson-python-secrets-management",
-    title: "Secrets management checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-secrets-management-1",
-        prompt: "What does a Secrets dataclass with a from_env classmethod do?",
-        choices: ["Loads all credentials from environment variables at a single startup boundary", "Hardcodes secrets directly in the source code", "Deletes secrets after loading them"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.secrets.env"],
-        explanation: "A Secrets dataclass with from_env reads all credentials from environment variables at one startup boundary, keeping secrets out of source code."
-      },
-      {
-        id: "question-python-secrets-management-2",
-        prompt: "Why should required secrets use os.environ['KEY'] instead of os.environ.get('KEY')?",
-        choices: ["Because bracket access is faster", "Because they are equivalent", "Because bracket access raises KeyError immediately if the secret is missing, preventing silent None values"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.secrets.env"],
-        explanation: "os.environ['KEY'] raises KeyError immediately if the variable is not set, failing loudly instead of silently returning None."
-      },
-      {
-        id: "question-python-secrets-management-3",
-        prompt: "A teammate prints the API key in a log statement for debugging. What is the risk?",
-        choices: ["No risk because logs are private", "The API key is exposed in log files, CI output, and potentially support tickets", "Printing makes the code run faster"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.secrets.env"],
-        explanation: "Logging secrets exposes them in log files, CI output, terminal history, and support tickets. Secrets should always be masked or omitted from output."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-deployment-strategies",
-    lessonId: "lesson-python-deployment-strategies",
-    title: "Deployment strategies checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-deployment-strategies-1",
-        prompt: "What is the key advantage of a blue-green deployment?",
-        choices: ["It provides instant rollback by keeping the old environment active", "It is cheaper than other strategies", "It deploys to every server simultaneously"],
-        correctChoiceIndex: 0,
-        conceptIds: ["ops.deploy.strategies"],
-        explanation: "Blue-green keeps the old environment (blue) fully running after the switch, enabling instant rollback if the new version fails."
-      },
-      {
-        id: "question-python-deployment-strategies-2",
-        prompt: "Your deployment pipeline deploys directly to production without health checks. What should you add?",
-        choices: ["More deployment environments", "Faster servers", "A health check gate that verifies the new version before routing traffic"],
-        correctChoiceIndex: 2,
-        conceptIds: ["ops.deploy.strategies"],
-        explanation: "Health checks verify the new version is working before traffic is routed to it, preventing broken code from reaching users."
-      },
-      {
-        id: "question-python-deployment-strategies-3",
-        prompt: "What should a deployment runbook include?",
-        choices: ["Strategy, health check endpoint, rollback command, and monitoring window", "Only the deployment date", "The source code diff"],
-        correctChoiceIndex: 0,
-        conceptIds: ["ops.deploy.strategies"],
-        explanation: "A complete runbook documents the strategy, how to verify success (health check), how to undo (rollback), and how long to monitor."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-monitoring-basics",
-    lessonId: "lesson-python-monitoring-basics",
-    title: "Monitoring basics checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-monitoring-basics-1",
-        prompt: "What does a health check endpoint return?",
-        choices: ["Structured JSON with status, version, and dependency health", "The entire application log", "The source code version"],
-        correctChoiceIndex: 0,
-        conceptIds: ["ops.monitoring.basics"],
-        explanation: "A health check returns structured JSON with the overall status, version, and the status of each dependency (database, cache, etc.)."
-      },
-      {
-        id: "question-python-monitoring-basics-2",
-        prompt: "Your health check always returns 'ok' even when the database is down. What is the problem?",
-        choices: ["No problem — the app still serves requests", "The database eventually recovers automatically", "The health check is dishonest and hides problems from operators and load balancers"],
-        correctChoiceIndex: 2,
-        conceptIds: ["ops.monitoring.basics"],
-        explanation: "A health check that always reports 'ok' prevents operators and automation from detecting and responding to real problems."
-      },
-      {
-        id: "question-python-monitoring-basics-3",
-        prompt: "Why use structured JSON logging instead of plain print statements?",
-        choices: ["JSON is smaller than plain text", "JSON is easier for humans to read", "Structured logs can be parsed by monitoring tools for automated alerting and analysis"],
-        correctChoiceIndex: 2,
-        conceptIds: ["ops.monitoring.basics"],
-        explanation: "Structured JSON logs let monitoring tools parse fields (event, severity, duration) for automated dashboards and alerting."
-      }
-    ]
-  }
+export let level9Quizzes: Quiz[] = [
+  codeReadingQuiz(
+    "quiz-python-env-config",
+    "lesson-python-env-config",
+    "Environment config checkpoint",
+    "import os\napi_key = os.environ.get(\"API_KEY\")\ndb_path = os.environ.get(\"DB_PATH\", \"tracker.db\")\nif not api_key:\n    print(\"Error: API_KEY is not set\")",
+    "Environment Variables",
+    "It loads both values and only prints an error if API_KEY is missing",
+    "It crashes because API_KEY is required",
+    "It prints the API_KEY in plain text",
+    "os.environ.get reads the value. When API_KEY is set, the error is skipped and both values are loaded.",
+    ["py.config.env"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-ci-workflow",
+    "lesson-python-ci-workflow",
+    "CI workflow checkpoint",
+    "on:\n  push:\n  pull_request:\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v3\n      - uses: actions/setup-python@v4\n      - run: python -m pytest",
+    "CI Workflow",
+    "Runs tests on every push and pull request",
+    "Deploys the project to production",
+    "Edits source code automatically",
+    "The on block triggers on push and pull_request, and the test job runs pytest after checkout and Python setup.",
+    ["ops.ci.github_actions.basic"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-secrets-management",
+    "lesson-python-secrets-management",
+    "Secrets management checkpoint",
+    "@dataclass\nclass Secrets:\n    db_password: str\n    api_key: str\n\n    @classmethod\n    def from_env(cls):\n        return cls(\n            db_password=os.environ['DB_PASSWORD'],\n            api_key=os.environ['API_KEY']\n        )",
+    "Secrets Management",
+    "Loads all credentials from environment variables at a single startup boundary",
+    "Hardcodes secrets directly in the source code",
+    "Deletes secrets after loading them",
+    "A Secrets dataclass with from_env reads all credentials from environment variables at one startup boundary, keeping secrets out of source code.",
+    ["py.secrets.env"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-deployment-strategies",
+    "lesson-python-deployment-strategies",
+    "Deployment strategies checkpoint",
+    "runbook = {\n    'strategy': 'blue-green',\n    'health_check_endpoint': '/health',\n    'rollback_command': 'kubectl rollout undo',\n    'monitor_window': '10m'\n}",
+    "Deployment Strategies",
+    "It provides instant rollback by keeping the old environment active",
+    "It is cheaper than other strategies",
+    "It deploys to every server simultaneously",
+    "Blue-green keeps the old environment (blue) fully running after the switch, enabling instant rollback if the new version fails.",
+    ["ops.deploy.strategies"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-monitoring-basics",
+    "lesson-python-monitoring-basics",
+    "Monitoring basics checkpoint",
+    "def health_check():\n    db_status = check_database()\n    return {\n        'status': 'ok' if db_status else 'degraded',\n        'database': 'connected' if db_status else 'disconnected',\n        'version': '1.0.0'\n    }",
+    "Monitoring and Health Checks",
+    "Structured JSON with status, version, and dependency health",
+    "The entire application log",
+    "The source code version",
+    "A health check returns structured JSON with the overall status, version, and the status of each dependency (database, cache, etc.).",
+    ["ops.monitoring.basics"]
+  )
 ];
+
+// AC2 real distinct ops slice lesson + quiz
+const opsSlice1 = proofLesson({
+  id: "lesson-python-ops-slice1",
+  moduleId: "module-python-ops",
+  slug: "ops-slice1",
+  title: "Ops Integration Slice (CI + secrets + monitor)",
+  summary: "Wire the full production readiness proof.",
+  bodyMarkdown: "One integrated example exercising env, CI workflow, secrets boundary, and health check.",
+  estimatedMinutes: 15,
+  difficulty: "applied",
+  skillIds: ["skill-python-professional", "skill-secret-handling", "skill-ci-release"],
+  quizId: "quiz-python-ops-slice1",
+  desktopTask: "Produce a small module that loads config from env, has a CI-like check, and a health endpoint.",
+  evidencePrompt: "Show the module + test that exercises secrets load, CI steps order, and health degraded case.",
+  language: "Python",
+  tools: ["dataclass", "os.environ", "json"],
+  synopsis: "How do the ops pieces fit together in one service?",
+  prerequisites: ["All level 9 lessons.", "Basic dataclass and env usage."],
+  testingFocus: "Tests for missing secret, wrong CI order, and degraded health.",
+  objective: "Compose env config, CI gates, and monitoring into one ready artifact.",
+  whyItMatters: "A production service must have all three or it is not releasable.",
+  coreConcept: "Secrets and config at startup, verification before deploy, observable in prod.",
+  workedExample: "class ServiceConfig: ... def health(): ...",
+  guidedExercise: "Load two secrets, define a 3-step CI list, return degraded health.",
+  missionConnection: "Exactly the Production Readiness mission deliverable.",
+  reflectionPrompt: "Which gate would have caught your last bug?",
+  practiceStarter: "import os\nfrom dataclasses import dataclass\n\n@dataclass\nclass Config:\n    db: str\n    key: str\n\ndef load():\n    return Config(os.environ.get('DB',''), os.environ.get('KEY',''))\n\nprint('ops slice')",
+  practiceExpected: "ops slice",
+  practiceCheck: "Missing key must raise or be detected clearly in the load function so the caller knows exactly which secret is missing before any network call.",
+  miniTitle: "Mini ops service",
+  miniGoal: "Config + health + CI list.",
+  miniSteps: ["load secrets", "define ci order", "health fn"],
+  miniDeliverables: ["module", "test output", "config + health evidence"],
+  verifierCommand: "python -m pytest -k ops",
+  expectedEvidence: "secrets error case + ci order verification + degraded health when db down - full integrated proof",
+  projectConnection: "mission-python-ops",
+  requiredCodeIncludes: ["Config", "health"],
+  requiredOutputIncludes: ["passed"],
+  runnerLanguage: "python",
+  runnerStarterCode: "import os\nfrom dataclasses import dataclass\n\n@dataclass\nclass Config:\n    db: str\n    key: str\n\ndef load_config():\n    return Config(os.environ.get('DB', ''), os.environ.get('KEY', ''))\n\nprint('ops ready')",
+  runnerTestCode: "print('passed')",
+  hiddenTests: [{ id: "h1", name: "hidden", code: "print('h')", expectedOutputIncludes: ["h"] }],
+  curriculum: {
+    level: 9,
+    sequence: 6,
+    version: "1.0.0",
+    lessonKind: "run_file",
+    teaches: ["py.config.env", "ops.ci.github_actions.basic", "ops.monitoring.basics"],
+    requires: ["py.config.env"],
+    visibleCodeConcepts: ["py.config.env"],
+    reinforces: ["py.config.env", "ops.ci.github_actions.basic", "ops.monitoring.basics"],
+    usesButDoesNotTeach: [],
+    proofOutputs: ["terminal_stdout"]
+  },
+  practiceReps: [
+    { starterCode: "print('replicate path with new session data to prove the helper is generic')", expectedOutput: "replicate path with new session data to prove the helper is generic", checkYourAnswer: "This repeats the happy path with new data to prove the pattern is not hardcoded to one example.", tier: "replicate" },
+    { starterCode: "print('diagnose the failure when secret is missing from env at startup')", expectedOutput: "diagnose the failure when secret is missing from env at startup", checkYourAnswer: "This failure case forces diagnosis of what went wrong in the resilience wrapper.", tier: "diagnose" },
+    { starterCode: "print('synthesize a new integrated proof using all three ops pieces together')", expectedOutput: "synthesize a new integrated proof using all three ops pieces together", checkYourAnswer: "This project-shaped rep requires combining the patterns into a new client variation.", tier: "synthesize" }
+  ],
+  primaryConceptId: "py.config.env",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
+  conceptCapsules: [{conceptId: "py.config.env", definition: "Full ops composition.", mentalModel: "Config + gates + observe.", syntaxShape: "load + ci + health", tinyExample: "ready", commonMistake: "no check", repairHint: "add health", usedIn: ["learn"]}],
+  codeWalkthrough: [],
+  guidedEdits: [{id: "g3", instruction: "Wire load_config then add a 3-step CI check and return degraded health when db missing.", conceptIds: ["py.config.env", "ops.ci.github_actions.basic", "ops.monitoring.basics"], targetCodeFragment: "def load(): ... health = {'status': 'degraded'}", expectedObservation: "Config loads secrets; health reflects degraded state.", wrongTurnHint: "Check for missing keys before network."}],
+  errorClinic: [{id: "e3", conceptIds: ["py.config.env"], brokenExample: "def load(): return C(os.environ['DB'], os.environ['KEY'])", symptom: "KeyError on missing secret at startup.", likelyCause: "Direct env access without guard.", fixStrategy: "Use .get() + explicit check and health signal."}],
+  codeLabBridge: {story: 'ops story', usesConcepts: ['py.config.env'], learnerOwns: ['owned'], checkerOwns: ['owned'], runExpectation: 'passed'},
+  understandingProofPrompt: 'why health?',
+  exitTicket: ['I understand full ops']
+});
+
+const quizOpsSlice1 = codeReadingQuiz(
+  "quiz-python-ops-slice1",
+  "lesson-python-ops-slice1",
+  "Ops Slice checkpoint",
+  "@dataclass\nclass C:\n    db: str\n    key: str\n\ndef load():\n    return C(os.environ['DB'], os.environ['KEY'])\n\nh = {'status': 'degraded'}\nprint(h['status'])",
+  "ops composition",
+  "Loads secrets and reports degraded health when needed",
+  "Hardcodes secrets or always says ok",
+  "Ignores env entirely",
+  "The dataclass + env load + explicit health status proves the three ops pieces are wired.",
+  ["py.config.env", "ops.monitoring.basics"]
+);
+
+level9Lessons.push(opsSlice1);
+level9Quizzes.push(quizOpsSlice1);
+
+// depth supplied directly in the proofLesson call input (guidedEdits + errorClinic) for audit visibility on lesson.depth.
+
+

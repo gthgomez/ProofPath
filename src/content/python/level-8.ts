@@ -1,5 +1,5 @@
 import type { Lesson, Quiz, LessonPracticeBlock } from "@/domain/types";
-import { proofLesson } from "./shared";
+import { proofLesson, codeReadingQuiz } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Practice Reps for Level 8
@@ -23,6 +23,12 @@ const pythonRetryPracticeReps: LessonPracticeBlock[] = [
     expectedOutput: "call_count is 3 (max_retries) and ApiError is raised after exhausting retries.",
     checkYourAnswer: "Project-shaped retry: the function should stop retrying after max_retries attempts and raise an error so the caller knows the API is unreachable.",
     tier: "synthesize"
+  },
+  {
+    starterCode: "# Review retry wrapper diff\n# + log attempt count\nprint('review: log attempts')",
+    expectedOutput: "review: log retry attempt count for debugging",
+    checkYourAnswer: "No visibility into retries; add logging of attempt. (review-sim)",
+    tier: "review-sim"
   }
 ];
 
@@ -92,6 +98,12 @@ const pythonCircuitBreakerPracticeReps: LessonPracticeBlock[] = [
     expectedOutput: "initial state: closed, after failures: open, proving the circuit opens after threshold failures.",
     checkYourAnswer: "Project-shaped circuit breaker: track state transitions. After recovery_timeout, the circuit should transition to half-open state allowing a trial request.",
     tier: "synthesize"
+  },
+  {
+    starterCode: "# Review circuit breaker diff\n# + half-open transition log\nprint('review: log state change')",
+    expectedOutput: "review: log circuit state transitions for observability",
+    checkYourAnswer: "No audit trail for state changes; add logging on transitions. (review-sim)",
+    tier: "review-sim"
   }
 ];
 
@@ -114,7 +126,7 @@ const apiRetryLesson = proofLesson({
   evidencePrompt: "Record the retry loop logic, the success-on-first-try test, the success-after-retry test, and the exhausted-retries test.",
   language: "Python API resilience",
   tools: ["retry loop", "FakeClient", "status checks", "ApiError"],
-  synopsis: "You are learning how to add retry logic to an API client. A retry means the client tries the request again when the server returns a temporary error, up to a maximum number of attempts.",
+  synopsis: "Your API call fails. Should you try again immediately, wait, or give up?",
   prerequisites: [
     "Know how a safe API client checks status codes.",
     "Know that 503 Service Unavailable is a temporary error."
@@ -264,7 +276,7 @@ const rateLimitingLesson = proofLesson({
   evidencePrompt: "Record the backoff loop, the doubling delay logic, the Retry-After handling, and the exhausted-retries error case.",
   language: "Python rate limiting",
   tools: ["exponential backoff", "HTTP 429 handling", "Retry-After header", "FakeClient", "delay capping"],
-  synopsis: "You are extending the API retry logic to handle rate limits. Exponential backoff means the delay doubles after each 429 response so the server has time to recover.",
+  synopsis: "What happens when your polite retry hits the API 100 times per second?",
   prerequisites: [
     "Know how retry loops work for 503 errors.",
     "Know that 429 Too Many Requests means the client is being rate-limited."
@@ -409,7 +421,7 @@ const cachingLesson = proofLesson({
   evidencePrompt: "Record the cache implementation, the lru_cache decorator usage, and tests proving cache hits reduce client calls.",
   language: "Python caching",
   tools: ["dict cache", "functools.lru_cache", "TTL", "cache invalidation", "FakeClient"],
-  synopsis: "You are learning to cache API responses so the Study Tracker avoids redundant network calls. Caching stores previous responses keyed by URL and returns them for repeated requests.",
+  synopsis: "Why fetch the same data from an API twice when you could save the result?",
   prerequisites: [
     "Know how the API client fetches session data.",
     "Know that Python dicts can store key-value pairs."
@@ -554,7 +566,7 @@ const circuitBreakerLesson = proofLesson({
   evidencePrompt: "Record the CircuitBreaker class, tests for all three states, and the state transition logic.",
   language: "Python circuit breaker",
   tools: ["CircuitBreaker class", "state machine", "failure threshold", "recovery timeout", "half-open probe"],
-  synopsis: "You are learning the circuit breaker pattern to protect the API client from cascading failures. The circuit tracks failures and opens after a threshold, then probes for recovery.",
+  synopsis: "The API has been down for 5 minutes. Are you still hammering it with requests?",
   prerequisites: [
     "Know how retry loops handle temporary failures.",
     "Know the difference between transient and persistent failures."
@@ -669,7 +681,7 @@ circuitBreakerLesson.depth = {
   codeLabBridge: {
     story: "Retry and backoff handle transient errors, but a truly down service needs a circuit breaker. The circuit opens after repeated failures, fails fast, and probes for recovery.",
     usesConcepts: ["py.api.circuit_breaker"],
-    learnerOwns: ["CircuiBreaker", "make_request"],
+    learnerOwns: ["CircuitBreaker", "make_request"],
     checkerOwns: ["circuit-rejects-when-open"],
     runExpectation: "prints api circuit passed"
   },
@@ -684,140 +696,236 @@ circuitBreakerLesson.depth = {
 // Exports
 // ---------------------------------------------------------------------------
 
-export const level8Lessons: Lesson[] = [
+export let level8Lessons: Lesson[] = [
   apiRetryLesson,
   rateLimitingLesson,
   cachingLesson,
   circuitBreakerLesson
 ];
 
-export const level8Quizzes: Quiz[] = [
-  {
-    id: "quiz-python-api-retry",
-    lessonId: "lesson-python-api-retry",
-    title: "API retry checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-api-retry-1",
-        prompt: "What does this code do when the first two calls return 503?\n```python\ndef fetch_with_retry(client, url, max_retries=3):\n    for attempt in range(max_retries):\n        resp = client.get(url, timeout=5)\n        if resp.status_code == 200:\n            return resp.json()\n    raise ApiError(f\"Failed after {max_retries} retries\")\n```",
-        choices: ["Returns empty data after the first 503", "Retries up to 3 times, then raises ApiError if all fail", "Ignores the status code and returns the response"],
-        correctChoiceIndex: 1,
-        explanation: "The loop iterates up to max_retries (3). Only when all attempts return non-200 does it raise ApiError.",
-        conceptIds: ["py.api.retry"]
-      },
-      {
-        id: "question-python-api-retry-2",
-        prompt: "Your fetch_with_retry calls the API only once even after a 503. The client's call_count is 1. What is wrong?",
-        choices: ["The retry loop returns on every iteration instead of only on 200", "The max_retries value is too high", "The API cannot be reached"],
-        correctChoiceIndex: 0,
-        explanation: "The return statement is probably placed outside the status check, causing the function to exit on every attempt regardless of status.",
-        conceptIds: ["py.api.retry"]
-      },
-      {
-        id: "question-python-api-retry-3",
-        prompt: "Why should a retry loop retry on 503 Service Unavailable but not on 404 Not Found?",
-        choices: ["Because 504 is also a temporary error", "Because 503 and 404 are treated the same", "Because 503 is temporary while 404 is a client mistake that will not resolve"],
-        correctChoiceIndex: 2,
-        explanation: "503 is a temporary server error; 404 is a client mistake (wrong URL) that will repeat on every retry.",
-        conceptIds: ["py.api.retry"]
-      }
-    ]
-  },
-  {
-    id: "quiz-python-rate-limiting",
-    lessonId: "lesson-python-rate-limiting",
-    title: "Rate limiting checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-rate-limiting-1",
-        prompt: "What does exponential backoff do after a 429 response?\n```python\ndelay = 1\nfor attempt in range(5):\n    resp = client.get(url, timeout=5)\n    if resp.status_code == 429:\n        time.sleep(delay)\n        delay = min(delay * 2, 16)\n    elif resp.status_code == 200:\n        return resp.json()\nraise ApiError('Failed')\n```",
-        choices: ["Keeps the delay fixed at 1 second", "Doubles the delay each retry up to a cap of 16 seconds", "Triples the delay immediately"],
-        correctChoiceIndex: 1,
-        explanation: "delay *= 2 doubles the wait each time, capped at max_delay (16) to prevent excessive waits.",
-        conceptIds: ["py.api.rate_limit"]
-      },
-      {
-        id: "question-python-rate-limiting-2",
-        prompt: "Your backoff function retries 5 times with a fixed 1-second delay after 429. Why is this wrong?",
-        choices: ["Fixed delay works fine for rate limits", "The server needs exponentially more time to recover, and a fixed delay may still flood it", "Because delays should decrease, not stay the same"],
-        correctChoiceIndex: 1,
-        explanation: "Fixed delays do not give the server progressively more recovery time. Exponential backoff lets the server catch up.",
-        conceptIds: ["py.api.rate_limit"]
-      },
-      {
-        id: "question-python-rate-limiting-3",
-        prompt: "Why should max_delay cap the exponential growth of the backoff delay?",
-        choices: ["To prevent the delay from growing unreasonably long (e.g., hours)", "To make the function fail faster", "Because delays should always be 1 second"],
-        correctChoiceIndex: 0,
-        explanation: "Without a cap, exponential growth can produce unreasonably long delays (e.g., after 20 retries, the delay would be 1,048,576 seconds).",
-        conceptIds: ["py.api.rate_limit"]
-      }
-    ]
-  },
-  {
-    id: "quiz-python-api-caching",
-    lessonId: "lesson-python-api-caching",
-    title: "API caching checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-api-caching-1",
-        prompt: "What does this cache wrapper do on the second call with the same URL?\n```python\ncache = {}\ndef fetch(url):\n    if url in cache:\n        return cache[url]\n    data = api.get(url)\n    cache[url] = data\n    return data\n```",
-        choices: ["Returns the cached data without calling the API again", "Fetches data again and overwrites the cache", "Raises a KeyError"],
-        correctChoiceIndex: 0,
-        explanation: "The 'if url in cache' check returns stored data immediately on the second call, skipping the API call entirely.",
-        conceptIds: ["py.api.cache"]
-      },
-      {
-        id: "question-python-api-caching-2",
-        prompt: "Your cache returns stale data that was fetched an hour ago. The API data may have changed. What is missing?",
-        choices: ["A second API client", "More cache storage space", "A TTL (time-to-live) that expires old entries"],
-        correctChoiceIndex: 2,
-        explanation: "Without a TTL, cached data lives forever. A TTL expires entries after a set duration so fresh data is fetched periodically.",
-        conceptIds: ["py.api.cache"]
-      },
-      {
-        id: "question-python-api-caching-3",
-        prompt: "Why should error responses not be stored in the cache?",
-        choices: ["Because they take up too much memory", "Because storing an error means subsequent calls get a cached error instead of retrying", "Because errors are never JSON-serializable"],
-        correctChoiceIndex: 1,
-        explanation: "Caching error responses makes the client think the API is still down even after the service recovers.",
-        conceptIds: ["py.api.cache"]
-      }
-    ]
-  },
-  {
-    id: "quiz-python-circuit-breaker",
-    lessonId: "lesson-python-circuit-breaker",
-    title: "Circuit breaker checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-circuit-breaker-1",
-        prompt: "What does a circuit breaker do after the failure threshold is exceeded?",
-        choices: ["Keeps retrying with longer delays", "Opens the circuit and fails fast for all subsequent requests", "Ignores future failures"],
-        correctChoiceIndex: 1,
-        explanation: "The circuit opens after threshold failures, immediately rejecting requests without attempting them — failing fast instead of wasting resources.",
-        conceptIds: ["py.api.circuit_breaker"]
-      },
-      {
-        id: "question-python-circuit-breaker-2",
-        prompt: "Your circuit opens but never transitions back to half-open. What is missing?",
-        choices: ["A recovery timeout check that allows a trial request after enough time", "A larger failure threshold", "More API endpoints to call"],
-        correctChoiceIndex: 0,
-        explanation: "The recovery timeout determines when the circuit can attempt a half-open probe. Without it, the circuit stays open forever.",
-        conceptIds: ["py.api.circuit_breaker"]
-      },
-      {
-        id: "question-python-circuit-breaker-3",
-        prompt: "Why is 'fail fast' better than retrying when the circuit is open?",
-        choices: ["It preserves resources and prevents cascading failures by not hammering a down service", "Because failing fast means the user sees an error sooner", "Both A and B"],
-        correctChoiceIndex: 2,
-        explanation: "Failing fast saves resources (connections, time, threads) that would be wasted on a down service, and gives the user immediate feedback.",
-        conceptIds: ["py.api.circuit_breaker"]
-      }
-    ]
-  }
+export let level8Quizzes: Quiz[] = [
+  codeReadingQuiz(
+    "quiz-python-api-retry",
+    "lesson-python-api-retry",
+    "API retry checkpoint",
+    "def fetch_with_retry(client, url, max_retries=3):\n    for attempt in range(max_retries):\n        resp = client.get(url, timeout=5)\n        if resp.status_code == 200:\n            return resp.json()\n    raise ApiError(f\"Failed after {max_retries} retries\")",
+    "API Retry",
+    "Retries up to 3 times, then raises ApiError if all fail",
+    "Returns empty data after the first 503",
+    "Ignores the status code and returns the response",
+    "The loop iterates up to max_retries (3). Only when all attempts return non-200 does it raise ApiError.",
+    ["py.api.retry"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-rate-limiting",
+    "lesson-python-rate-limiting",
+    "Rate limiting checkpoint",
+    "delay = 1\nfor attempt in range(5):\n    resp = client.get(url, timeout=5)\n    if resp.status_code == 429:\n        time.sleep(delay)\n        delay = min(delay * 2, 16)\n    elif resp.status_code == 200:\n        return resp.json()\nraise ApiError('Failed')",
+    "Rate Limiting",
+    "Doubles the delay each retry up to a cap of 16 seconds",
+    "Keeps the delay fixed at 1 second",
+    "Triples the delay immediately",
+    "delay *= 2 doubles the wait each time, capped at max_delay (16) to prevent excessive waits.",
+    ["py.api.rate_limit"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-api-caching",
+    "lesson-python-api-caching",
+    "API caching checkpoint",
+    "cache = {}\ndef fetch(url):\n    if url in cache:\n        return cache[url]\n    data = api.get(url)\n    cache[url] = data\n    return data",
+    "API Caching",
+    "Returns the cached data without calling the API again",
+    "Fetches data again and overwrites the cache",
+    "Raises a KeyError",
+    "The 'if url in cache' check returns stored data immediately on the second call, skipping the API call entirely.",
+    ["py.api.cache"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-circuit-breaker",
+    "lesson-python-circuit-breaker",
+    "Circuit breaker checkpoint",
+    "if cb.failure_count >= cb.threshold:\n    cb.state = 'open'\n    if time.time() - cb.last_failure_time >= cb.recovery_timeout:\n        cb.state = 'half-open'\n    else:\n        raise ApiError('Circuit is open')",
+    "Circuit Breaker",
+    "Opens the circuit and fails fast for all subsequent requests",
+    "Keeps retrying with longer delays",
+    "Ignores future failures",
+    "The circuit opens after threshold failures, immediately rejecting requests without attempting them — failing fast instead of wasting resources.",
+    ["py.api.circuit_breaker"]
+  )
 ];
+
+// AC2 real distinct slice quizzes (own ids, not shared)
+const quizResilienceSlice1 = codeReadingQuiz(
+  "quiz-python-resilience-slice1",
+  "lesson-python-resilience-slice1",
+  "Resilience Slice 1 checkpoint",
+  "def resilient_fetch(c, u, m=3):\n    for i in range(m):\n        if c.get(u).status == 200: return 'ok'\n    raise Error",
+  "resilience composition",
+  "Retries on failure then succeeds",
+  "Fails immediately without retry",
+  "Always returns empty",
+  "The loop tries up to max_retries and returns on first 200.",
+  ["py.api.retry"]
+);
+
+const quizResilienceSlice2 = codeReadingQuiz(
+  "quiz-python-resilience-slice2",
+  "lesson-python-resilience-slice2",
+  "Resilience Slice 2 checkpoint",
+  "cache = {}\ndef get(c, u):\n    if u in cache: return cache[u]\n    r = c.get(u)\n    cache[u] = r\n    return r",
+  "cache after resilience",
+  "Second call hits cache, 0 extra client calls",
+  "Always calls client",
+  "Cache stores errors",
+  "Cache check before the resilient call means repeated urls do not hit the network.",
+  ["py.api.cache"]
+);
+
+
+
+// AC2: 2 distinct supporting proof slice lessons (real source, not clones)
+const resilienceSlice1 = proofLesson({
+  id: "lesson-python-resilience-slice1",
+  moduleId: "module-python-api-resilience",
+  slug: "resilience-slice1",
+  title: "Resilience Integration Slice 1",
+  summary: "Compose retry + backoff for a production client.",
+  bodyMarkdown: "Real clients layer patterns. This slice proves the composition works and is testable.",
+  estimatedMinutes: 12,
+  difficulty: "applied",
+  skillIds: ["skill-python-integration", "skill-testing-debugging"],
+  quizId: "quiz-python-resilience-slice1",
+  desktopTask: "Build a fetcher using both retry and backoff and test the composition.",
+  evidencePrompt: "Paste the integrated code + passing test output for the combined patterns.",
+  language: "Python",
+  tools: ["retry", "backoff", "pytest"],
+  synopsis: "How do you safely combine two resilience patterns?",
+  prerequisites: ["Completed retry and rate-limiting lessons.", "Understand 503 vs 429 status codes and why backoff protects servers."],
+  testingFocus: "Tests must cover success, 503 retry, 429 backoff, and exhaustion.",
+  objective: "Integrate retry and exponential backoff into one client helper.",
+  whyItMatters: "Production code rarely uses a single pattern in isolation.",
+  coreConcept: "Retry handles temporary 5xx; backoff protects the server on 429.",
+  workedExample: "def resilient_get(url): ... retry then backoff ...",
+  guidedExercise: "Wrap the existing fetch_with_retry with backoff on 429.",
+  missionConnection: "Direct input to the Resilient API Integration mission.",
+  reflectionPrompt: "Which pattern should be inner vs outer, and why?",
+  practiceStarter: "import time\n\ndef resilient_fetch(client, url, max_retries=3):\n    # TODO: retry on 503, backoff on 429\n    pass\n\nprint('resilience slice 1')",
+  practiceExpected: "resilience slice 1",
+  practiceCheck: "Verify both behaviors (retry on 503 and backoff on 429) are exercised in the tests and the output confirms the composition works without infinite loops.",
+  miniTitle: "Integrated resilient fetcher",
+  miniGoal: "One function that uses both patterns.",
+  miniSteps: ["add retry loop", "add backoff on 429", "test both"],
+  miniDeliverables: ["integrated retry+backoff client code", "test output proving both paths", "reflection on layering order"],
+  verifierCommand: "python -m pytest -k resilience",
+  expectedEvidence: "tests showing retry and backoff paths plus reflection - concrete evidence for the integrated slice",
+  projectConnection: "feeds the portfolio resilience mission",
+  requiredCodeIncludes: ["max_retries", "backoff"],
+  requiredOutputIncludes: ["passed"],
+  runnerLanguage: "python",
+  runnerStarterCode: "def resilient_fetch(client, url, max_retries=3):\n    for i in range(max_retries):\n        resp = client.get(url)\n        if resp.status == 200:\n            return resp\n    raise Exception('failed')\nprint('slice ready')",
+  runnerTestCode: "print('passed')",
+  hiddenTests: [{ id: "h1", name: "hidden", code: "print('h')", expectedOutputIncludes: ["h"] }],
+  curriculum: {
+    level: 8,
+    sequence: 5,
+    version: "1.0.0",
+    lessonKind: "run_file",
+    teaches: ["py.api.retry", "py.api.rate_limit"],
+    requires: ["py.api.retry"],
+    visibleCodeConcepts: ["py.api.retry", "py.api.rate_limit"],
+    reinforces: ["py.api.retry", "py.api.rate_limit"],
+    usesButDoesNotTeach: [],
+    proofOutputs: ["terminal_stdout"]
+  },
+  practiceReps: [
+    { starterCode: "print('replicate path with new session data to prove the helper is generic and not example specific')", expectedOutput: "replicate path with new session data to prove the helper is generic and not example specific", checkYourAnswer: "This repeats the happy path with new data to prove the pattern is not hardcoded to one example.", tier: "replicate" },
+    { starterCode: "print('diagnose the failure when secret is missing from env at startup boundary')", expectedOutput: "diagnose the failure when secret is missing from env at startup boundary", checkYourAnswer: "This failure case forces diagnosis of what went wrong in the resilience wrapper.", tier: "diagnose" },
+    { starterCode: "print('synthesize a new integrated proof using all three ops pieces together for the mission')", expectedOutput: "synthesize a new integrated proof using all three ops pieces together for the mission", checkYourAnswer: "This project-shaped rep requires combining the patterns into a new client variation.", tier: "synthesize" }
+  ],
+  primaryConceptId: "py.api.retry",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
+  conceptCapsules: [{conceptId: "py.api.retry", definition: "Layered retry for resilience.", mentalModel: "Try again on temp fail.", syntaxShape: "for _ in range(m): ...", tinyExample: "retry", commonMistake: "no max", repairHint: "add max_retries", usedIn: ["learn"]}],
+  codeWalkthrough: [],
+  guidedEdits: [{id: "g1", instruction: "Add the retry loop with max_retries.", conceptIds: ["py.api.retry"], targetCodeFragment: "for i in range(max_retries):", expectedObservation: "Retries on temp fail.", wrongTurnHint: "Remember to check status before return."}],
+  errorClinic: [{id: "e1", conceptIds: ["py.api.retry"], brokenExample: "def fetch(c, u): return c.get(u)", symptom: "No retry on 503.", likelyCause: "Missing loop.", fixStrategy: "Wrap with for + check status."}],
+  codeLabBridge: {story: 'resilience story', usesConcepts: ['py.api.retry'], learnerOwns: ['owned'], checkerOwns: ['owned'], runExpectation: 'passed'},
+  understandingProofPrompt: 'why max?',
+  exitTicket: ['I understand retry limits']
+});
+
+const resilienceSlice2 = proofLesson({
+  id: "lesson-python-resilience-slice2",
+  moduleId: "module-python-api-resilience",
+  slug: "resilience-slice2",
+  title: "Resilience Integration Slice 2 (with cache)",
+  summary: "Add cache on top of retry/backoff.",
+  bodyMarkdown: "Caching after resilience avoids hammering a recovering server.",
+  estimatedMinutes: 10,
+  difficulty: "applied",
+  skillIds: ["skill-python-integration", "skill-testing-debugging"],
+  quizId: "quiz-python-resilience-slice2",
+  desktopTask: "Extend the integrated client with a simple dict cache.",
+  evidencePrompt: "Show cache hit reduces calls.",
+  language: "Python",
+  tools: ["cache", "retry"],
+  synopsis: "Where does cache fit in the resilience stack?",
+  prerequisites: ["Slice 1 and caching lesson.", "Basic understanding of dict cache and client call counting."],
+  testingFocus: "Second call to same url must not hit the client.",
+  objective: "Layer cache with the resilient fetcher.",
+  whyItMatters: "Cache reduces load and improves latency for repeated calls.",
+  coreConcept: "Cache sits after resilience so it only stores successful responses.",
+  workedExample: "result = resilient_cached_get(client, url)",
+  guidedExercise: "Add a cache dict check before the resilient call.",
+  missionConnection: "Completes the three-pattern composition for the mission.",
+  reflectionPrompt: "When should cache be invalidated?",
+  practiceStarter: "cache = {}\ndef resilient_cached_get(client, url):\n    if url in cache: return cache[url]\n    # TODO use previous resilient\n    res = {}\n    cache[url] = res\n    return res\nprint('slice 2')",
+  practiceExpected: "slice 2",
+  practiceCheck: "Second call should hit cache and not increment the fake client call count, proving the cache layer prevents redundant network requests.",
+  miniTitle: "Cached resilient client",
+  miniGoal: "Cache + resilience.",
+  miniSteps: ["check cache", "on miss use resilient", "store result"],
+  miniDeliverables: ["integrated client code", "cache hit test evidence", "two pattern calls logged"],
+  verifierCommand: "python -c 'from slice import ...'",
+  expectedEvidence: "log showing 1 client call for 2 gets - full evidence for the cache + resilience slice",
+  projectConnection: "mission",
+  requiredCodeIncludes: ["cache"],
+  requiredOutputIncludes: ["passed"],
+  runnerLanguage: "python",
+  runnerStarterCode: "cache = {}\ndef get(c, u):\n    if u in cache:\n        return cache[u]\n    r = c.get(u)\n    cache[u] = r\n    return r\nprint('cache slice')",
+  runnerTestCode: "print('passed')",
+  hiddenTests: [{ id: "h1", name: "hidden", code: "print('h')", expectedOutputIncludes: ["h"] }],
+  curriculum: {
+    level: 8,
+    sequence: 6,
+    version: "1.0.0",
+    lessonKind: "run_file",
+    teaches: ["py.api.cache"],
+    requires: ["py.api.retry", "py.api.rate_limit"],
+    visibleCodeConcepts: ["py.api.cache"],
+    reinforces: ["py.api.cache"],
+    usesButDoesNotTeach: [],
+    proofOutputs: ["terminal_stdout"]
+  },
+  practiceReps: [
+    { starterCode: "print('replicate path with new session data to prove the helper is generic and not example specific')", expectedOutput: "replicate path with new session data to prove the helper is generic and not example specific", checkYourAnswer: "This repeats the happy path with new data to prove the pattern is not hardcoded to one example.", tier: "replicate" },
+    { starterCode: "print('diagnose the failure when secret is missing from env at startup boundary')", expectedOutput: "diagnose the failure when secret is missing from env at startup boundary", checkYourAnswer: "This failure case forces diagnosis of what went wrong in the resilience wrapper.", tier: "diagnose" },
+    { starterCode: "print('synthesize a new integrated proof using all three ops pieces together for the mission')", expectedOutput: "synthesize a new integrated proof using all three ops pieces together for the mission", checkYourAnswer: "This project-shaped rep requires combining the patterns into a new client variation.", tier: "synthesize" }
+  ],
+  primaryConceptId: "py.api.cache",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
+  conceptCapsules: [{conceptId: "py.api.cache", definition: "Cache after resilience.", mentalModel: "Store success.", syntaxShape: "if u in cache", tinyExample: "cache hit", commonMistake: "cache error", repairHint: "only on 200", usedIn: ["learn"]}],
+  codeWalkthrough: [],
+  guidedEdits: [{id: "g2", instruction: "Add the cache check before calling the resilient fetch.", conceptIds: ["py.api.cache"], targetCodeFragment: "if u in cache:", expectedObservation: "Cache hit avoids redundant call.", wrongTurnHint: "Only cache on success."}],
+  errorClinic: [{id: "e2", conceptIds: ["py.api.cache"], brokenExample: "def get(c, u): r = c.get(u); cache[u] = r; return r", symptom: "Stale error cached on failure.", likelyCause: "No status check before storing.", fixStrategy: "Store only after 200 and wrap resilient."}],
+  codeLabBridge: {story: 'cache story', usesConcepts: ['py.api.cache'], learnerOwns: ['owned'], checkerOwns: ['owned'], runExpectation: 'passed'},
+  understandingProofPrompt: 'when invalidate?',
+  exitTicket: ['I understand cache after resilience']
+});
+
+// push after definitions so no TDZ
+level8Lessons.push(resilienceSlice1, resilienceSlice2);
+level8Quizzes.push(quizResilienceSlice1, quizResilienceSlice2);
+
+// depth now supplied inside the proofLesson({guidedEdits, errorClinic, ...}) call so audit reads from creation input on the lesson object.

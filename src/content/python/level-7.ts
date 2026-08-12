@@ -23,6 +23,12 @@ const pythonRegexPracticeReps: LessonPracticeBlock[] = [
     expectedOutput: "The row passes shape validation before deeper parser checks.",
     checkYourAnswer: "Project-shaped validation happens at the boundary. Regex checks the text shape before date parsing, minute conversion, or business rules run.",
     tier: "synthesize"
+  },
+  {
+    starterCode: "# Review regex validation diff\n# + stricter date pattern\nprint('review: tighten pattern')",
+    expectedOutput: "review: tighten DATE_PATTERN to reject malformed dates in input rows",
+    checkYourAnswer: "Call out loose regex that accepts bad dates; add stricter pattern + unit test. (review-sim)",
+    tier: "review-sim"
   }
 ];
 
@@ -44,6 +50,12 @@ const pythonServicePracticeReps: LessonPracticeBlock[] = [
     expectedOutput: "topic_minutes('python') returns only the python total.",
     checkYourAnswer: "Project-shaped service methods answer product questions. A topic total should skip unrelated sessions without changing caller code.",
     tier: "synthesize"
+  },
+  {
+    starterCode: "# Review service diff\n# + totals_by_topic\nprint('review: expose totals')",
+    expectedOutput: "review: expose totals_by_topic for dashboard evidence",
+    checkYourAnswer: "Missing public totals method for reports; expose it. (review-sim)",
+    tier: "review-sim"
   }
 ];
 
@@ -86,6 +98,12 @@ const pythonApiPracticeReps: LessonPracticeBlock[] = [
     expectedOutput: "The client uses base_url configuration while secret values stay out of logs and evidence.",
     checkYourAnswer: "Project-shaped API work includes config and secret boundaries. A beginner client can stay offline while still learning not to log secrets.",
     tier: "synthesize"
+  },
+  {
+    starterCode: "# Review api client diff\n# + timeout handling\nprint('review: add timeout')",
+    expectedOutput: "review: add timeout and retry to safe client for resilience",
+    checkYourAnswer: "Client lacks timeout/retry; add it for prod safety. (review-sim)",
+    tier: "review-sim"
   }
 ];
 
@@ -171,7 +189,7 @@ const typeHintsLesson = proofLesson({
   evidencePrompt: "Record the typed function signatures, one call with a missing optional field, and the test output confirming types pass.",
   language: "Python type hints",
   tools: ["typing", "Optional", "function annotations"],
-  synopsis: "You are learning how type hints make function contracts visible. A function contract is the promise about what types the caller provides and what types the function returns.",
+  synopsis: "What if you could tell Python 'this variable is always a string' and catch bugs before you even run the code?",
   prerequisites: [
     "Know that functions take parameters and return values.",
     "Know that some session fields like notes may be absent."
@@ -335,7 +353,7 @@ const regexValidationLesson = proofLesson({
   evidencePrompt: "Record valid and invalid examples, the regex patterns, and the tests that prove each boundary.",
   language: "Python regex",
   tools: ["re", "parser tests", "input validation"],
-  synopsis: "You are learning how to use regular expressions as focused validation tools while keeping parser behavior understandable. Use regex for shape checks, not for every business rule.",
+  synopsis: "How does a single line of code check if an email, phone number, or date is correctly formatted?",
   prerequisites: [
     "Know that raw rows are strings.",
     "Know why bad dates or topic slugs should be rejected clearly."
@@ -348,6 +366,7 @@ const regexValidationLesson = proofLesson({
   guidedExercise: "Write validators for date strings and topic slugs, then test valid and invalid examples.",
   missionConnection: "This closes the regex gap and strengthens parser boundaries for the Study Data Cleaner mission.",
   reflectionPrompt: "Which validation belongs in regex, and which validation should be handled by date or business logic later?",
+  commonMistakes: ["Not escaping special characters like . and *", "Using regex for problems that need a parser instead of a pattern match"],
   practiceStarter: "import re\n\nDATE_PATTERN = r\"\"\nSLUG_PATTERN = r\"\"\n\ndef is_valid_date(value):\n    return False\n\ndef is_valid_slug(value):\n    return False\n\nprint(is_valid_date(\"2026-05-08\"))\nprint(is_valid_slug(\"python-basics\"))",
   practiceExpected: "True\nTrue\nFalse for malformed examples",
   practiceCheck: "If bad-2026 passes, your date regex is matching only part of the text. Use anchors or fullmatch so the whole value must match.",
@@ -460,7 +479,7 @@ const oopServiceLesson = proofLesson({
   evidencePrompt: "Record two independent service instances and the tests proving they do not share state.",
   language: "Python classes",
   tools: ["classes", "methods", "state tests"],
-  synopsis: "You are learning when object-oriented Python helps: when one object should own state and expose clear behavior. State means data that the object remembers between method calls.",
+  synopsis: "When a function isn't enough — how do you organize code that has setup, state, and multiple operations?",
   prerequisites: [
     "Know how functions receive inputs and return values.",
     "Know what session data the tracker stores."
@@ -585,7 +604,7 @@ const sqlitePersistenceLesson = proofLesson({
   evidencePrompt: "Record the schema, seed rows, total-by-topic query, and command output.",
   language: "SQLite for Python utilities",
   tools: ["SQLite", "schema", "aggregate query"],
-  synopsis: "You are learning how a Python utility can persist session data with SQLite. Persist means save data so it is still available after the program exits.",
+  synopsis: "Your app restarts and all your data disappears. How do you make it remember?",
   prerequisites: [
     "Know the session fields date, topic, and minutes.",
     "Know that SQL tables store rows and queries calculate answers."
@@ -721,7 +740,7 @@ const apiClientLesson = proofLesson({
   evidencePrompt: "Record one successful fake response, one bad-status response, one bad-shape response, and the tests proving each path.",
   language: "Python API client",
   tools: ["HTTP client boundary", "fake responses", "validation tests", "config safety"],
-  synopsis: "You are learning how to design API code as a safe boundary. Network data is untrusted input until your code checks the status code and response shape.",
+  synopsis: "How does your Study Tracker talk to a web service that's halfway across the internet?",
   prerequisites: [
     "Know the StudySession fields.",
     "Know that network responses are untrusted input."
@@ -734,6 +753,7 @@ const apiClientLesson = proofLesson({
   guidedExercise: "Use a fake client to test success, bad status, bad shape, and safe config handling without making real network calls.",
   missionConnection: "This closes the API/networking gap while keeping the mobile sandbox safe and offline.",
   reflectionPrompt: "Which failures belong at the API boundary before data reaches the service layer?",
+  commonMistakes: ["Not checking response.status_code before parsing body", "Hardcoding the API URL instead of making it configurable"],
   practiceStarter: "class ApiError(Exception):\n    pass\n\nclass FakeResponse:\n    def __init__(self, status_code, payload):\n        self.status_code = status_code\n        self._payload = payload\n    def json(self):\n        return self._payload\n\nclass FakeClient:\n    def __init__(self, response):\n        self.response = response\n        self.timeout_seen = None\n    def get(self, url, timeout):\n        self.timeout_seen = timeout\n        return self.response\n\ndef fetch_sessions(client, url):\n    return []",
   practiceExpected: "[{'date': '2026-05-08', 'topic': 'python', 'minutes': 30}]\ntimeout=5",
   practiceCheck: "If bad status or bad shape returns an empty list, the caller cannot tell success from failure. Raise a project-specific API error so failure stays visible.",
@@ -763,7 +783,7 @@ const apiClientLesson = proofLesson({
     version: "1.0.0",
     lessonKind: "run_file",
     teaches: ["py.api.client", "py.http.status"],
-    requires: ["py.sqlite.query"],
+    requires: [],
     visibleCodeConcepts: ["py.api.client", "py.http.status"],
     quizConcepts: ["py.api.client", "py.http.status"],
     usesButDoesNotTeach: ["py.json"],
@@ -879,7 +899,7 @@ const testingMocksLesson = proofLesson({
   evidencePrompt: "Record the patched test function, the mock assertion output, and one example of side_effect testing.",
   language: "Python unittest.mock",
   tools: ["unittest.mock", "patch", "MagicMock", "assert_called_with", "side_effect", "return_value"],
-  synopsis: "You are learning how to replace real API calls with controlled mock objects so your tests run fast and deterministically without network access.",
+  synopsis: "How do you test code that needs a web service that isn't running?",
   prerequisites: [
     "Know how the Study Tracker API client fetches sessions.",
     "Know that real network calls make tests slow and flaky."
@@ -1033,7 +1053,7 @@ const integrationCapstoneLesson = proofLesson({
   evidencePrompt: "Record the completed session_repository.py, tracker_service.py, cli.py, test output, and one example of validation rejecting bad input.",
   language: "Python integration capstone",
   tools: ["sqlite3", "argparse", "repository pattern", "integration tests"],
-  synopsis: "You are building a Study Dashboard from scratch using SQLite persistence, a service layer, and a CLI. This is a proof that you can wire multiple Python layers together into one working utility.",
+  synopsis: "You have SQLite, an API, and OOP services — what can you build with all three?",
   prerequisites: [
     "Know how to write SQL CREATE TABLE and SELECT queries.",
     "Know how to use argparse for CLI flags.",
@@ -1206,7 +1226,7 @@ const integrationReviewLesson = proofLesson({
   evidencePrompt: "Record the layer matrix, pytest output, SQLite query output, API client failure proof, CLI JSON output, and one risk/improvement.",
   language: "Python capstone review",
   tools: ["integration matrix", "pytest", "SQLite output", "API failure output", "CLI JSON output"],
-  synopsis: "You are learning to audit an integrated Python utility by connecting each layer to evidence, risk, and improvement. This is a judgment exercise, not just a completion screen.",
+  synopsis: "Does your integrated Study Dashboard actually hold up under real use?",
   prerequisites: [
     "Have completed the integration lessons.",
     "Have final verification commands and artifacts to inspect."
@@ -1332,166 +1352,66 @@ export const level7Lessons: Lesson[] = [
 // ---------------------------------------------------------------------------
 
 export const level7Quizzes: Quiz[] = [
-  {
-    id: "quiz-python-type-hints",
-    lessonId: "lesson-python-type-hints",
-    title: "Type hints checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-type-hints-1",
-        prompt: "What does this function signature tell a reviewer?\n```python\ndef format_session(topic: str, minutes: int) -> str:\n    return f\"{topic}: {minutes} min\"\n```",
-        choices: ["topic is a string, minutes is an integer, and the function returns a string", "topic is optional, minutes is a string", "The function has no return value"],
-        correctChoiceIndex: 0,
-        explanation: "The type hints declare that topic must be str, minutes must be int, and the return value is str.",
-        conceptIds: ["py.typing.hints"]
-      },
-      {
-        id: "question-python-type-hints-2",
-        prompt: "Your format_session function crashes with AttributeError when notes is None. The signature is:\n```python\ndef format_session(topic: str, minutes: int, notes: str | None = None) -> str:\n```\nWhat is missing in the body?",
-        choices: ["The notes parameter should not be Optional", "The function does not check if notes is None before using it", "The function has the wrong return type"],
-        correctChoiceIndex: 1,
-        explanation: "An str | None parameter may be None. The function body must check for None before using string methods.",
-        conceptIds: ["py.typing.optional"]
-      },
-      {
-        id: "question-python-type-hints-3",
-        prompt: "Python does not enforce type hints at runtime. Why add them at all?",
-        choices: ["They make Python run faster", "They replace all testing", "They document the expected types for reviewers, linters, and future maintainers"],
-        correctChoiceIndex: 2,
-        explanation: "Type hints serve as documentation and enable static analysis tools (like mypy) to catch mismatches before runtime.",
-        conceptIds: ["py.typing.hints"]
-      }
-    ]
-  },
-  {
-    id: "quiz-python-regex-validation",
-    lessonId: "lesson-python-regex-validation",
-    title: "Regex validation checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-regex-1",
-        prompt: "What does this code return for '2026-05-08-extra'?\n```python\nimport re\nDATE_PATTERN = r\"^\\d{4}-\\d{2}-\\d{2}$\"\ndef is_valid_date(value):\n    return bool(re.fullmatch(DATE_PATTERN, value))\n```",
-        choices: ["True", "False", "None"],
-        correctChoiceIndex: 1,
-        explanation: "re.fullmatch requires the entire string to match. '2026-05-08-extra' has trailing characters so fullmatch returns None (falsy).",
-        conceptIds: ["py.validation.schema"]
-      },
-      {
-        id: "question-python-regex-2",
-        prompt: "Your date validator re.match allows 'bad-2026-05-08' to pass. What is wrong?",
-        choices: ["re.match only checks the beginning of the string, not the whole string", "The regex pattern is too short", "Python does not support regex"],
-        correctChoiceIndex: 0,
-        explanation: "re.match finds a match at the beginning. 'bad-2026-05-08' does not match, but a prefix match would pass if the pattern is at the start.",
-        conceptIds: ["py.validation.schema"]
-      },
-      {
-        id: "question-python-regex-3",
-        prompt: "A regex matches YYYY-MM-DD shape. What dates can still slip through?",
-        choices: ["Only completely invalid dates like 'not-a-date'", "All invalid dates are caught by the regex", "Calendar-invalid dates like '2026-02-30' which have valid shape but are not real dates"],
-        correctChoiceIndex: 2,
-        explanation: "Regex checks text shape only. A date like '2026-02-30' has valid digit pattern but is not a real calendar date.",
-        conceptIds: ["py.validation.schema"]
-      }
-    ]
-  },
-  {
-    id: "quiz-python-oop-service",
-    lessonId: "lesson-python-oop-service",
-    title: "OOP service checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-oop-1",
-        prompt: "What does this code output?\n```python\ntracker = StudyTrackerService()\ntracker.add_session(\"python\", 30)\ntracker.add_session(\"git\", 15)\nprint(tracker.total_minutes())\n```",
-        choices: ["30", "15", "45"],
-        correctChoiceIndex: 2,
-        explanation: "The total_minutes method sums all added sessions: 30 + 15 = 45.",
-        conceptIds: ["py.dataclass"]
-      },
-      {
-        id: "question-python-oop-2",
-        prompt: "Two StudyTrackerService instances share the same session list. What is the likely cause?",
-        choices: ["The sessions list is defined at the class level instead of inside __init__", "The instances are the same object", "Python automatically shares all lists"],
-        correctChoiceIndex: 0,
-        explanation: "Defining sessions = [] at the class level creates one shared list; using self.sessions = [] in __init__ gives each instance its own.",
-        conceptIds: ["py.dataclass"]
-      },
-      {
-        id: "question-python-oop-3",
-        prompt: "Why expose methods like total_minutes() instead of allowing direct access to a sessions list?",
-        choices: ["Because lists cannot be accessed from outside a class", "Because methods can encapsulate calculation logic while hiding internal storage details", "Because methods are faster than variables"],
-        correctChoiceIndex: 1,
-        explanation: "Methods provide controlled behavior (like summing minutes) while keeping the internal storage abstracted.",
-        conceptIds: ["py.dataclass"]
-      }
-    ]
-  },
-  {
-    id: "quiz-python-sqlite-persistence",
-    lessonId: "lesson-python-sqlite-persistence",
-    title: "SQLite persistence checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-sqlite-1",
-        prompt: "What does this SQL query return?\n```sql\nSELECT topic, SUM(minutes)\nFROM sessions GROUP BY topic;\n```",
-        choices: ["One row per topic with the total minutes for that topic", "Every session row individually", "An error because the syntax is wrong"],
-        correctChoiceIndex: 0,
-        explanation: "GROUP BY topic groups rows by topic, and SUM(minutes) calculates the total minutes for each group.",
-        conceptIds: ["py.sqlite.query"]
-      },
-      {
-        id: "question-python-sqlite-2",
-        prompt: "Your totals_by_topic query returns empty even though rows were inserted. What is the most likely cause?",
-        choices: ["SQLite does not support GROUP BY", "The INSERT was not committed before the SELECT ran", "The table has no rows"],
-        correctChoiceIndex: 1,
-        explanation: "SQLite wraps INSERTs inside a transaction. The changes must be committed before SELECT can see them.",
-        conceptIds: ["py.sqlite"]
-      },
-      {
-        id: "question-python-sqlite-3",
-        prompt: "Why store raw session rows instead of pre-calculated totals?",
-        choices: ["Because SQLite cannot calculate totals", "Because raw rows take up more space", "Because raw rows can be re-queried for different summaries as requirements evolve"],
-        correctChoiceIndex: 2,
-        explanation: "Raw rows are the source of truth; they can be aggregated differently as new questions arise.",
-        conceptIds: ["py.sqlite.query"]
-      }
-    ]
-  },
-  {
-    id: "quiz-python-api-client",
-    lessonId: "lesson-python-api-client",
-    title: "API client checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-api-1",
-        prompt: "What does this API client snippet do?\n```python\ndef fetch_sessions(client, url):\n    response = client.get(url, timeout=5)\n    if response.status_code != 200:\n        raise ApiError(f\"HTTP {response.status_code}\")\n    return response.json()\n```",
-        choices: ["It calls the API with a timeout, checks status, and raises ApiError on bad status", "It always returns empty data", "It ignores the response status"],
-        correctChoiceIndex: 0,
-        explanation: "The client sets a timeout, verifies status code is 200, and raises ApiError for non-200 responses.",
-        conceptIds: ["py.api.client"]
-      },
-      {
-        id: "question-python-api-2",
-        prompt: "Your API client returns an empty list for 503 Service Unavailable. Why is this dangerous?",
-        choices: ["503 errors are always temporary", "An empty list looks the same as a successful response with no data, hiding the failure", "An empty list is faster"],
-        correctChoiceIndex: 1,
-        explanation: "Returning empty data on error makes it impossible for callers to distinguish between 'no sessions' and 'API is down'.",
-        conceptIds: ["py.http.status"]
-      },
-      {
-        id: "question-python-api-3",
-        prompt: "Why test with a FakeClient instead of making real HTTP requests in unit tests?",
-        choices: ["Because real HTTP is always faster", "Because fake clients require no setup", "Because fake clients let you test success, timeout, bad status, and bad shape without network dependence"],
-        correctChoiceIndex: 2,
-        explanation: "Fake clients make tests deterministic and avoid network flakiness, while still proving every code path.",
-        conceptIds: ["py.api.client"]
-      }
-    ]
-  },
+  codeReadingQuiz(
+    "quiz-python-type-hints",
+    "lesson-python-type-hints",
+    "Type hints checkpoint",
+    'def format_session(topic: str, minutes: int) -> str:\n    return f"{topic}: {minutes} min"',
+    "type hints",
+    "topic is a string, minutes is an integer, and the function returns a string",
+    "topic is optional, minutes is a string",
+    "The function has no return value",
+    "The type hints declare that topic must be str, minutes must be int, and the return value is str.",
+    ["py.typing.hints"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-regex-validation",
+    "lesson-python-regex-validation",
+    "Regex validation checkpoint",
+    'import re\nDATE_PATTERN = r"^\\d{4}-\\d{2}-\\d{2}$"\ndef is_valid_date(value):\n    return bool(re.fullmatch(DATE_PATTERN, value))',
+    "regex validation",
+    "False",
+    "True",
+    "None",
+    "re.fullmatch requires the entire string to match. '2026-05-08-extra' has trailing characters so fullmatch returns None (falsy).",
+    ["py.validation.schema"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-oop-service",
+    "lesson-python-oop-service",
+    "OOP service checkpoint",
+    'tracker = StudyTrackerService()\ntracker.add_session("python", 30)\ntracker.add_session("git", 15)\nprint(tracker.total_minutes())',
+    "oop service",
+    "45",
+    "30",
+    "15",
+    "The total_minutes method sums all added sessions: 30 + 15 = 45.",
+    ["py.dataclass"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-sqlite-persistence",
+    "lesson-python-sqlite-persistence",
+    "SQLite persistence checkpoint",
+    'SELECT topic, SUM(minutes)\nFROM sessions GROUP BY topic;',
+    "sqlite query",
+    "One row per topic with the total minutes for that topic",
+    "Every session row individually",
+    "An error because the syntax is wrong",
+    "GROUP BY topic groups rows by topic, and SUM(minutes) calculates the total minutes for each group.",
+    ["py.sqlite.query"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-api-client",
+    "lesson-python-api-client",
+    "API client checkpoint",
+    'def fetch_sessions(client, url):\n    response = client.get(url, timeout=5)\n    if response.status_code != 200:\n        raise ApiError(f"HTTP {response.status_code}")\n    return response.json()',
+    "api client",
+    "It calls the API with a timeout, checks status, and raises ApiError on bad status",
+    "It always returns empty data",
+    "It ignores the response status",
+    "The client sets a timeout, verifies status code is 200, and raises ApiError for non-200 responses.",
+    ["py.api.client"]
+  ),
   codeReadingQuiz(
     "quiz-python-integration-capstone",
     "lesson-python-integration-capstone",
@@ -1504,38 +1424,18 @@ export const level7Quizzes: Quiz[] = [
     "SessionRepository wraps SQL operations behind clean method calls. add_session uses ? placeholders to prevent SQL injection. totals_by_topic uses GROUP BY to aggregate minutes per topic.",
     ["py.sqlite.query"]
   ),
-  {
-    id: "quiz-python-integration-review",
-    lessonId: "lesson-python-integration-review",
-    title: "Integration review checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-integration-review-1",
-        prompt: "What does this review snippet identify?\n```python\nreview = {\n    \"layers\": [\n        {\"name\": \"sqlite\", \"risk\": \"transaction rollback untested\"}\n    ],\n    \"improvement\": \"Add rollback tests\"\n}\n```",
-        choices: ["A layer with a named risk and an improvement path", "A list of all project files", "A deployment pipeline"],
-        correctChoiceIndex: 0,
-        explanation: "The review identifies a specific risk for the sqlite layer and proposes a concrete improvement.",
-        conceptIds: ["evidence.portfolio"]
-      },
-      {
-        id: "question-python-integration-review-2",
-        prompt: "Your integration review has no risk column. Why is this a concern?",
-        choices: ["Because risk is optional", "Because a review without risk assessment does not guide future improvements", "Because risk cannot be documented"],
-        correctChoiceIndex: 1,
-        explanation: "Professional review names specific risks; without them the review does not help prioritize what to fix next.",
-        conceptIds: ["evidence.portfolio"]
-      },
-      {
-        id: "question-python-integration-review-3",
-        prompt: "What makes final review evidence strongest?",
-        choices: ["Only a passing badge", "Only a written description", "A mix of passing test output, CLI smoke results, and documented limitations"],
-        correctChoiceIndex: 2,
-        explanation: "Strong evidence combines multiple types of proof: tests, commands, and honest scope documentation.",
-        conceptIds: ["evidence.portfolio"]
-      }
-    ]
-  },
+  codeReadingQuiz(
+    "quiz-python-integration-review",
+    "lesson-python-integration-review",
+    "Integration review checkpoint",
+    'review = {\n    "layers": [\n        {"name": "sqlite", "risk": "transaction rollback untested"}\n    ],\n    "improvement": "Add rollback tests"\n}',
+    "integration review",
+    "A layer with a named risk and an improvement path",
+    "A list of all project files",
+    "A deployment pipeline",
+    "The review identifies a specific risk for the sqlite layer and proposes a concrete improvement.",
+    ["evidence.portfolio"]
+  ),
   codeReadingQuiz(
     "quiz-python-testing-mocks",
     "lesson-python-testing-mocks",

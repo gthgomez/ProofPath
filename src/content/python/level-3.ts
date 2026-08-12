@@ -1,5 +1,5 @@
 import type { Lesson, Quiz, LessonPracticeBlock } from "@/domain/types";
-import { proofLesson, checkpointQuiz, codeReadingQuiz } from "./shared";
+import { proofLesson, codeReadingQuiz } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Practice rep pools
@@ -289,7 +289,7 @@ const whyFunctionsLesson = proofLesson({
   evidencePrompt: "Write one sentence explaining what the function removes and what remains in each call site.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are seeing the problem functions solve before touching the syntax.",
+  synopsis: "What happens when you need to do the same task 17 times?",
   prerequisites: ["Know how to assign variables (Level 1 lessons).", "Understand how variables are named and printed."],
   testingFocus: "Compare duplicated code against a function and identify what changed.",
   objective: "State in one sentence what problem a function solves.",
@@ -404,7 +404,7 @@ const defCallLesson = proofLesson({
   evidencePrompt: "Record the function body, the two call outputs, and what changed between calls.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are writing your first def block and calling it to confirm it works.",
+  synopsis: "How do you teach Python a new trick so it remembers forever?",
   prerequisites: ["Understand why functions exist (previous lesson).", "Know how running scripts produces output in the terminal."],
   testingFocus: "The test calls the function and checks that the function prints expected greeting.",
   objective: "Define a function with def and call it to produce an output.",
@@ -540,6 +540,11 @@ defCallLesson.depth = {
   ]
 };
 
+defCallLesson.workshop.commonMistakes = [
+  "Defining a function but never calling it",
+  "Forgetting parentheses when calling the function"
+];
+
 // ---------------------------------------------------------------------------
 // Micro-lesson 3 — Parameters and Arguments (run_file)
 // ---------------------------------------------------------------------------
@@ -559,7 +564,7 @@ const parametersLesson = proofLesson({
   evidencePrompt: "Record two different call outputs and explain what changed between them.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning how to make a function flexible by giving it named inputs.",
+  synopsis: "How do you give a function different inputs each time you call it?",
   prerequisites: ["Know how to define and call a function (previous lesson).", "Know how running scripts produces output in the terminal."],
   testingFocus: "The test calls the function with two different argument sets and checks that they are printed.",
   objective: "Write a function with two parameters and call it with two different argument sets.",
@@ -706,7 +711,7 @@ const returnLesson = proofLesson({
   evidencePrompt: "Record the function signature, the return value, and one assertion that confirmed it.",
   language: "Python",
   tools: ["Python 3", "terminal", "assertions"],
-  synopsis: "You are learning how to pass data out of a function so the caller can use it.",
+  synopsis: "What's the point of a function that does work but never tells you the answer?",
   prerequisites: ["Know how to define a function and pass parameters (previous lessons).", "Understand print output in functions."],
   testingFocus: "The test calls the function and checks the returned value matches expected data.",
   objective: "Write a function that returns a value the caller can store and test.",
@@ -844,7 +849,7 @@ const printVsReturnLesson = proofLesson({
   evidencePrompt: "Record what the two functions produce and why the test passes for one but not the other.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning the most important function design rule: return data, do not print it.",
+  synopsis: "Your function prints the result but your test sees nothing — what went wrong?",
   prerequisites: [
     "Know how return works (previous lesson).",
     "Understand how print displays output in the terminal."
@@ -989,7 +994,7 @@ const functionsCapstoneLesson = proofLesson({
   evidencePrompt: "Record the four function definitions, the printed summary output, and one line that proves the result matches the Level 2 capstone output.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You have four focused Python functions ready to define: parse_row, total_minutes, focus_sessions, and format_summary. Your previous capstone wrote one flat script; this one splits the logic across testable, single-responsibility helpers.",
+  synopsis: "How do you turn 50 lines of tangled code into clean, testable pieces?",
   prerequisites: [
     "Know how to define, call, parameterize, and return from functions (Level 3 micro-lessons 1-5).",
     "Understand the Study Tracker flat script from the Level 2 capstone (lesson-python-foundation-capstone)."
@@ -1406,11 +1411,12 @@ print(result)`,
     "Decomposition means each function has a single responsibility. parse_row only formats a row — it does not loop, accumulate, or print. This makes it independently testable and reusable across the program.",
     ["py.decomposition.helper_function", "py.single_responsibility.basic"]
   ),
-  // Deprecated quiz — kept so old quiz attempt IDs still resolve
-  checkpointQuiz(
+  // 5Q quiz (was checkpoint, now codeReadingQuiz)
+  codeReadingQuiz(
     "quiz-python-functions",
     "lesson-python-functions",
-    "Functions Checkpoint (Deprecated)",
+    "Functions Checkpoint",
+    'def summarize(minutes):\n    return f"Total: {minutes}"\nprint(summarize(30))',
     "defining functions",
     "Structure reusable code blocks using def, parameters, and return statement values.",
     "Rely on global variables and print results directly without returning data.",

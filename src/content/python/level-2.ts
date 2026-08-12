@@ -1,10 +1,10 @@
 import type { Lesson, LessonPracticeBlock, Quiz } from "@/domain/types";
-import { proofLesson, checkpointQuiz, codeReadingQuiz } from "./shared";
+import { proofLesson, codeReadingQuiz } from "./shared";
 
 const pythonListPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "topics = ['python', 'git', 'sql']\nsecond = ''\nprint(second)",
-    expectedOutput: "git\nIndex 1 is the second item because lists start at 0.",
+    starterCode: "topics = ['python', 'git', 'sql']\nsecond = topics[1]\nprint('Your topics:', topics)\nprint('Second item:', second)",
+    expectedOutput: "Your topics: ['python', 'git', 'sql']\nSecond item: git",
     checkYourAnswer: "List positions start at 0. Index 0 is 'python', index 1 is 'git'. Make sure you access index 1, not index 2.",
     tier: "replicate"
   },
@@ -217,6 +217,48 @@ const pythonModuleGuardPracticeReps: LessonPracticeBlock[] = [
   }
 ];
 
+const pythonTruthinessPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "print(bool('python'))\nprint(bool(''))\nprint(bool(42))\nprint(bool(0))",
+    expectedOutput: "True\nFalse\nTrue\nFalse",
+    checkYourAnswer: "Non-empty strings, non-zero numbers, and non-empty collections are truthy. Empty strings and zero are falsy.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "errors = ['missing field']\n# Bug: this checks length instead of using truthiness.\nif len(errors) > 0:\n    print('has issues')\nelse:\n    print('all clear')",
+    expectedOutput: "has issues using truthiness",
+    checkYourAnswer: "Replace len(errors) > 0 with just 'if errors:' to use truthiness directly instead of an explicit length check.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "def validate(data):\n    errors = []\n    # Add to errors if something is wrong, then use truthiness to report.\n    return errors\n\nresult = validate({'topic': ''})\nif result: print('failed')\nelse: print('passed')",
+    expectedOutput: "passed with truthiness check",
+    checkYourAnswer: "The function returns an empty list (falsy) so 'passed' prints. If errors had items, 'failed' would print.",
+    tier: "synthesize"
+  }
+];
+
+const pythonMutabilityPracticeReps: LessonPracticeBlock[] = [
+  {
+    starterCode: "a = [1, 2, 3]\nb = a\nb.append(4)\nprint(a)",
+    expectedOutput: "[1, 2, 3, 4] -- both variables see the change",
+    checkYourAnswer: "b = a makes b point to the same list. Mutating through b also changes a because lists are mutable. The output shows the original has changed.",
+    tier: "replicate"
+  },
+  {
+    starterCode: "name = 'python'\n# Bug: this tries to modify a string in place.\nname[0] = 'P'",
+    expectedOutput: "Fix: strings are immutable — reassign the variable instead of using bracket assignment.",
+    checkYourAnswer: "Strings are immutable. You cannot change characters in place. Reassign the whole string: name = 'Python'.",
+    tier: "diagnose"
+  },
+  {
+    starterCode: "original = [1, 2, 3]\ncopy = original.copy()\ncopy.append(4)\nprint('Original:', original)\nprint('Copy:', copy)",
+    expectedOutput: "Original: [1, 2, 3]\nCopy: [1, 2, 3, 4]",
+    checkYourAnswer: "Using .copy() creates a separate list. Mutating the copy does not affect the original.",
+    tier: "synthesize"
+  }
+];
+
 export const level2Lessons: Lesson[] = [
   proofLesson({
     id: "lesson-python-lists",
@@ -249,7 +291,7 @@ export const level2Lessons: Lesson[] = [
     evidencePrompt: "Record the list code, the output, and one reason position 0 matters.",
     language: "Python",
     tools: ["Python 3", "terminal", "lists"],
-    synopsis: "You are learning how Python stores multiple values in one ordered list.",
+    synopsis: "What if you need to track 100 study sessions but only have one variable?",
     prerequisites: ["Know that a variable can store a single value.", "Know that strings use quotes and numbers usually do not."],
     testingFocus: "You will test that the list is created correctly and that items can be accessed by their zero-based index.",
     objective: "Create a Python list and access items by their index position.",
@@ -314,7 +356,7 @@ export const level2Lessons: Lesson[] = [
     evidencePrompt: "Record the dictionary code, the output, and one key that every session record should share.",
     language: "Python",
     tools: ["Python 3", "terminal", "dictionaries"],
-    synopsis: "You are learning how Python stores labeled data in key-value pairs.",
+    synopsis: "If a list is like numbered train cars, what do you use when your seats have names, not numbers?",
     prerequisites: ["Know that a variable can store a single value.", "Know that strings use quotes."],
     testingFocus: "You will test that the dictionary is created with the right keys and that values can be accessed by their key name.",
     objective: "Create a Python dictionary and access values by their key names.",
@@ -349,10 +391,79 @@ export const level2Lessons: Lesson[] = [
     ]
   }),
   proofLesson({
+    id: "lesson-python-mutability",
+    curriculum: {
+      level: 2,
+      sequence: 3,
+      version: "1.0.0",
+      teaches: ["py.mutability", "py.reference"],
+      requires: ["py.list.literal", "py.dict.literal", "py.variable.assignment"],
+      usesButDoesNotTeach: ["py.assertion"]
+    },
+    codeShape: [
+      "# Lists and dicts are mutable — they change in place.",
+      "a = [1, 2, 3]",
+      "b = a  # b references the same list",
+      "b.append(4)",
+      "print(a)  # [1, 2, 3, 4] — a changed too!",
+      "",
+      "# Strings and ints are immutable — each change creates a new object.",
+      'name = "python"',
+      "new_name = name.upper()",
+      "print(name)  # python — original unchanged"
+    ].join("\n"),
+    moduleId: "module-python-core",
+    slug: "python-mutability",
+    title: "Mutable vs Immutable Types",
+    summary: "Understand which values can change in place and what happens when two variables share one object.",
+    bodyMarkdown: "Lists and dicts are mutable — you can change their contents without creating a new object. Strings and integers are immutable — every operation creates a new value. When you assign b = a where a is a list, b points to the same list — mutating through b affects a too.",
+    estimatedMinutes: 10,
+    difficulty: "foundation",
+    skillIds: ["skill-python-basics"],
+    quizId: "quiz-python-mutability",
+    desktopTask: "Predict what happens when you mutate a list through two variable names.",
+    evidencePrompt: "Record the aliasing code, the output, and one advantage of immutability for strings.",
+    language: "Python",
+    tools: ["Python 3", "terminal", "mutability"],
+    synopsis: "What happens when you change a list through two different variable names?",
+    prerequisites: ["Know how to create a list with square brackets.", "Know how to create a dict with curly braces.", "Know that variables store values."],
+    testingFocus: "You will test that mutating a list through one variable affects other references to the same list.",
+    objective: "Distinguish mutable from immutable types and predict aliasing behavior.",
+    whyItMatters: "Understanding mutability prevents subtle bugs where changing data in one place unexpectedly changes it elsewhere.",
+    coreConcept: "Lists and dicts are mutable (change in place); strings, integers, booleans are immutable (create new objects). Variables hold references — b = a makes b point to the same mutable object as a.",
+    workedExample: "a = [1, 2, 3]; b = a; b.append(4) — a is now [1, 2, 3, 4] because b and a reference the same list. s = 'hi'; t = s.upper() — s is still 'hi' because strings are immutable.",
+    guidedExercise: "Create a list, assign a second variable to it, mutate through the second, and print the original.",
+    missionConnection: "This prevents the Study Tracker from accidentally mutating shared session lists when only a copy was intended.",
+    reflectionPrompt: "Why does Python make strings immutable but lists mutable? What trade-off is Python making?",
+    practiceStarter: "a = [1, 2, 3]\nb = a\nb.append(4)\nprint(a)",
+    practiceExpected: "[1, 2, 3, 4]",
+    practiceCheck: "b = a makes b point to the same list. Mutating b also changes a. If you saw [1, 2, 3], b might have created a copy instead of a reference.",
+    practiceReps: pythonMutabilityPracticeReps,
+    miniTitle: "Copy before mutating",
+    miniGoal: "Write code that copies a list before mutating to avoid unintended side effects.",
+    miniSteps: ["Create an original list", "Make a true copy using .copy()", "Mutate the copy and print both to show the original stayed the same"],
+    miniDeliverables: ["Python script showing aliasing", "Output showing both the original and the copy", "One sentence explaining when to use .copy()"],
+    verifierCommand: "python mutability_demo.py",
+    expectedEvidence: "Terminal output showing the original unchanged and the copy mutated, plus a note about when aliasing matters.",
+    projectConnection: "The shared sessions list in the Study Tracker should not be mutated directly — always copy first.",
+    requiredCodeIncludes: ["a", "b", "copy"],
+    requiredOutputIncludes: ["Original", "Copy"],
+    runnerLanguage: "python",
+    runnerStarterCode: "original = [1, 2, 3]\ncopy = original.copy()\ncopy.append(4)\nprint('Original:', original)\nprint('Copy:', copy)",
+    runnerTestCode: "assert original == [1, 2, 3], 'original should stay unchanged'\nassert copy == [1, 2, 3, 4], 'copy should have the new item'\nprint('mutability passed')",
+    hiddenTests: [
+      {
+        id: "mutability-uses-copy",
+        name: "Uses .copy() to avoid aliasing",
+        code: "assert id(original) != id(copy), 'original and copy must be distinct objects'"
+      }
+    ]
+  }),
+  proofLesson({
     id: "lesson-python-list-of-dicts",
       curriculum: {
         level: 2,
-        sequence: 3,
+        sequence: 4,
         version: "1.0.0",
         teaches: ["py.record.list_of_dicts"],
         requires: ["py.list.literal", "py.dict.literal", "py.variable.assignment", "py.string", "py.integer", "py.boolean"],
@@ -383,7 +494,7 @@ export const level2Lessons: Lesson[] = [
     evidencePrompt: "Record the data structure, output, and one field name that every record should share.",
     language: "Python",
     tools: ["Python 3", "terminal", "lists of dictionaries"],
-    synopsis: "You are learning how Python holds repeated records. A record is one study session, and repeated records are what let the tracker move beyond one hardcoded example.",
+    synopsis: "What data structure holds a list of people, where each person has a name, age, and email?",
     prerequisites: ["Know that a list stores items in order by position.", "Know that a dictionary maps key names to values."],
     testingFocus: "You will test that the sessions value is a list, that it contains two dictionaries, and that both records use the same beginner-friendly keys: topic and minutes.",
     objective: "Represent two related study sessions with a list of dictionaries.",
@@ -421,7 +532,7 @@ export const level2Lessons: Lesson[] = [
     id: "lesson-python-decisions",
       curriculum: {
         level: 2,
-        sequence: 4,
+        sequence: 5,
         version: "1.0.0",
         teaches: ["py.if_else", "py.comparison", "py.indentation.block"],
         requires: ["py.variable.assignment"],
@@ -453,7 +564,7 @@ export const level2Lessons: Lesson[] = [
     evidencePrompt: "Record the condition you used, the output, and one example that should take the other branch.",
     language: "Python",
     tools: ["Python 3", "terminal", "if/else"],
-    synopsis: "You are learning how Python chooses between two paths, which is the heart of validation and helpful user feedback.",
+    synopsis: "How do you make your code choose between two paths?",
     prerequisites: ["Know how to store a number in a variable.", "Know how to run a Python file and inspect printed output."],
     testingFocus: "You will test that 30 minutes becomes the text label focus, and you will explain which shorter value would make the else branch choose quick.",
     objective: "Write an if/else decision that labels a study session from its minutes.",
@@ -488,10 +599,77 @@ export const level2Lessons: Lesson[] = [
     ]
   }),
   proofLesson({
+    id: "lesson-python-truthiness",
+    curriculum: {
+      level: 2,
+      sequence: 6,
+      version: "1.0.0",
+      teaches: ["py.truthiness"],
+      requires: ["py.boolean"],
+      usesButDoesNotTeach: ["py.assertion", "py.function.def", "py.return"]
+    },
+    codeShape: [
+      "# Python treats some values as True and others as False.",
+      'if errors:  # Works when errors is an empty list, None, etc.',
+      '    print("something went wrong")',
+      "else:",
+      '    print("all clear")',
+      "",
+      "# Truthiness lets you write cleaner conditions:",
+      "if errors:  # instead of: if len(errors) > 0:"
+    ].join("\n"),
+    moduleId: "module-python-core",
+    slug: "python-truthiness",
+    title: "Truthiness & Falsy Values",
+    summary: "Understanding which Python values count as True or False.",
+    bodyMarkdown: "Python treats some values as True and others as False when they appear in an if condition. Empty things (0, \"\", [], {}, None) are False — everything else is True. This is called 'truthiness' and it lets you write conditions like 'if errors:' instead of 'if len(errors) > 0'.",
+    estimatedMinutes: 7,
+    difficulty: "foundation",
+    skillIds: ["skill-python-basics"],
+    quizId: "quiz-python-truthiness",
+    desktopTask: "Write a function that returns 'ready' or 'pending' based on whether a checklist list is empty.",
+    evidencePrompt: "Record code using truthiness, the output, and one falsy value that surprised you.",
+    language: "Python",
+    tools: ["Python 3", "terminal", "truthiness"],
+    synopsis: "How does 'if errors:' work when 'errors' is an empty list?",
+    prerequisites: ["Know that if/else checks whether a condition is True or False.", "Know that booleans are True and False."],
+    testingFocus: "You will test that truthiness works correctly with different values in conditions.",
+    objective: "Use truthiness to write cleaner conditions.",
+    whyItMatters: "Truthiness turns manual length checks into readable conditions. 'if errors:' says more than 'if len(errors) > 0:'.",
+    coreConcept: "Values that are 0, empty, or None are falsy — everything else is truthy.",
+    workedExample: "bool('python') is True, bool('') is False, bool(42) is True, bool(0) is False. In an if condition: if errors: means 'if errors is truthy' which is True when errors has items.",
+    guidedExercise: "Write a check that prints 'has items' if a list has elements using only its truthiness.",
+    missionConnection: "This prepares the Study Tracker validation step to check for errors using truthiness.",
+    reflectionPrompt: "Why does Python have truthiness instead of requiring explicit comparisons like len() or ==?",
+    practiceStarter: "errors = []\n# Use truthiness to print 'no errors' if errors is falsy.\nif errors:\n    print('has errors')\nelse:\n    print('no errors')",
+    practiceExpected: "no errors",
+    practiceCheck: "An empty list is falsy, so the else branch runs instead of the if branch. Truthiness removes the need for manual checks like len().",
+    practiceReps: pythonTruthinessPracticeReps,
+    miniTitle: "Use truthiness in a validator",
+    miniGoal: "Write code that uses truthiness to return 'ready' or 'pending' based on whether a checklist list is empty.",
+    miniSteps: ["Create a checklist list", "Use truthiness to check if it has items", "Print ready or pending"],
+    miniDeliverables: ["Python script using truthiness", "Output showing the result", "One sentence explaining which value made the condition True or False"],
+    verifierCommand: "python truthiness_check.py",
+    expectedEvidence: "Terminal output showing 'ready' or 'pending' plus one note about which value was falsy.",
+    projectConnection: "This validation pattern appears in the Study Tracker when checking for errors or missing data.",
+    requiredCodeIncludes: ["if", "errors"],
+    requiredOutputIncludes: ["ready", "pending"],
+    runnerLanguage: "python",
+    runnerStarterCode: "errors = []\n# Use truthiness to set status.\nif errors:\n    status = 'pending'\nelse:\n    status = 'ready'\nprint(status)",
+    runnerTestCode: "assert status == 'ready', 'empty list is falsy, status should be ready'\nprint('truthiness passed')",
+    hiddenTests: [
+      {
+        id: "truthiness-uses-truthiness",
+        name: "Uses truthiness not len()",
+        code: "assert isinstance(status, str)\nassert status in {'ready', 'pending'}"
+      }
+    ]
+  }),
+  proofLesson({
     id: "lesson-python-loops",
       curriculum: {
         level: 2,
-        sequence: 5,
+        sequence: 7,
         version: "1.0.0",
         teaches: ["py.for_loop", "py.accumulator", "py.loop_body"],
         requires: ["py.record.list_of_dicts"],
@@ -521,7 +699,7 @@ export const level2Lessons: Lesson[] = [
     evidencePrompt: "Record the loop code, the total output, and one reason the loop is safer than adding values by hand.",
     language: "Python",
     tools: ["Python 3", "terminal", "for loops"],
-    synopsis: "You are learning how Python repeats a small action across records, which is the bridge from beginner syntax to useful automation.",
+    synopsis: "How do you do something to every item in a list without writing it 100 times?",
     prerequisites: ["Know that sessions can be a list of dictionaries.", "Know that minutes should be stored as numbers if you want to add them."],
     testingFocus: "You will test that the loop produces the exact total for known records and that the total starts outside the loop.",
     objective: "Use a for loop to total minutes from a list of study-session dictionaries.",
@@ -559,7 +737,7 @@ export const level2Lessons: Lesson[] = [
     id: "lesson-python-foundation-capstone",
       curriculum: {
         level: 2,
-        sequence: 6,
+        sequence: 8,
         version: "1.0.0",
         teaches: [],
         requires: ["py.for_loop", "py.if_else", "py.accumulator"],
@@ -585,7 +763,7 @@ export const level2Lessons: Lesson[] = [
     title: "Build the First Study Tracker Slice",
     summary: "Combine values, records, decisions, and loops into one small tracker result.",
     bodyMarkdown: "A capstone is where small ideas stop living alone. This script has three sections: data to start with, logic that calculates from the data, and output that explains the result.",
-    estimatedMinutes: 12,
+    estimatedMinutes: 18,
     difficulty: "foundation",
     skillIds: ["skill-python-basics", "skill-testing-debugging"],
     quizId: "quiz-python-foundation-capstone",
@@ -593,7 +771,7 @@ export const level2Lessons: Lesson[] = [
     evidencePrompt: "Record the script path, passing output, and one change you would make if the sessions came from a file.",
     language: "Python",
     tools: ["Python 3", "terminal", "lists, if/else, for loops"],
-    synopsis: "You are learning to combine beginner pieces into one small program. The goal is to see values, records, decisions, and loops working together instead of feeling like separate syntax facts.",
+    synopsis: "What can you build now that you know lists, conditions, and loops?",
     prerequisites: ["Know how to store sessions as dictionaries in a list.", "Know how to use if/else inside a for loop."],
     testingFocus: "You will test that the script calculates the session count, total minutes, and focus-session count from the records.",
     objective: "Combine beginner Python building blocks into one working study-tracker slice.",
@@ -631,7 +809,7 @@ export const level2Lessons: Lesson[] = [
     id: "lesson-python-strings-cleanup",
       curriculum: {
         level: 2,
-        sequence: 7,
+        sequence: 9,
         version: "1.0.0",
         teaches: ["py.string"],
         requires: ["py.variable.assignment"],
@@ -659,7 +837,7 @@ export const level2Lessons: Lesson[] = [
     evidencePrompt: "Record messy input, cleaned output, and the exact string method that fixed the issue.",
     language: "Python",
     tools: ["Python 3", "terminal", "string methods"],
-    synopsis: "You are learning to clean messy text before using it in program logic, which is a key move in real scripts and data tools.",
+    synopsis: "Your data has ' python ', 'PYTHON', and 'PyThOn' — how do you treat them all the same?",
     prerequisites: ["Know that strings are text values.", "Know that dictionary topics need consistent names if you want reliable totals."],
     testingFocus: "You will test that messy spacing and capitalization become one predictable cleaned topic and one slug, which is the hyphenated storage-friendly name.",
     objective: "Clean raw text into a dependable topic name and slug.",
@@ -697,10 +875,11 @@ export const level2Lessons: Lesson[] = [
     id: "lesson-python-module-guard",
       curriculum: {
         level: 2,
-        sequence: 8,
+        sequence: 10,
         version: "1.0.0",
-        teaches: ["py.module.guard"],
+        teaches: ["py.module.guard", "py.module.guard.mechanics"],
         requires: ["py.if_else", "py.f_string", "py.for_loop", "py.print.variable"],
+        visibleCodeConcepts: ["py.module.guard", "py.module.guard.mechanics"],
         usesButDoesNotTeach: ["py.assertion", "py.function.def", "py.return"]
       },
     codeShape: [
@@ -715,7 +894,7 @@ export const level2Lessons: Lesson[] = [
     slug: "python-module-guard",
     title: "The Module Guard Lets Files Be Reusable AND Runnable",
     summary: "Learn the module guard pattern that lets Python files act as reusable modules AND standalone scripts.",
-    bodyMarkdown: "When Python runs a script, the built-in variable __name__ is set to '__main__'. When another file imports that script, __name__ is the module name, not '__main__'. The guard `if __name__ == '__main__':` checks which case this is, so code inside only runs during direct execution. This means the Study Tracker file can define reusable functions at the top, and wrap the interactive CLI code behind the guard. When you write `from study_tracker import parse_row`, the import silently loads the function without triggering test prints or the menu prompt.",
+    bodyMarkdown: "When Python runs a script, the built-in variable __name__ is set to '__main__'. When another file imports that script, __name__ is the module name, not '__main__'. The guard `if __name__ == '__main__':` checks which case this is, so code inside only runs during direct execution. __name__ and __main__ are dunder strings Python sets automatically (mechanics: during direct run __name__=='__main__', on import it is the module's __name__). This means the Study Tracker file can define reusable functions at the top, and wrap the interactive CLI code behind the guard. When you write `from study_tracker import parse_row`, the import silently loads the function without triggering test prints or the menu prompt.",
     estimatedMinutes: 10,
     difficulty: "applied",
     skillIds: ["skill-python-basics"],
@@ -724,7 +903,7 @@ export const level2Lessons: Lesson[] = [
     evidencePrompt: "Record the guarded script, the output from direct execution, and proof that importing the module stays silent.",
     language: "Python",
     tools: ["Python 3", "terminal", "module guard pattern"],
-    synopsis: "You are learning to protect your module's test and CLI code from running during import, which is the standard way professional Python projects organize reusable code.",
+    synopsis: "How does Python know whether a file is meant to run or be imported?",
     prerequisites: ["Know that a function is a reusable block of code.", "Know that import loads another module's symbols."],
     testingFocus: "You will test that the guarded code runs only when the file is executed directly, and that importing the module does not trigger the guarded output.",
     objective: "Explain and apply the if __name__ == '__main__' pattern to make Python files dual-purpose as modules and scripts.",
@@ -898,6 +1077,84 @@ level2Lessons[1].depth = {
 };
 
 level2Lessons[2].depth = {
+  primaryConceptId: "py.mutability",
+  secondaryConceptIds: ["py.reference"],
+  maxNewConcepts: 2,
+  conceptCapsules: [
+    {
+      conceptId: "py.mutability",
+      definition: "Whether an object's value can change in place (mutable: list, dict) or every change creates a new object (immutable: string, int, bool).",
+      mentalModel: "Think of mutable objects like a whiteboard — you erase and rewrite. Immutable objects are like a printed page — you need a new page for each change.",
+      syntaxShape: "# mutable: change in place\nmy_list.append(4)\n# immutable: creates new object\nnew_str = my_str.upper()",
+      tinyExample: "a = [1, 2, 3]\na.append(4)  # same list, now [1, 2, 3, 4]",
+      commonMistake: "Trying to modify a string with bracket assignment (e.g., name[0] = 'P').",
+      repairHint: "Strings are immutable. Reassign the variable to a new string: name = 'P' + name[1:].",
+      usedIn: ["learn", "practice", "code_lab"]
+    },
+    {
+      conceptId: "py.reference",
+      definition: "Variables hold references to objects, not the objects themselves. Two variables can reference the same mutable object.",
+      mentalModel: "Think of a reference as a sticky note pointing to a shared box. If two notes point to the same box and you change what's inside, both notes still point to the changed box.",
+      syntaxShape: "b = a  # b references the same object as a",
+      tinyExample: "a = [1, 2]\nb = a\nb.append(3)\nprint(a)  # [1, 2, 3] — a changed too!",
+      commonMistake: "Assuming b = a creates a copy when a is a list.",
+      repairHint: "Use .copy() or list slicing [:] to create independent copies of lists.",
+      usedIn: ["learn", "practice", "code_lab"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-mut-1",
+      label: "Mutable list aliasing",
+      codeFragment: "a = [1, 2, 3]\nb = a\nb.append(4)\nprint(a)",
+      conceptIds: ["py.mutability", "py.reference"],
+      explanation: "b references the same list as a. Appending through b changes what a sees because they share one object.",
+      learnerShouldBeAbleToSay: "b = a makes both variables point to the same list; mutating one affects the other"
+    },
+    {
+      id: "w-mut-2",
+      label: "Immutable string behavior",
+      codeFragment: "name = 'python'\nnew_name = name.upper()\nprint(name)      # python\nprint(new_name)  # PYTHON",
+      conceptIds: ["py.mutability"],
+      explanation: "Strings are immutable. .upper() returns a new string; the original stays unchanged.",
+      learnerShouldBeAbleToSay: "immutable types create new objects on change; the original stays intact"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-mut-1",
+      instruction: "Add a .copy() call so mutating the copy does not affect the original list.",
+      conceptIds: ["py.mutability", "py.reference"],
+      targetCodeFragment: "original = [1, 2, 3]\ncopy = original\ncopy.append(4)",
+      expectedObservation: "After copying with .copy(), the original list stays as [1, 2, 3] and only the copy gets the new item.",
+      wrongTurnHint: "Assign copy = original.copy() instead of copy = original."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-mut-1",
+      conceptIds: ["py.mutability"],
+      brokenExample: 'word = "python"\nword[0] = "P"',
+      symptom: "TypeError: 'str' object does not support item assignment",
+      likelyCause: "Trying to modify a string in place using bracket assignment, which only works for mutable types.",
+      fixStrategy: "Create a new string: word = 'P' + word[1:] or use word.replace('p', 'P')."
+    }
+  ],
+  codeLabBridge: {
+    story: "Demonstrate aliasing by mutating a list through a reference and comparing the original.",
+    usesConcepts: ["py.mutability", "py.reference"],
+    learnerOwns: ["original", "copy"],
+    checkerOwns: ["original-unchanged"],
+    runExpectation: "prints mutability passed"
+  },
+  understandingProofPrompt: "Why does b = a; b.append(4) change a when a is a list, but b = a; b = b + 1 doesn't change a when a is an integer?",
+  exitTicket: [
+    "I can distinguish mutable (list, dict) from immutable (string, int, bool) types.",
+    "I understand that variables hold references, and aliasing affects mutable objects."
+  ]
+};
+
+level2Lessons[3].depth = {
   primaryConceptId: "py.record.list_of_dicts",
   secondaryConceptIds: [],
   maxNewConcepts: 1,
@@ -948,7 +1205,7 @@ level2Lessons[2].depth = {
   ]
 };
 
-level2Lessons[3].depth = {
+level2Lessons[4].depth = {
   primaryConceptId: "py.if_else",
   secondaryConceptIds: ["py.comparison", "py.indentation.block"],
   maxNewConcepts: 3,
@@ -1052,7 +1309,80 @@ level2Lessons[3].depth = {
   ]
 };
 
-level2Lessons[4].depth = {
+level2Lessons[4].workshop.commonMistakes = [
+  "Using = instead of ==",
+  "Forgetting colon after the condition"
+];
+
+level2Lessons[5].depth = {
+  primaryConceptId: "py.truthiness",
+  secondaryConceptIds: [],
+  maxNewConcepts: 1,
+  conceptCapsules: [
+    {
+      conceptId: "py.truthiness",
+      definition: "Python's rule that every value is either truthy or falsy in a boolean context like an if condition.",
+      mentalModel: "Think of truthiness as Python asking 'is this value empty or zero?' If yes, it's falsy. If no, it's truthy.",
+      syntaxShape: "if value:",
+      tinyExample: "if errors:  # works when errors is a list (empty = False, non-empty = True)",
+      commonMistake: "Writing if len(errors) > 0: instead of the simpler if errors:",
+      repairHint: "Replace len(x) > 0 with just the variable name in the condition.",
+      usedIn: ["learn", "practice", "code_lab"]
+    }
+  ],
+  codeWalkthrough: [
+    {
+      id: "w-truth-1",
+      label: "Check truthiness with if",
+      codeFragment: "errors = []\nif errors:\n    print('has issues')\nelse:\n    print('all clear')",
+      conceptIds: ["py.truthiness"],
+      explanation: "An empty list is falsy, so the else branch prints 'all clear'.",
+      learnerShouldBeAbleToSay: "empty list is falsy, so the else branch runs"
+    },
+    {
+      id: "w-truth-2",
+      label: "Truthy and falsy examples",
+      codeFragment: "print(bool('python'))  # True\nprint(bool(''))        # False\nprint(bool(42))        # True\nprint(bool(0))         # False",
+      conceptIds: ["py.truthiness"],
+      explanation: "Non-empty strings and non-zero numbers are truthy. Empty strings and zero are falsy.",
+      learnerShouldBeAbleToSay: "non-empty values are truthy, empty and zero are falsy"
+    }
+  ],
+  guidedEdits: [
+    {
+      id: "g-truth-1",
+      instruction: "Replace the len() check with truthiness in the condition.",
+      conceptIds: ["py.truthiness"],
+      targetCodeFragment: "if len(errors) > 0:",
+      expectedObservation: "The code still prints the same result but is shorter and more readable.",
+      wrongTurnHint: "Just use 'if errors:' directly. Python evaluates the list itself as True or False."
+    }
+  ],
+  errorClinic: [
+    {
+      id: "e-truth-1",
+      conceptIds: ["py.truthiness"],
+      brokenExample: 'value = 1\nif value == True:\n    print("it is True")',
+      symptom: "Prints 'it is True' because 1 == True is True in Python, but the intent was wrong.",
+      likelyCause: "Confusing truthiness with equality — checking if value == True instead of just if value:",
+      fixStrategy: "Use 'if value:' directly. Python checks truthiness automatically in conditions."
+    }
+  ],
+  codeLabBridge: {
+    story: "Check if a list has errors using truthiness instead of length comparison.",
+    usesConcepts: ["py.truthiness"],
+    learnerOwns: ["errors"],
+    checkerOwns: ["truthiness-check"],
+    runExpectation: "prints truthiness passed"
+  },
+  understandingProofPrompt: "Why does Python have truthiness instead of requiring explicit comparisons like len() or == for every condition?",
+  exitTicket: [
+    "I know which values are falsy in Python (0, empty, None).",
+    "I can use truthiness to write cleaner if conditions."
+  ]
+};
+
+level2Lessons[6].depth = {
   primaryConceptId: "py.for_loop",
   secondaryConceptIds: ["py.accumulator", "py.loop_body"],
   maxNewConcepts: 3,
@@ -1148,7 +1478,12 @@ level2Lessons[4].depth = {
   ]
 };
 
-level2Lessons[5].depth = {
+level2Lessons[6].workshop.commonMistakes = [
+  "Forgetting to initialize the accumulator before the loop",
+  "Forgetting the colon after the for loop header"
+];
+
+level2Lessons[7].depth = {
   primaryConceptId: "py.accumulator",
   secondaryConceptIds: ["py.for_loop", "py.if_else"],
   maxNewConcepts: 1,
@@ -1218,7 +1553,7 @@ level2Lessons[5].depth = {
   ]
 };
 
-level2Lessons[6].depth = {
+level2Lessons[8].depth = {
   primaryConceptId: "py.string",
   secondaryConceptIds: ["py.variable.assignment"],
   maxNewConcepts: 1,
@@ -1286,7 +1621,7 @@ level2Lessons[6].depth = {
   ]
 };
 
-level2Lessons[7].depth = {
+level2Lessons[9].depth = {
   primaryConceptId: "py.module.guard",
   secondaryConceptIds: ["py.if_else", "py.f_string", "py.module.guard.mechanics"],
   maxNewConcepts: 1,
@@ -1476,5 +1811,29 @@ export const level2Quizzes: Quiz[] = [
     "The if __name__ condition prevents analyze() from being defined during import at all.",
     "The guard `if __name__ == '__main__':` lets the function be imported without triggering the test code. Only direct execution runs the indented block.",
     ["py.module.guard"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-truthiness",
+    "lesson-python-truthiness",
+    "Truthiness Checkpoint",
+    'errors = []\nif errors:\n    print("has issues")\nelse:\n    print("all clear")',
+    "truthiness",
+    "An empty list is falsy, so 'all clear' prints",
+    "An empty list is truthy, so 'has issues' prints",
+    "The if statement causes an error because a list cannot be used as a condition",
+    "Empty collections are falsy. The else branch runs when errors is an empty list.",
+    ["py.truthiness"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-mutability",
+    "lesson-python-mutability",
+    "Mutability Checkpoint",
+    'a = [1, 2, 3]\nb = a\nb.append(4)\nprint(a)',
+    "mutability and references",
+    "a prints [1, 2, 3, 4] because b and a reference the same mutable list",
+    "a prints [1, 2, 3] because b = a makes a copy",
+    "a causes an error because you cannot mutate a list through another variable",
+    "Variables hold references. b = a means both point to the same list object. Mutating through b affects a.",
+    ["py.mutability", "py.reference"]
   )
 ];

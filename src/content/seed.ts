@@ -1,4 +1,4 @@
-import type { ContentPack, Difficulty, Lesson, LessonMiniProject, LessonMiniProjectTester, LessonMisconceptionCheck, LessonPracticeBlock, LessonRecallCard, LessonRunnerSpec, LessonWorkshop, MissionEvidenceRequirements, ProjectMissionPhase, Quiz, RunnerLanguage } from "@/domain/types";
+import type { ContentPack, CurriculumMetadata, Difficulty, Lesson, LessonMiniProject, LessonMiniProjectTester, LessonMisconceptionCheck, LessonPracticeBlock, LessonRecallCard, LessonRunnerSpec, LessonWorkshop, MissionEvidenceRequirements, ProjectMissionPhase, Quiz, RunnerLanguage } from "@/domain/types";
 import { deterministicShuffle } from "./python/shared";
 import { level0Lessons, level0Quizzes } from "./python/level-0";
 import { level1Lessons, level1Quizzes, deprecatedLevel1Lessons } from "./python/level-1";
@@ -12,7 +12,7 @@ import { level8Lessons, level8Quizzes } from "./python/level-8";
 import { level9Lessons, level9Quizzes } from "./python/level-9";
 
 const foundationEvidence: MissionEvidenceRequirements = {
-  repoUrl: true,
+  repoUrl: false,
   commitHash: false,
   passingVerifierOutput: true,
   readmeStatus: "basic",
@@ -176,10 +176,14 @@ function lessonRecallCards(objective: string, coreConcept: string, guidedExercis
   ];
 }
 
-function lessonMisconceptionChecks(commonMistakes: string[]): LessonMisconceptionCheck[] {
+function lessonMisconceptionChecks(
+  commonMistakes: string[],
+  customRepairs?: Record<string, string>
+): LessonMisconceptionCheck[] {
   return commonMistakes.slice(0, 2).map((mistake) => ({
     mistake,
-    repair: "Slow down to one observable behavior, run the smallest check, and explain what changed before moving on.",
+    repair: customRepairs?.[mistake]
+      ?? "Slow down to one observable behavior, run the smallest check, and explain what changed before moving on.",
     checkPrompt: `How would you catch this mistake before claiming the lesson is done: ${lowerFirst(mistake)}?`
   }));
 }
@@ -214,7 +218,8 @@ function workshop(
     expectedEvidence: "A note with the result path, check output, and one limitation.",
     projectConnection: "This mini project is a small rehearsal for the larger portfolio mission."
   },
-  practiceReps: LessonPracticeBlock[] = []
+  practiceReps: LessonPracticeBlock[] = [],
+  customRepairs?: Record<string, string>
 ): LessonWorkshop {
   const completedMiniProject = miniProjectWithTester(miniProject);
 
@@ -231,7 +236,7 @@ function workshop(
     coreConcept: professorCoreConcept(coreConcept),
     workedExample,
     commonMistakes,
-    misconceptionChecks: lessonMisconceptionChecks(commonMistakes),
+    misconceptionChecks: lessonMisconceptionChecks(commonMistakes, customRepairs),
     recallCards: lessonRecallCards(objective, coreConcept, guidedExercise, missionConnection),
     guidedExercise: professorGuidedExercise(guidedExercise),
     missionConnection,
@@ -280,6 +285,10 @@ interface ProofLessonInput {
   runnerLanguage?: RunnerLanguage;
   runnerStarterCode: string;
   runnerTestCode: string;
+  hiddenTests?: any[];
+  curriculum?: CurriculumMetadata;
+  codeShape?: string;
+  customRepairs?: Record<string, string>;
 }
 
 function proofLesson(input: ProofLessonInput): Lesson {
@@ -296,6 +305,7 @@ function proofLesson(input: ProofLessonInput): Lesson {
     quizId: input.quizId,
     desktopTask: input.desktopTask,
     evidencePrompt: input.evidencePrompt,
+    curriculum: input.curriculum,
     workshop: workshop(
       input.objective,
       input.whyItMatters,
@@ -310,7 +320,8 @@ function proofLesson(input: ProofLessonInput): Lesson {
         tools: input.tools,
         synopsis: input.synopsis,
         prerequisites: input.prerequisites,
-        testingFocus: `${input.testingFocus} This test keeps the result tied to observable behavior.`
+        testingFocus: `${input.testingFocus} This test keeps the result tied to observable behavior.`,
+        codeShape: input.codeShape
       },
       {
         starterCode: input.practiceStarter,
@@ -344,11 +355,12 @@ function proofLesson(input: ProofLessonInput): Lesson {
               expectedOutputIncludes: input.requiredOutputIncludes
             }
           ],
-          hiddenTests: [],
+          hiddenTests: input.hiddenTests ?? [],
           expectedOutput: input.requiredOutputIncludes
         }
       },
-      input.practiceReps
+      input.practiceReps,
+      input.customRepairs
     )
   };
 }
@@ -361,7 +373,8 @@ function checkpointQuiz(
   rightAnswer: string,
   wrongAnswerA: string,
   wrongAnswerB: string,
-  explanation: string
+  explanation: string,
+  conceptIds?: string[]
 ): Quiz {
   // Q1: Concept purpose — shuffle the 3 answer choices
   const q1Choices = deterministicShuffle([rightAnswer, wrongAnswerA, wrongAnswerB], `${id}-cp-1`);
@@ -388,259 +401,54 @@ function checkpointQuiz(
         prompt: `What is the main purpose of ${concept}?`,
         choices: q1Choices,
         correctChoiceIndex: q1CorrectIndex,
-        explanation
+        explanation,
+        conceptIds
       },
       {
         id: `${id}-2`,
         prompt: `Which check makes ${concept} reviewable?`,
         choices: q2Choices,
         correctChoiceIndex: q2CorrectIndex,
-        explanation: "CareerForge treats finished work as an inspectable result plus a check result or explicit review note."
+        explanation: "CareerForge treats finished work as an inspectable result plus a check result or explicit review note.",
+        conceptIds
       },
       {
         id: `${id}-3`,
         prompt: `What should a beginner avoid when practicing ${concept}?`,
         choices: q3Choices,
         correctChoiceIndex: q3CorrectIndex,
-        explanation: "The failure case shows whether the work handles real-world mess instead of only the happy path."
+        explanation: "The failure case shows whether the work handles real-world mess instead of only the happy path.",
+        conceptIds
       }
     ]
   };
 }
 
-const pythonValuePracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "topic = \"git\"\nminutes = 15\ncompleted = False\nsummary = \"\"\nprint(summary)",
-    expectedOutput: "git: 15 minutes planned",
-    checkYourAnswer: "Use the variables instead of typing an unrelated sentence. If minutes later changes, the summary should be the only output that changes with it."
-  },
-  {
-    starterCode: "topic = \"python\"\nminutes = 30\ncompleted = True\nstatus = \"\"\nprint(status)",
-    expectedOutput: "python session complete: True",
-    checkYourAnswer: "The boolean should stay True, not the string \"True\". Ask yourself whether a later if statement could use the value directly."
-  },
-  {
-    starterCode: "track = \"backend\"\nlesson_count = 2\nready = False\nreport = \"\"\nprint(report)",
-    expectedOutput: "backend has 2 lessons ready=False",
-    checkYourAnswer: "This rep checks whether you can combine text, numbers, and booleans without losing the type of each original value."
-  }
-];
+// Removed: pythonValuePracticeReps — moved to level file
 
-const pythonCollectionPracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "sessions = []\n# Add python 30 and git 15 as dictionaries.\nprint(sessions)",
-    expectedOutput: "[{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]",
-    checkYourAnswer: "You should have one list and two dictionaries. If you made topic1 and topic2 variables, you avoided the record shape the next lessons need."
-  },
-  {
-    starterCode: "session = {\"topic\": \"python\", \"minutes\": 30}\n# Add a completed field set to False.\nprint(session)",
-    expectedOutput: "{'topic': 'python', 'minutes': 30, 'completed': False}",
-    checkYourAnswer: "A dictionary can grow one named field at a time. Check that completed is a boolean, because later decisions will branch on it."
-  },
-  {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}]\nsecond_topic = \"\"\nprint(second_topic)",
-    expectedOutput: "second topic: git\nThe second record's topic is git.",
-    checkYourAnswer: "Read the list position first, then the dictionary key. The second item is index 1 because Python lists start at zero."
-  }
-];
+// Removed: pythonCollectionPracticeReps — moved to level file
 
-const pythonDecisionPracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "minutes = 10\nlabel = \"\"\n# Use if/else so short sessions become quick.\nprint(label)",
-    expectedOutput: "quick session planned",
-    checkYourAnswer: "This is the branch the main example does not take. If it still prints focus, reread the comparison as a true-or-false question."
-  },
-  {
-    starterCode: "completed = False\nmessage = \"\"\n# If completed is true, message is done. Otherwise message is keep going.\nprint(message)",
-    expectedOutput: "keep going until complete",
-    checkYourAnswer: "Do not compare completed to the text \"False\". A boolean can be used directly in an if statement."
-  },
-  {
-    starterCode: "errors = 0\nstatus = \"\"\n# If there are no errors, status is clean. Otherwise status is needs review.\nprint(status)",
-    expectedOutput: "clean: no errors found",
-    checkYourAnswer: "This rep practices equality. Ask whether errors == 0 is true for the starter value before you choose the branch."
-  }
-];
+// Removed: pythonDecisionPracticeReps — moved to level file
 
-const pythonLoopPracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"sql\", \"minutes\": 20}]\ncount = 0\n# Count each session with a loop.\nprint(count)",
-    expectedOutput: "3 sessions counted\nCount one session during each loop pass.",
-    checkYourAnswer: "The count should change once per record. If it stays zero, the loop body never updated the running count."
-  },
-  {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"sql\", \"minutes\": 20}]\ntopics = []\n# Append each topic to topics.\nprint(topics)",
-    expectedOutput: "['python', 'git', 'sql']",
-    checkYourAnswer: "This rep asks you to collect one field from every record. If only one topic appears, the append likely happened outside the loop."
-  },
-  {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"python\", \"minutes\": 25}]\npython_minutes = 0\n# Add minutes only when topic is python.\nprint(python_minutes)",
-    expectedOutput: "55 python minutes\nOnly python records are included in this total.",
-    checkYourAnswer: "This combines a loop with a decision. The total should skip git and include both python records."
-  }
-];
+// Removed: pythonLoopPracticeReps — moved to level file
 
-const pythonFoundationCapstonePracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}]\ntotal_minutes = 0\n# Add each session's minutes with a loop.\nprint(total_minutes)",
-    expectedOutput: "45 total minutes counted",
-    checkYourAnswer: "This rep isolates the total before the full capstone. If the answer is 0, the loop did not update total_minutes. If it is only 15 or 30, only one record was counted."
-  },
-  {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"sql\", \"minutes\": 45}]\nfocus_count = 0\n# Count sessions where minutes is 30 or more.\nprint(focus_count)",
-    expectedOutput: "2 focus sessions counted",
-    checkYourAnswer: "This rep checks the decision inside the loop. A 30-minute session counts because the condition is greater than or equal to 30."
-  },
-  {
-    starterCode: "session_count = 3\ntotal_minutes = 70\nfocus_count = 1\nsummary = \"\"\n# Build the exact readable summary from the calculated values.\nprint(summary)",
-    expectedOutput: "3 sessions, 70 minutes, 1 focus session",
-    checkYourAnswer: "This rep separates presentation from calculation. The summary should use the calculated variables instead of typing unrelated numbers."
-  }
-];
+// Removed: pythonFoundationCapstonePracticeReps — moved to level file
 
-const pythonStringCleanupPracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "raw_topic = \"  PYTHON  \"\nclean_topic = \"\"\nprint(clean_topic)",
-    expectedOutput: "python cleaned topic",
-    checkYourAnswer: "Use strip before lower so edge spaces disappear and capitalization becomes consistent. The cleaned value should not keep the original spacing."
-  },
-  {
-    starterCode: "clean_topic = \"python basics\"\nslug = \"\"\nprint(slug)",
-    expectedOutput: "python-basics slug output",
-    checkYourAnswer: "Create the slug after cleaning the topic. If spaces remain in slug, replace spaces with hyphens on the cleaned value."
-  },
-  {
-    starterCode: "raw_topics = [\" Python \", \"python\", \"PYTHON\"]\ncleaned_topics = []\n# Add the cleaned version of each topic.\nprint(cleaned_topics)",
-    expectedOutput: "['python', 'python', 'python']",
-    checkYourAnswer: "This rep shows why cleanup matters. Three visually different inputs should become the same dependable topic before grouping."
-  }
-];
+// Removed: pythonStringCleanupPracticeReps — moved to level file
 
-const pythonFunctionPracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "def describe_session(topic, minutes):\n    return \"\"\n\nprint(describe_session(\"python\", 30))",
-    expectedOutput: "python: 30 minutes planned",
-    checkYourAnswer: "This rep practices parameters and return. The function should use the topic and minutes it receives, not hardcoded values."
-  },
-  {
-    starterCode: "def group_minutes(sessions):\n    totals = {}\n    # Add each session's minutes by topic.\n    return totals\n\nprint(group_minutes([{\"topic\": \"python\", \"minutes\": 30}]))",
-    expectedOutput: "{'python': 30} grouped by topic",
-    checkYourAnswer: "Start with one record before trying several. The returned dictionary should use the topic as the key and minutes as the value."
-  },
-  {
-    starterCode: "def group_minutes(sessions):\n    totals = {}\n    return totals\n\nprint(group_minutes([]))",
-    expectedOutput: "{} for empty sessions input",
-    checkYourAnswer: "An empty input should return an empty dictionary. This failure case proves the function does not depend on hidden global data."
-  }
-];
+// Removed: pythonFunctionPracticeReps — moved to level file
 
-const pythonCoreReviewPracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "review = {'architecture': 'CLI calls parser, parser returns records, report prints totals', 'commands': ['python study_tracker.py --help'], 'failure_inspection': 'bad minutes row is rejected with a reason', 'improvement': 'add parser tests for missing topic'}\nprint(review)",
-    expectedOutput: "Architecture, command, failure inspection, and one improvement are all present.",
-    checkYourAnswer: "This rep keeps the review specific. If the architecture could describe any script, name the CLI, parser, report, and rejected-row behavior."
-  },
-  {
-    starterCode: "failure = {'input': '2026-05-08,python,soon', 'expected': 'rejected row reason', 'actual': '', 'next_check': ''}\nprint(failure)",
-    expectedOutput: "A rejected-row failure includes input, expected behavior, actual behavior, and next check.",
-    checkYourAnswer: "A useful failure inspection keeps the bad input visible. Without the raw failed row, a reviewer cannot tell what behavior was actually inspected."
-  },
-  {
-    starterCode: "improvement_decision = {'target': 'parser', 'reason': 'malformed rows are hardest to debug', 'first_step': 'add test_missing_minutes'}\nprint(improvement_decision)",
-    expectedOutput: "The improvement names a concrete target, reason, and first step.",
-    checkYourAnswer: "The improvement should be small enough to do next. Avoid vague plans like make it better; name the file, behavior, and check."
-  }
-];
+// Removed: pythonCoreReviewPracticeReps — moved to level file
 
-const pythonDataclassPracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "row = {'date': '2026-05-08', 'topic': 'git', 'minutes': '15'}\n# Convert this row into StudySession with minutes as int.\nprint(row)",
-    expectedOutput: "StudySession(date='2026-05-08', topic='git', minutes=15)",
-    checkYourAnswer: "This repeats the model contract with new data. The key check is that minutes becomes an integer before the rest of the project uses it."
-  },
-  {
-    starterCode: "row = {'date': '2026-05-08', 'topic': 'python', 'minutes': '-5'}\n# Try to build StudySession and record the failure.\nprint(row)",
-    expectedOutput: "Negative minutes are rejected with a clear ValueError or project input error.",
-    checkYourAnswer: "The failure case is the point of the model. If negative minutes create a session, the model is only decoration."
-  },
-  {
-    starterCode: "rows = [{'date': '2026-05-08', 'topic': 'python', 'minutes': '30'}]\n# Convert rows into model objects before reports use them.\nprint(rows)",
-    expectedOutput: "Report code receives a list of StudySession objects, not loose raw dictionaries.",
-    checkYourAnswer: "This is the project-shaped rep: parsing creates trusted objects, reports consume trusted objects, and raw rows stay at the boundary."
-  }
-];
+// Removed: pythonDataclassPracticeReps — moved to level file
 
-const pythonJsonPracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "import json\nsummary = {'session_count': 3, 'total_minutes': 65, 'rejected_count': 0}\njson_report = ''\nprint(json_report)",
-    expectedOutput: "{\"session_count\": 3, \"total_minutes\": 65, \"rejected_count\": 0}",
-    checkYourAnswer: "Use new numbers without changing field names. Stable keys matter because tests and future API consumers depend on them."
-  },
-  {
-    starterCode: "import json\njson_report = '{\"total_minutes\": \"45\"}'\nparsed = json.loads(json_report)\n# Decide why this is the wrong contract.\nprint(parsed)",
-    expectedOutput: "The failure is that total_minutes is text, not a number, so the contract should reject it.",
-    checkYourAnswer: "Machine-readable does not only mean valid JSON text. The parsed types must match the contract the rest of the app expects."
-  },
-  {
-    starterCode: "import json\nreport = {'sessions': [{'topic': 'python', 'minutes': 30}], 'totals': {'python': 30}, 'rejected_count': 1}\nprint(json.dumps(report))",
-    expectedOutput: "JSON includes sessions, totals, and rejected_count so another tool can inspect the tracker result.",
-    checkYourAnswer: "This is the project-shaped rep. Include enough stable fields for a dashboard or evidence log to consume without scraping terminal prose."
-  }
-];
+// Removed: pythonJsonPracticeReps — moved to level file
 
-const pythonConfigPracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "DEFAULT_CONFIG = {'format': 'text', 'output': 'summary.txt', 'min_minutes': 0}\nfile_config = {'output': 'weekly.txt'}\n# Merge without losing omitted defaults.\nprint(file_config)",
-    expectedOutput: "{'format': 'text', 'output': 'weekly.txt', 'min_minutes': 0}",
-    checkYourAnswer: "This repeats the merge with new data. File values update known defaults, but omitted defaults should still be present."
-  },
-  {
-    starterCode: "DEFAULT_CONFIG = {'format': 'text', 'output': 'summary.txt', 'min_minutes': 0}\nfile_config = {'format': 'json', 'secret_token': 'do-not-use'}\n# Ignore unknown or secret-looking keys.\nprint(file_config)",
-    expectedOutput: "The config keeps format=json and rejects or ignores secret_token.",
-    checkYourAnswer: "The failure case protects the boundary. Config should not silently accept unknown keys that could change behavior or leak secrets."
-  },
-  {
-    starterCode: "config_sources = ['defaults', 'tracker.config.json', '--format json']\n# Write the precedence order the CLI will use.\nprint(config_sources)",
-    expectedOutput: "CLI flags override config file values, and config file values override defaults.",
-    checkYourAnswer: "Project-shaped config needs a visible precedence rule. Without it, a user cannot predict why a run produced JSON or text."
-  }
-];
+// Removed: pythonConfigPracticeReps — moved to level file
 
-const pythonCiPracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "ci_commands = ['python -m pytest', 'study-tracker --help']\n# Add a JSON smoke command that proves report output still works.\nprint(ci_commands)",
-    expectedOutput: "python -m pytest, study-tracker --help, and study-tracker --input sessions.csv --format json are present.",
-    checkYourAnswer: "Repeat the gate with one more integration command. Unit tests plus an installed CLI smoke command catch different failures."
-  },
-  {
-    starterCode: "gate = {'lint': True, 'tests': False, 'cli_smoke': True, 'allowed': True}\n# Make allowed depend on every required check passing.\nprint(gate)",
-    expectedOutput: "allowed is False when tests fail.",
-    checkYourAnswer: "This is the failure rep. A quality gate that stays green when tests fail is not a gate; it is just a checklist."
-  },
-  {
-    starterCode: "evidence = {'local': [], 'ci': [], 'limitation': ''}\n# Record local and CI evidence plus one limitation.\nprint(evidence)",
-    expectedOutput: "Evidence names local commands, CI commands, and one limitation or skipped check.",
-    checkYourAnswer: "Project-shaped CI evidence should be honest. If pre-commit is not installed yet, say that and keep pytest plus smoke output visible."
-  }
-];
+// Removed: pythonCiPracticeReps — moved to level file
 
-const pythonProfessionalReviewPracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "review_matrix = [{'area': 'structure', 'evidence': 'tree shows cli/parser/reports/tests'}]\n# Add metadata, command, config, logging, and tests rows.\nprint(review_matrix)",
-    expectedOutput: "Rows cover structure, metadata, command, config, logging, and tests.",
-    checkYourAnswer: "A professional review matrix is only useful when every quality area has evidence, not just a label."
-  },
-  {
-    starterCode: "weak_row = {'area': 'command', 'evidence': ''}\n# Explain why this row fails review.\nprint(weak_row)",
-    expectedOutput: "The row fails because command evidence is empty or lacks study-tracker output.",
-    checkYourAnswer: "This failure rep catches vague review notes. If the command row has no exact command output, installability is not proven."
-  },
-  {
-    starterCode: "improvement = {'target': 'typing', 'decision': '', 'first_check': ''}\n# Choose whether to add mypy/pyright now or document runtime-only typing.\nprint(improvement)",
-    expectedOutput: "The improvement records a typing decision and one check or limitation.",
-    checkYourAnswer: "Typed depth needs a conscious decision. Either add a static type check later or document that this project currently relies on dataclasses and runtime tests."
-  }
-];
+// Removed: pythonProfessionalReviewPracticeReps — moved to level file
 
 
 const typescriptContractPracticeReps: LessonPracticeBlock[] = [
@@ -1172,13 +980,16 @@ export const contentPack: ContentPack = {
         "lesson-python-print-values",
         "lesson-python-numbers",
         "lesson-python-strings",
+        "lesson-python-string-indexing",
         "lesson-python-fstrings",
         // Level 2 — Collections, decisions, loops, capstone
         "lesson-python-lists",
         "lesson-python-dicts",
+        "lesson-python-mutability",
         "lesson-python-list-of-dicts",
         "lesson-python-strings-cleanup",
         "lesson-python-decisions",
+        "lesson-python-truthiness",
         "lesson-python-loops",
         "lesson-python-foundation-capstone",
         "lesson-python-module-guard",
@@ -1242,7 +1053,7 @@ export const contentPack: ContentPack = {
       slug: "python-api-resilience",
       title: "API Resilience & Retry",
       summary: "Retry logic, rate limiting, caching, and circuit breaker patterns for professional resilient Python services.",
-      lessonIds: ["lesson-python-api-retry", "lesson-python-rate-limiting", "lesson-python-api-caching", "lesson-python-circuit-breaker"],
+      lessonIds: ["lesson-python-api-retry", "lesson-python-rate-limiting", "lesson-python-api-caching", "lesson-python-circuit-breaker", "lesson-python-resilience-slice1", "lesson-python-resilience-slice2"],
       projectMissionIds: ["mission-python-api-resilience"],
       skillIds: ["skill-python-integration", "skill-api-contracts", "skill-testing-debugging"],
       sortOrder: 4
@@ -1253,7 +1064,7 @@ export const contentPack: ContentPack = {
       slug: "python-ops",
       title: "Operations & CI/CD",
       summary: "Environment configuration, secrets management, CI workflows, deployment strategies, and monitoring for professional Python.",
-      lessonIds: ["lesson-python-env-config", "lesson-python-ci-workflow", "lesson-python-secrets-management", "lesson-python-deployment-strategies", "lesson-python-monitoring-basics"],
+      lessonIds: ["lesson-python-env-config", "lesson-python-ci-workflow", "lesson-python-secrets-management", "lesson-python-deployment-strategies", "lesson-python-monitoring-basics", "lesson-python-ops-slice1"],
       projectMissionIds: ["mission-python-ops"],
       skillIds: ["skill-python-professional", "skill-secret-handling", "skill-ci-release"],
       sortOrder: 5
@@ -3553,7 +3364,7 @@ export const contentPack: ContentPack = {
       title: "Resilient API Integration",
       brief: "Build a resilient API client with retry, exponential backoff, caching, and circuit breaker patterns for the Study Tracker.",
       difficulty: "portfolio",
-      deliverables: ["Retry wrapper with max_retries", "Exponential backoff for 429 rate limits", "In-memory response cache with TTL", "Circuit breaker with open/half-open/closed states", "Integration tests for all patterns", "Architecture note explaining pattern choices"],
+      deliverables: ["Retry wrapper with max_retries", "Exponential backoff for 429 rate limits", "In-memory response cache with TTL", "Circuit breaker with open/half-open/closed states", "Integration tests for all patterns", "Architecture note explaining pattern choices", "Integrated resilient client demo module exercising retry+backoff+cache+breaker"],
       acceptanceCriteria: ["Retry handles 503 errors up to max_retries", "Backoff doubles delay after 429 and caps at max_delay", "Cache returns data without network call on repeated URLs", "Circuit breaker opens after threshold failures and recovers via half-open", "Each pattern has passing unit tests", "Architecture note names trade-offs of each pattern"],
       phases: missionPhases("python-api-resilience", "a resilient API integration layer", "unit tests for retry, backoff, cache, and circuit breaker", "portfolio architecture note"),
       starterPrompt: "Extend the Study Tracker API client with retry, exponential backoff, caching, and circuit breaker patterns. Each pattern should be independently testable and documented with its trade-offs.",
@@ -3571,7 +3382,7 @@ export const contentPack: ContentPack = {
       title: "Production Readiness",
       brief: "Deploy a monitored, secure Study Tracker application with CI/CD, secrets management, deployment strategy, and health monitoring.",
       difficulty: "portfolio",
-      deliverables: ["CI workflow file with lint and test gates", "Secrets dataclass with from_env boundary", "Deployment runbook with strategy and rollback", "Health check endpoint specification", "Structured logging configuration", "Monitoring and alert thresholds document"],
+      deliverables: ["CI workflow file with lint and test gates", "Secrets dataclass with from_env boundary", "Deployment runbook with strategy and rollback", "Health check endpoint specification", "Structured logging configuration", "Monitoring and alert thresholds document", "Integrated ops proof: wired CI+secrets+deploy+monitor in one runbook+config set"],
       acceptanceCriteria: ["CI workflow triggers on push and pull_request", "Secrets boundary loads from environment with no defaults for required values", "Deployment runbook names strategy, health check, rollback command, and monitor window", "Health check reports dependency status", "Logs are structured JSON with event and severity fields", "Alert thresholds are documented with action owners"],
       phases: missionPhases("python-ops", "a production-ready deployment pipeline", "CI check, secrets tests, and runbook review", "portfolio README"),
       starterPrompt: "Prepare the Study Tracker for production: set up CI, secure secrets, define a deployment strategy with health checks, and configure monitoring and alerting.",
@@ -3616,6 +3427,41 @@ export const contentPack: ContentPack = {
         detail: "Complete one schema mission and capture the query output that proves it.",
         linkedProjectMissionId: "mission-job-tracker-schema",
         minutes: 75
+      },
+      {
+        id: "task-python-api-resilience",
+        title: "Ship resilient API integration",
+        detail: "Complete the Resilient API Integration mission with tests for all four patterns.",
+        linkedProjectMissionId: "mission-python-api-resilience",
+        minutes: 120
+      },
+      {
+        id: "task-python-ops",
+        title: "Prepare production deployment",
+        detail: "Complete the Production Readiness mission including CI, secrets, runbook, and monitoring spec.",
+        linkedProjectMissionId: "mission-python-ops",
+        minutes: 90
+      },
+      {
+        id: "task-resilience-slice1",
+        title: "Resilience slice 1 integrated proof",
+        detail: "Complete the retry+backoff integration slice and capture evidence.",
+        linkedLessonId: "lesson-python-resilience-slice1",
+        minutes: 25
+      },
+      {
+        id: "task-resilience-slice2",
+        title: "Resilience slice 2 with cache",
+        detail: "Complete the cache+resilience slice and show cache hit.",
+        linkedLessonId: "lesson-python-resilience-slice2",
+        minutes: 20
+      },
+      {
+        id: "task-ops-slice1",
+        title: "Ops slice integrated proof",
+        detail: "Complete the ops composition slice and show the integrated proof.",
+        linkedLessonId: "lesson-python-ops-slice1",
+        minutes: 30
       }
     ]
   }

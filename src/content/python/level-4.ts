@@ -1,5 +1,5 @@
 import type { Lesson, Quiz, LessonPracticeBlock } from "@/domain/types";
-import { proofLesson, checkpointQuiz, codeReadingQuiz } from "./shared";
+import { proofLesson, codeReadingQuiz } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Micro-lesson 1 — Read a Traceback (concept_only)
@@ -20,7 +20,7 @@ const readTracebackLesson = proofLesson({
   evidencePrompt: "Write down the last two lines of the traceback and explain what each part means.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning to treat a traceback as information, not panic.",
+  synopsis: "Your screen just exploded with red text. What is it actually telling you?",
   prerequisites: [
     "Have run at least one Python file that produced output.",
     "Understand how to run files in the terminal."
@@ -183,7 +183,7 @@ const nameErrorLesson = proofLesson({
   evidencePrompt: "Record the original error message, your diagnosis, and the one-line fix.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning the exact steps to diagnose and fix a NameError.",
+  synopsis: "'name 'sessions' is not defined' — but you defined it. Where did it go?",
   prerequisites: [
     "Know how to read a traceback (previous lesson).",
     "Understand how Python variables are assigned values."
@@ -339,7 +339,7 @@ const typeErrorLesson = proofLesson({
   evidencePrompt: "Record the TypeError message, which type was wrong, and what you changed to fix it.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning how to diagnose a TypeError and fix the type mismatch.",
+  synopsis: "Why does Python say you can't add a string to an integer when it looks fine to you?",
   prerequisites: [
     "Know how to read a traceback (lesson-python-read-traceback).",
     "Understand Python string and integer value types."
@@ -510,7 +510,7 @@ const valueErrorLesson = proofLesson({
   evidencePrompt: "Record the ValueError message, the bad input, and the error message your code produces.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning to catch a ValueError and report it clearly instead of crashing.",
+  synopsis: "You passed 'thirty' where Python expected 30 — how does it tell you?",
   prerequisites: [
     "Know how to read a traceback and fix a TypeError (previous lessons).",
     "Understand how try/except blocks are structured in Python."
@@ -687,7 +687,7 @@ const tryExceptLesson = proofLesson({
   evidencePrompt: "Record the valid output, the invalid error message, and the two assertion results.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning how to write a function that handles both the happy path and the failure path.",
+  synopsis: "Your program crashes on bad input every time. Can you catch the fall instead of preventing it?",
   prerequisites: [
     "Know how to read tracebacks and identify ValueError (previous lessons).",
     "Understand the concept of a happy path and failure path."
@@ -860,6 +860,11 @@ tryExceptLesson.depth = {
   ]
 };
 
+tryExceptLesson.workshop.commonMistakes = [
+  "Catching too broad an Exception class (bare except:)",
+  "Placing try around too much code"
+];
+
 // ---------------------------------------------------------------------------
 // Micro-lesson 6 — Use the Debugger to Find Hidden Bugs (run_file)
 // ---------------------------------------------------------------------------
@@ -886,7 +891,7 @@ breakpoint() works with any Python program and requires no special tools or edit
   evidencePrompt: "Record the bug you found, the line where you placed breakpoint(), and the p variable output that revealed the bug.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning to use Python's built-in debugger to pause code, inspect variables, and find bugs that print() would miss.",
+  synopsis: "What if you could stop time and inspect every variable mid-execution?",
   prerequisites: [
     "Know how to read a traceback (lesson-python-read-traceback).",
     "Understand functions and how parameters are passed (Level 3).",
@@ -1216,7 +1221,7 @@ const assertionsLesson = proofLesson({
   evidencePrompt: "Capture the terminal output showing all three assertions passed or one assertion failing with a clear custom message.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning to use assert as your first testing tool — a lightweight way to demand that your code keeps its promises.",
+  synopsis: "How do you write code that checks itself before it wrecks itself?",
   prerequisites: [
     "Know how to define a function with def and return.",
     "Know that int('30') returns 30 and int('soon') raises ValueError.",
@@ -1401,7 +1406,7 @@ This capstone combines everything you have learned about reading tracebacks, fix
   evidencePrompt: "Record each bug you found: the error message, your diagnosis, the one-line fix, and the assert statement that proves the fix works.",
   language: "Python",
   tools: ["Python 3", "terminal", "tracebacks", "assert"],
-  synopsis: "You are learning to debug systematically: run, read the traceback, classify the exception, apply the minimal fix, and prove it with an assertion before moving to the next bug.",
+  synopsis: "You've learned 7 debugging tools. Here are 5 bugs — which tool fixes each one?",
   prerequisites: [
     "Know how to read a traceback and identify NameError, TypeError, ValueError, and IndentationError.",
     "Know how to write assert statements with custom messages.",
@@ -1807,11 +1812,12 @@ export const level4Quizzes: Quiz[] = [
     "breakpoint() is a built-in Python function that pauses execution and opens the interactive pdb debugger. You control the flow with n (next), p (print), and c (continue).",
     ["debug.breakpoint.basic"]
   ),
-  // Deprecated quiz — kept so old quiz attempt IDs still resolve
-  checkpointQuiz(
+  // 5Q quiz (was checkpoint, now codeReadingQuiz)
+  codeReadingQuiz(
     "quiz-python-traceback-clinic",
     "lesson-python-traceback-clinic",
-    "Traceback Clinic Checkpoint (Deprecated)",
+    "Traceback Clinic Checkpoint",
+    'try:\n    minutes = int("bad")\nexcept ValueError as e:\n    print("error:", e)',
     "reading traceback errors",
     "Interpret exception details, line numbers, and stderr lines, using try/except blocks to handle invalid input.",
     "Bypass try/except blocks and let scripts crash, assuming users read raw tracebacks.",

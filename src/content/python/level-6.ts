@@ -23,6 +23,12 @@ const professionalProjectStructurePracticeReps: LessonPracticeBlock[] = [
     expectedOutput: "A project-shaped file tree includes package modules and tests outside package code.",
     checkYourAnswer: "This is the structure a reviewer can navigate before reading implementation details.",
     tier: "synthesize"
+  },
+  {
+    starterCode: "# Diff review sim:\n# + [project.scripts]\n# study = 'study_tracker:main'\nprint('review: missing test, add entry point')",
+    expectedOutput: "review: missing console script entry point and no smoke test for CLI packaging",
+    checkYourAnswer: "Call out missing console_scripts and no CLI test. Fix: add to pyproject + smoke test. (review-sim tier)",
+    tier: "review-sim"
   }
 ];
 
@@ -44,6 +50,12 @@ const pythonDataclassPracticeReps: LessonPracticeBlock[] = [
     expectedOutput: "Report code receives a list of StudySession objects, not loose raw dictionaries.",
     checkYourAnswer: "This is the project-shaped rep: parsing creates trusted objects, reports consume trusted objects, and raw rows stay at the boundary.",
     tier: "synthesize"
+  },
+  {
+    starterCode: "# Review model diff for dataclass:\n# + @dataclass\n# + class StudySession: ...\nprint('review: add validation in post_init')",
+    expectedOutput: "review: add post_init validation to reject negative minutes in dataclass model",
+    checkYourAnswer: "Flag: no validation for negative minutes; suggest __post_init__ check. (review-sim)",
+    tier: "review-sim"
   }
 ];
 
@@ -65,6 +77,12 @@ const pythonJsonPracticeReps: LessonPracticeBlock[] = [
     expectedOutput: "JSON includes sessions, totals, and rejected_count so another tool can inspect the tracker result.",
     checkYourAnswer: "This is the project-shaped rep. Include enough stable fields for a dashboard or evidence log to consume without scraping terminal prose.",
     tier: "synthesize"
+  },
+  {
+    starterCode: "# Review json report diff\n# + 'schema_version': 1\nprint('review: add version')",
+    expectedOutput: "review: add schema_version field to json report for forward compatibility in parsers",
+    checkYourAnswer: "Missing version field; future parsers may break. Add it. (review-sim)",
+    tier: "review-sim"
   }
 ];
 
@@ -253,7 +271,7 @@ const projectStructureLesson = proofLesson({
   evidencePrompt: "Record the file tree, one module boundary decision, and the command that still passes after the split.",
   language: "Python project structure",
   tools: ["Python package", "module boundaries", "pytest"],
-  synopsis: "You are learning how professional Python projects are organized. The goal is not more folders; the goal is making each file's job clear so future changes stay local.",
+  synopsis: "When your project grows from 1 file to 10, how do you keep it organized?",
   prerequisites: [
     "Have a working study tracker script.",
     "Know which parts parse input, format reports, and handle command-line flags."
@@ -403,7 +421,7 @@ const dataclassModelsLesson = proofLesson({
   evidencePrompt: "Record the model definition, one valid parsed session, one invalid minutes case, and passing test output.",
   language: "Python dataclasses",
   tools: ["dataclasses", "type hints", "assertions"],
-  synopsis: "You are learning to replace loose dictionaries with a typed model. A typed model says which fields exist and what kind of value each field should hold.",
+  synopsis: "What if every one of your data records came with built-in validation and a clean print?",
   prerequisites: [
     "Know what fields a session needs.",
     "Know how parser functions turn raw input into program data."
@@ -416,6 +434,7 @@ const dataclassModelsLesson = proofLesson({
   guidedExercise: "Define StudySession, convert one row dictionary into it, and reject negative minutes.",
   missionConnection: "This prepares JSON reports, logging, and pytest tests to share the same data shape.",
   reflectionPrompt: "Which validation belongs in the model, and which validation belongs in row parsing before the model is created?",
+  commonMistakes: ["Forgetting frozen=True to prevent mutation", "Adding methods that mutate fields"],
   practiceStarter: "from dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass StudySession:\n    date: str\n    topic: str\n    minutes: int\n\n    def __post_init__(self):\n        pass\n\ndef session_from_row(row):\n    return None\n\nsession = session_from_row({'date': '2026-05-07', 'topic': 'python', 'minutes': '30'})\nprint(session)",
   practiceExpected: "StudySession(date='2026-05-07', topic='python', minutes=30)",
   practiceCheck: "If minutes is still text, the parser conversion is incomplete. If negative minutes work, the model is not protecting the project from impossible data.",
@@ -554,7 +573,7 @@ const jsonReportsLesson = proofLesson({
   evidencePrompt: "Record the JSON output, a parsed assertion, and one reason machine-readable output is useful.",
   language: "Python JSON",
   tools: ["json", "CLI output", "assertions"],
-  synopsis: "You are learning how to produce machine-readable report output. Machine-readable means another program can parse the result without guessing from a paragraph.",
+  synopsis: "Your CLI produces text output — how do you make it produce data that other programs can read?",
   prerequisites: [
     "Know how the tracker calculates totals.",
     "Know that JSON has strings, numbers, lists, booleans, and objects."
@@ -705,7 +724,7 @@ const loggingErrorsLesson = proofLesson({
   evidencePrompt: "Record one raised custom exception, one log message, and the user-facing error output.",
   language: "Python logging",
   tools: ["logging", "custom exceptions", "terminal"],
-  synopsis: "You are learning how professional Python code reports expected failures. The user should get a clear message, and the developer should get enough logged context to diagnose the problem.",
+  synopsis: "Your program runs overnight and crashes at 3am. How do you find out why?",
   prerequisites: [
     "Know why bad minutes should be rejected.",
     "Know how try/except catches expected failures."
@@ -856,7 +875,7 @@ const pytestCiLesson = proofLesson({
   evidencePrompt: "Record the fixture names, test names, exact commands, and final passing output.",
   language: "Python testing",
   tools: ["pytest", "fixtures", "CI-style commands"],
-  synopsis: "You are learning how professional Python projects prove behavior with repeatable tests and exact verification commands. Repeatable means a reviewer can run the same command and inspect the same kind of result.",
+  synopsis: "How do you write a test that sets up data, runs code, and cleans up — without repeating yourself?",
   prerequisites: [
     "Have parser and report behavior to test.",
     "Know why clean and messy inputs both matter."
@@ -1043,7 +1062,7 @@ const pyprojectMetadataLesson = proofLesson({
   evidencePrompt: "Record the pyproject.toml sections, the Python version requirement, and the command that reads the same test layout.",
   language: "Python packaging",
   tools: ["pyproject.toml", "pytest", "packaging metadata"],
-  synopsis: "You are learning how professional Python projects declare metadata. Metadata is information about the project, such as its name, version, Python requirement, and test settings.",
+  synopsis: "How does pip know what your package is called, who wrote it, and what it needs to run?",
   prerequisites: [
     "Know the utility package name.",
     "Know the test folder and minimum Python version the project expects."
@@ -1193,7 +1212,7 @@ const installableCliLesson = proofLesson({
   evidencePrompt: "Record the entry point, the install command, and the smoke-test command that proves the installed CLI runs.",
   language: "Python packaging",
   tools: ["pyproject.toml", "console scripts", "CLI smoke test"],
-  synopsis: "You are learning how professional Python projects expose an installable command with a stable entry point, so a reviewer can run study-tracker instead of remembering a file path.",
+  synopsis: "You've built a great tool — how do you install it with `pip install` like every other Python tool?",
   prerequisites: [
     "Have a package module with cli.py.",
     "Know what main() should call without owning all business logic."
@@ -1344,7 +1363,7 @@ const configFilesLesson = proofLesson({
   evidencePrompt: "Record the default config, a sample config file, merged config output, and one missing-config behavior.",
   language: "Python configuration",
   tools: ["json", "config files", "defaults"],
-  synopsis: "You are learning how to give a Python CLI configurable behavior while keeping defaults explicit and testable. Defaults are the values the tool uses when no config file overrides them.",
+  synopsis: "How do you change your program's behavior without editing the source code?",
   prerequisites: [
     "Know the CLI options format, output, and min_minutes.",
     "Know how JSON represents dictionaries."
@@ -1495,7 +1514,7 @@ const ciPrecommitLesson = proofLesson({
   evidencePrompt: "Record the local pre-commit checks, CI commands, and final passing output from the same verifier set.",
   language: "Python project operations",
   tools: ["pre-commit", "CI workflow", "pytest", "CLI smoke test"],
-  synopsis: "You are learning how professional Python projects make verification repeatable before review and in clean CI environments. CI means continuous integration: checks that run automatically in a fresh environment.",
+  synopsis: "What if every git commit automatically checked your code for bugs before it saved?",
   prerequisites: [
     "Know the pytest command for the utility.",
     "Know the installed CLI command name."
@@ -1645,7 +1664,7 @@ const professionalReviewLesson = proofLesson({
   evidencePrompt: "Record the package tree, pyproject excerpt, installed command output, config behavior, log/error example, and pytest output.",
   language: "Professional Python review",
   tools: ["pyproject.toml", "installed CLI", "config tests", "pytest"],
-  synopsis: "You are learning to review a Python package for maintainability: structure, metadata, installability, configuration, logging, and repeatable tests.",
+  synopsis: "Your tool is packaged, tested, and documented. Does it actually meet professional standards?",
   prerequisites: [
     "Have completed the Professional Python Utility lessons.",
     "Have proof commands for pytest and the installed CLI."
@@ -1818,7 +1837,7 @@ const virtualEnvLesson = proofLesson({
   evidencePrompt: "Record the venv creation command, the activation command, pip freeze output showing only project dependencies, and one reason venvs prevent version conflicts.",
   language: "Python virtual environments",
   tools: ["venv", "pip freeze", "requirements.txt"],
-  synopsis: "You are learning how Python projects manage dependencies by isolating them in virtual environments. Virtual environments prevent one project's library versions from interfering with another project's requirements.",
+  synopsis: "What happens when Project A needs Python 3.9 and Project B needs Python 3.12?",
   prerequisites: [
     "Have Python 3 installed on your system.",
     "Know what pip install does."
@@ -1945,326 +1964,126 @@ virtualEnvLesson.depth = {
 // ---------------------------------------------------------------------------
 
 export const level6Quizzes: Quiz[] = [
-  {
-    id: "quiz-python-project-structure",
-    lessonId: "lesson-python-project-structure",
-    title: "Project structure checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-project-structure-1",
-        prompt: "What does this import pattern tell a reviewer?\n```python\nfrom study_tracker.cli import build_parser\nfrom study_tracker.parser import parse_row\nfrom study_tracker.reports import format_report\n```",
-        choices: ["The functions live in separate modules with clear responsibilities", "All project logic is in one large file", "The project has no structure"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.structure.package"],
-        explanation: "Each import comes from a different module, showing the project is split into cli, parser, and reports."
-      },
-      {
-        id: "question-python-project-structure-2",
-        prompt: "Your parser.py imports argparse. Why is this a module boundary violation?",
-        choices: ["argparse requires an internet connection", "parser.py should not depend on CLI flag definitions; those belong in cli.py", "parser.py cannot import anything"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.structure.boundaries"],
-        explanation: "Parser logic should stay pure and reusable without knowing about command-line argument parsing."
-      },
-      {
-        id: "question-python-project-structure-3",
-        prompt: "When adding a new --topic filter flag to the CLI, which module should change?",
-        choices: ["The database module", "The test runner configuration", "cli.py, because it owns argument definitions"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.structure.boundaries"],
-        explanation: "The CLI module owns argument definitions; parser and report modules should remain unchanged."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-dataclass-models",
-    lessonId: "lesson-python-dataclass-models",
-    title: "Dataclass model checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-dataclass-1",
-        prompt: "What does this code produce?\n```python\n@dataclass(frozen=True)\nclass StudySession:\n    date: str\n    topic: str\n    minutes: int\n\ns = StudySession(\"2026-05-07\", \"python\", 30)\nprint(s.minutes)\n```",
-        choices: ["30", "\"30\"", "TypeError"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.dataclass.model"],
-        explanation: "The frozen dataclass stores minutes as an integer, so printing s.minutes outputs the number 30 without quotes."
-      },
-      {
-        id: "question-python-dataclass-2",
-        prompt: "Your parser calls StudySession(date, topic, -5) and the negative minutes are stored without complaint. What is missing?",
-        choices: ["The __post_init__ method that validates minutes must be positive", "The frozen=True decorator", "The topic field"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.dataclass.validation"],
-        explanation: "A __post_init__ validation check can raise ValueError for negative minutes before they corrupt totals."
-      },
-      {
-        id: "question-python-dataclass-3",
-        prompt: "Why use a conversion function like session_from_row instead of constructing StudySession directly from CSV values?",
-        choices: ["Because dataclasses cannot be constructed manually", "Because session_from_row is faster", "So type conversion (string to int) and validation happen at a single boundary"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.dataclass.model"],
-        explanation: "A conversion function centralizes the type casting and validation logic at the boundary between raw input and domain model."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-json-reports",
-    lessonId: "lesson-python-json-reports",
-    title: "JSON report checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-json-1",
-        prompt: "What does this code output?\n```python\nsummary = {\"session_count\": 2, \"total_minutes\": 45}\nprint(json.dumps(summary))\n```",
-        choices: ["2 45", "{\"session_count\": 2, \"total_minutes\": 45}", "[2, 45]"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.json.dumps"],
-        explanation: "json.dumps serializes the dictionary to a JSON string with the same key-value pairs."
-      },
-      {
-        id: "question-python-json-2",
-        prompt: "Your test checks JSON output by looking for the substring '45' in the text. Why is this dangerous?",
-        choices: ["The test might match '45' in the wrong field or context", "Substring searches are faster than parsing", "The number 45 is always correct"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.json.loads"],
-        explanation: "Substring checks can match the wrong field; parsing JSON and asserting specific fields is more precise."
-      },
-      {
-        id: "question-python-json-3",
-        prompt: "Why keep JSON field names stable (like session_count) instead of changing them between runs?",
-        choices: ["Because Python requires stable names", "Because field names do not matter in JSON", "Because unstable field names make it impossible for other tools to parse the report"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.json.dumps"],
-        explanation: "Stable field names create a contract that downstream tools and tests can depend on."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-logging-errors",
-    lessonId: "lesson-python-logging-errors",
-    title: "Logging and errors checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-logging-1",
-        prompt: "What does this code do when value is 'soon'?\n```python\ndef parse_minutes(value):\n    try:\n        return int(value)\n    except ValueError:\n        logger.warning(f\"invalid minutes: {value}\")\n        raise TrackerInputError(\"minutes must be a number\")\n```",
-        choices: ["Returns 0 silently", "Logs the bad value and raises TrackerInputError", "Prints the error and continues"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.logging.warning"],
-        explanation: "The function logs the invalid input for debugging and raises a project-specific error so the caller can handle it."
-      },
-      {
-        id: "question-python-logging-2",
-        prompt: "Your CLI prints error messages to stdout and they corrupt the JSON output. What should you use instead?",
-        choices: ["Silence all errors", "Print the errors to a separate file", "Use logger.warning which writes to stderr by default"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.logging.warning"],
-        explanation: "Logger.warning writes to stderr by default, keeping stdout clean for machine-readable output."
-      },
-      {
-        id: "question-python-logging-3",
-        prompt: "Why define a custom TrackerInputError instead of using generic Exception?",
-        choices: ["Because custom exceptions allow callers to catch input problems separately from programming bugs", "Because generic Exception is not available in Python", "Because custom exceptions run faster"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.errors.custom"],
-        explanation: "A custom exception lets you catch and handle expected input failures without catching unrelated programming errors."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-pytest-ci",
-    lessonId: "lesson-python-pytest-ci",
-    title: "Pytest and CI proof checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-pytest-ci-1",
-        prompt: "What does this pytest structure do?\n```python\n@pytest.fixture\ndef clean_rows():\n    return [\"2026-05-07,python,30\"]\n```",
-        choices: ["It defines a reusable test dataset called clean_rows", "It runs the test immediately", "It deletes the test data"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.pytest.fixtures"],
-        explanation: "The @pytest.fixture decorator creates a reusable input dataset that pytest injects into test functions."
-      },
-      {
-        id: "question-python-pytest-ci-2",
-        prompt: "Your verification commands list includes unit tests but no CLI smoke command. What failure mode is not covered?",
-        choices: ["The parser code could have bugs", "The test fixtures could be wrong", "The packaged entry point could be broken even when tests pass"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.pytest.smoke"],
-        explanation: "CLI smoke commands catch packaging and entry point failures that unit tests cannot detect."
-      },
-      {
-        id: "question-python-pytest-ci-3",
-        prompt: "Why use a clean_rows fixture with known data instead of hardcoding the same list in every test?",
-        choices: ["Because hardcoded data is always wrong", "Because fixtures are automatically shared across tests and eliminate duplication", "Because fixtures cannot be reused"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.pytest.fixtures"],
-        explanation: "Fixtures reduce duplication by defining reusable test data in one place."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-pyproject-metadata",
-    lessonId: "lesson-python-pyproject-metadata",
-    title: "pyproject metadata checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-pyproject-1",
-        prompt: "What does this pyproject.toml block declare?\n```toml\n[project]\nname = \"study-tracker\"\nversion = \"0.1.0\"\nrequires-python = \">=3.11\"\n```",
-        choices: ["The project's dependencies", "The project's name, version, and minimum Python version", "The project's test configuration"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.metadata.pyproject"],
-        explanation: "The [project] block declares the package identity: name, version, and supported Python versions."
-      },
-      {
-        id: "question-python-pyproject-2",
-        prompt: "Your project has no requires-python in pyproject.toml. What problem could this cause?",
-        choices: ["The project could be installed on an incompatible Python version and crash at runtime", "The project will not run on any Python version", "The project will always work"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.metadata.dependencies"],
-        explanation: "Without requires-python, there is no guard against installing the package on an unsupported Python runtime."
-      },
-      {
-        id: "question-python-pyproject-3",
-        prompt: "Why put pytest testpaths in pyproject.toml instead of only in the README?",
-        choices: ["Because pyproject.toml cannot contain test settings", "Because README files ignore Python settings", "Because putting configurations in pyproject.toml makes them machine-readable for tools"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.metadata.pyproject"],
-        explanation: "Tool configuration in pyproject.toml is automatically read by pytest and other tools, unlike README prose."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-installable-cli",
-    lessonId: "lesson-python-installable-cli",
-    title: "Installable CLI checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-installable-cli-1",
-        prompt: "What does this pyproject.toml configuration do?\n```toml\n[project.scripts]\nstudy-tracker = \"study_tracker.cli:main\"\n```",
-        choices: ["Defines a console script entry point so 'study-tracker' runs the main function", "Installs pytest automatically", "Creates a new Python file"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.packaging.scripts"],
-        explanation: "The [project.scripts] section maps the command name 'study-tracker' to the main function in the package."
-      },
-      {
-        id: "question-python-installable-cli-2",
-        prompt: "After running 'pip install -e .', the 'study-tracker' command is not found. What is most likely wrong?",
-        choices: ["Python is not installed", "The Python environment PATH does not include the installed scripts directory", "The package name has a typo"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.packaging.install"],
-        explanation: "Editable install links the scripts to the Python environment, but they must be on the PATH to be discoverable."
-      },
-      {
-        id: "question-python-installable-cli-3",
-        prompt: "Why should the entry point function (main) only coordinate CLI flow instead of containing all logic?",
-        choices: ["Because main functions cannot call other functions", "Because main is automatically called on import", "So the business logic can be tested independently without going through the CLI"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.packaging.scripts"],
-        explanation: "A thin entry point allows the core logic to be tested directly, while the CLI remains a thin wrapper."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-config-files",
-    lessonId: "lesson-python-config-files",
-    title: "Config files checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-config-1",
-        prompt: "What does this config loader do with unknown keys?\n```python\nDEFAULT_CONFIG = {\"format\": \"text\", \"min_minutes\": 0}\nfor key in overrides:\n    if key in DEFAULT_CONFIG:\n        merged[key] = overrides[key]\n```",
-        choices: ["It only applies overrides for keys that exist in DEFAULT_CONFIG, ignoring unknown ones", "It adds unknown keys to the config", "It crashes on unknown keys"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.config.merge"],
-        explanation: "The loop filters overrides so only keys that match DEFAULT_CONFIG are applied, ignoring unknown keys."
-      },
-      {
-        id: "question-python-config-2",
-        prompt: "Your config merge replaces the entire defaults instead of updating only specified keys. What went wrong?",
-        choices: ["The defaults are too large", "The merge uses .update() instead of copying defaults and filtering known keys", "The config format is wrong"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.config.loader"],
-        explanation: "Using .update() without copying first or filtering keys can replace defaults instead of merging selectively."
-      },
-      {
-        id: "question-python-config-3",
-        prompt: "Why should load_config always start from a copy of DEFAULT_CONFIG?",
-        choices: ["Because defaults change every call", "Because copying is faster", "Because copying prevents mutating the global DEFAULT_CONFIG across multiple load calls"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.config.merge"],
-        explanation: "Starting from a copy ensures the original defaults are never mutated by individual load operations."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-ci-precommit",
-    lessonId: "lesson-python-ci-precommit",
-    title: "CI and pre-commit checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-ci-precommit-1",
-        prompt: "What does this CI workflow snippet define?\n```yaml\non:\n  push:\n  pull_request:\n\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ruff check .\n```",
-        choices: ["A deployment pipeline", "A CI workflow that triggers on push and PR, running ruff linting", "A local pre-commit configuration"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.ci.workflow"],
-        explanation: "The on block triggers on push and pull_request events, and the lint job runs ruff."
-      },
-      {
-        id: "question-python-ci-precommit-2",
-        prompt: "Your CI pipeline runs tests but not lint. What issue could reach production?",
-        choices: ["The test suite is too fast", "Lint checks cannot run in CI", "Code formatting issues and style violations would not be caught"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.ci.precommit"],
-        explanation: "Without lint checks, formatting and style issues can accumulate even when tests pass."
-      },
-      {
-        id: "question-python-ci-precommit-3",
-        prompt: "Why should the CI test job depend on (need) the lint job?",
-        choices: ["So lint failures block tests from running, catching formatting issues before logic checks", "So both run in parallel", "So lint never runs"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.ci.workflow"],
-        explanation: "Using needs: lint creates a quality gate where formatting must pass before tests run."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-professional-review",
-    lessonId: "lesson-python-professional-review",
-    title: "Professional review checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-professional-review-1",
-        prompt: "What does this review matrix row prove?\n```python\n{\"area\": \"command\", \"evidence\": \"study-tracker --help returns usage\"}\n```",
-        choices: ["That the installed CLI entry point works and responds", "That the project has pytest tests", "That the README is complete"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.gate.matrix"],
-        explanation: "The matrix connects the quality area (command) with concrete evidence (the tool responds to --help)."
-      },
-      {
-        id: "question-python-professional-review-2",
-        prompt: "Your review matrix has an empty evidence field for the 'config' area. Why is this a problem?",
-        choices: ["Because empty evidence is better than no evidence", "Because an area without evidence is a claim that has not been verified", "Because config cannot be tested"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.gate.professional"],
-        explanation: "Every quality area in a review matrix must have inspectable evidence, not just a label."
-      },
-      {
-        id: "question-python-professional-review-3",
-        prompt: "Why should 'installed CLI works' be a separate evidence row from 'pytest passes'?",
-        choices: ["Because pytest cannot test the CLI", "Because both prove the same thing", "Because a package can fail at the CLI entry point even when internal tests succeed"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.gate.professional"],
-        explanation: "Internal tests and packaging correctness are separate concerns; either can fail independently."
-      }
-    ]
-  },
+  codeReadingQuiz(
+    "quiz-python-project-structure",
+    "lesson-python-project-structure",
+    "Project structure checkpoint",
+    'from study_tracker.cli import build_parser\nfrom study_tracker.parser import parse_row\nfrom study_tracker.reports import format_report',
+    "project structure",
+    "The functions live in separate modules with clear responsibilities",
+    "All project logic is in one large file",
+    "The project has no structure",
+    "Each import comes from a different module, showing the project is split into cli, parser, and reports.",
+    ["py.structure.package"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-dataclass-models",
+    "lesson-python-dataclass-models",
+    "Dataclass model checkpoint",
+    '@dataclass(frozen=True)\nclass StudySession:\n    date: str\n    topic: str\n    minutes: int\n\ns = StudySession("2026-05-07", "python", 30)\nprint(s.minutes)',
+    "dataclass model",
+    "30",
+    "\"30\"",
+    "TypeError",
+    "The frozen dataclass stores minutes as an integer, so printing s.minutes outputs the number 30 without quotes.",
+    ["py.dataclass.model"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-json-reports",
+    "lesson-python-json-reports",
+    "JSON report checkpoint",
+    'summary = {"session_count": 2, "total_minutes": 45}\nprint(json.dumps(summary))',
+    "json reports",
+    "{\"session_count\": 2, \"total_minutes\": 45}",
+    "2 45",
+    "[2, 45]",
+    "json.dumps serializes the dictionary to a JSON string with the same key-value pairs.",
+    ["py.json.dumps"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-logging-errors",
+    "lesson-python-logging-errors",
+    "Logging and errors checkpoint",
+    'def parse_minutes(value):\n    try:\n        return int(value)\n    except ValueError:\n        logger.warning(f"invalid minutes: {value}")\n        raise TrackerInputError("minutes must be a number")',
+    "logging errors",
+    "Logs the bad value and raises TrackerInputError",
+    "Returns 0 silently",
+    "Prints the error and continues",
+    "The function logs the invalid input for debugging and raises a project-specific error so the caller can handle it.",
+    ["py.logging.warning"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-pytest-ci",
+    "lesson-python-pytest-ci",
+    "Pytest and CI proof checkpoint",
+    '@pytest.fixture\ndef clean_rows():\n    return ["2026-05-07,python,30"]',
+    "pytest fixtures",
+    "It defines a reusable test dataset called clean_rows",
+    "It runs the test immediately",
+    "It deletes the test data",
+    "The @pytest.fixture decorator creates a reusable input dataset that pytest injects into test functions.",
+    ["py.pytest.fixtures"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-pyproject-metadata",
+    "lesson-python-pyproject-metadata",
+    "pyproject metadata checkpoint",
+    '[project]\nname = "study-tracker"\nversion = "0.1.0"\nrequires-python = ">=3.11"',
+    "pyproject metadata",
+    "The project's name, version, and minimum Python version",
+    "The project's dependencies",
+    "The project's test configuration",
+    "The [project] block declares the package identity: name, version, and supported Python versions.",
+    ["py.metadata.pyproject"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-installable-cli",
+    "lesson-python-installable-cli",
+    "Installable CLI checkpoint",
+    '[project.scripts]\nstudy-tracker = "study_tracker.cli:main"',
+    "packaging scripts",
+    "Defines a console script entry point so 'study-tracker' runs the main function",
+    "Installs pytest automatically",
+    "Creates a new Python file",
+    "The [project.scripts] section maps the command name 'study-tracker' to the main function in the package.",
+    ["py.packaging.scripts"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-config-files",
+    "lesson-python-config-files",
+    "Config files checkpoint",
+    'DEFAULT_CONFIG = {"format": "text", "min_minutes": 0}\nfor key in overrides:\n    if key in DEFAULT_CONFIG:\n        merged[key] = overrides[key]',
+    "config merge",
+    "It only applies overrides for keys that exist in DEFAULT_CONFIG, ignoring unknown ones",
+    "It adds unknown keys to the config",
+    "It crashes on unknown keys",
+    "The loop filters overrides so only keys that match DEFAULT_CONFIG are applied, ignoring unknown keys.",
+    ["py.config.merge"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-ci-precommit",
+    "lesson-python-ci-precommit",
+    "CI and pre-commit checkpoint",
+    'on:\n  push:\n  pull_request:\n\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ruff check .',
+    "ci precommit",
+    "A CI workflow that triggers on push and PR, running ruff linting",
+    "A deployment pipeline",
+    "A local pre-commit configuration",
+    "The on block triggers on push and pull_request events, and the lint job runs ruff.",
+    ["py.ci.workflow"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-professional-review",
+    "lesson-python-professional-review",
+    "Professional review checkpoint",
+    '{"area": "command", "evidence": "study-tracker --help returns usage"}',
+    "professional review",
+    "That the installed CLI entry point works and responds",
+    "That the project has pytest tests",
+    "That the README is complete",
+    "The matrix connects the quality area (command) with concrete evidence (the tool responds to --help).",
+    ["py.gate.matrix"]
+  ),
   codeReadingQuiz(
     "quiz-python-virtual-env",
     "lesson-python-virtual-env",

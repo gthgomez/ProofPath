@@ -210,6 +210,13 @@ export const conceptRegistry: ConceptDefinition[] = [
     description: "Convert types to string using str().",
     introducedLevel: 1
   },
+  {
+    id: "py.string.index",
+    label: "String Indexing & Slicing",
+    category: "python",
+    description: "Access individual characters by position using bracket notation, and extract substrings with slice syntax.",
+    introducedLevel: 1
+  },
 
   {
     id: "py.method",
@@ -246,6 +253,13 @@ export const conceptRegistry: ConceptDefinition[] = [
     label: "Indentation block syntax",
     category: "python",
     description: "Indent code sections to define local scopes.",
+    introducedLevel: 2
+  },
+  {
+    id: "py.truthiness",
+    label: "Truthiness & Falsy Values",
+    category: "python",
+    description: "Understand which values Python treats as True or False in boolean contexts, including empty collections, zero, and None.",
     introducedLevel: 2
   },
   {
@@ -288,6 +302,20 @@ export const conceptRegistry: ConceptDefinition[] = [
     label: "Dictionary Get and Set",
     category: "python",
     description: "Assign keys and use default retrieval.",
+    introducedLevel: 2
+  },
+  {
+    id: "py.mutability",
+    label: "Mutable vs Immutable Types",
+    category: "python",
+    description: "Distinguish types whose values can change in place (lists, dicts) from types whose values are fixed (strings, integers, tuples).",
+    introducedLevel: 2
+  },
+  {
+    id: "py.reference",
+    label: "References & Object Identity",
+    category: "python",
+    description: "Understand that variables hold references to objects, not the objects themselves, and what happens when two variables reference the same mutable object.",
     introducedLevel: 2
   },
   {
@@ -425,6 +453,13 @@ export const conceptRegistry: ConceptDefinition[] = [
     description: "Avoid dependency on external namespace globals.",
     introducedLevel: 3
   },
+  {
+    id: "py.list.comprehension",
+    label: "List Comprehensions",
+    category: "python",
+    description: "Construct lists by applying an expression to each item in an iterable with a concise for-inside-brackets syntax.",
+    introducedLevel: 3
+  },
 
   // Level 4: Debugging, Tracebacks, Assertions, Testing
   {
@@ -553,6 +588,13 @@ export const conceptRegistry: ConceptDefinition[] = [
     label: "Path strings",
     category: "files",
     description: "Reference files in Python code.",
+    introducedLevel: 5
+  },
+  {
+    id: "py.pathlib",
+    label: "pathlib.Path",
+    category: "files",
+    description: "Use pathlib.Path for object-oriented path handling, joining, and existence checks instead of string ops.",
     introducedLevel: 5
   },
   {

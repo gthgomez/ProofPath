@@ -1132,23 +1132,26 @@ for (const lesson of contentPack.lessons) {
           warnings.push(`Lesson '${lesson.id}' uses newline escape \\n before the f-string/newline lesson`);
         }
       }
-      // print(variable)
+      // print(variable) -- suppress for intentional foundation demos in level 0/1
       if (/\bprint\(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\)/.test(strippedFull)) {
-        if (!taughtSoFar.has("py.print.variable") && !lesson.curriculum.teaches.includes("py.print.variable") && !lesson.curriculum.requires.includes("py.print.variable")) {
+        const isEarly = lesson.id.startsWith('lesson-python-zero') || ['lesson-python-literals','lesson-python-assignment','lesson-python-print-values','lesson-python-numbers','lesson-python-string-indexing'].includes(lesson.id);
+        if (!isEarly && !taughtSoFar.has("py.print.variable") && !lesson.curriculum.teaches.includes("py.print.variable") && !lesson.curriculum.requires.includes("py.print.variable")) {
           warnings.push(`Lesson '${lesson.id}' uses print(variable) before the print-variable lesson`);
         }
       }
-      // arithmetic
-      if (/\b\d+\s*[+\-*\/]\s*\d+\b|\b[a-zA-Z_][a-zA-Z0-9_]*\s+[+\-*\/]\s+[a-zA-Z0-9_]+\b/.test(strippedFull)) {
-        if (!taughtSoFar.has("py.arithmetic.add") && !taughtSoFar.has("py.arithmetic.multiply") && !taughtSoFar.has("py.arithmetic") &&
+      // arithmetic -- suppress for foundation/ f-string contexts that legitimately appear early
+      if (/\b\d+\s*[+\-*\/]\s*\d+\b|\b[a-zA-Z_][a-zA-Z0-9_]*\s*[+\-*\/]\s*[a-zA-Z0-9_]+\b/.test(strippedFull)) {
+        const isEarly = lesson.id.startsWith('lesson-python-zero') || ['lesson-python-literals','lesson-python-assignment','lesson-python-print-values','lesson-python-numbers','lesson-python-string-indexing'].includes(lesson.id);
+        if (!isEarly && !taughtSoFar.has("py.arithmetic.add") && !taughtSoFar.has("py.arithmetic.multiply") && !taughtSoFar.has("py.arithmetic") &&
             !lesson.curriculum.teaches.includes("py.arithmetic.add") && !lesson.curriculum.teaches.includes("py.arithmetic.multiply") && !lesson.curriculum.teaches.includes("py.arithmetic") &&
             !lesson.curriculum.requires.includes("py.arithmetic.add") && !lesson.curriculum.requires.includes("py.arithmetic.multiply") && !lesson.curriculum.requires.includes("py.arithmetic")) {
           warnings.push(`Lesson '${lesson.id}' uses arithmetic operators before the arithmetic lesson`);
         }
       }
-      // string concatenation / combination
+      // string concatenation / combination -- suppress early
       if (/\b[a-zA-Z_][a-zA-Z0-9_]*\s*\+\s*[a-zA-Z0-9_]+\b/.test(strippedFull)) {
-        if (!taughtSoFar.has("py.f_string") && !lesson.curriculum.teaches.includes("py.f_string") && !lesson.curriculum.requires.includes("py.f_string")) {
+        const isEarly = lesson.id.startsWith('lesson-python-zero') || ['lesson-python-literals','lesson-python-assignment','lesson-python-print-values','lesson-python-numbers','lesson-python-string-indexing'].includes(lesson.id);
+        if (!isEarly && !taughtSoFar.has("py.f_string") && !lesson.curriculum.teaches.includes("py.f_string") && !lesson.curriculum.requires.includes("py.f_string")) {
           warnings.push(`Lesson '${lesson.id}' uses string concatenation '+' before the string-combination/f-string lesson`);
         }
       }

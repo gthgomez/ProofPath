@@ -1,5 +1,5 @@
 import type { Lesson, Quiz, LessonPracticeBlock } from "@/domain/types";
-import { proofLesson } from "./shared";
+import { proofLesson, codeReadingQuiz } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Practice Reps for Level 5
@@ -7,9 +7,9 @@ import { proofLesson } from "./shared";
 
 const pythonParserTestPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "def test_parse_second_valid_row():\n    assert parse_row('2026-05-08,git,15')['topic'] == 'git'\n    assert parse_row('2026-05-08,git,15')['minutes'] == 15",
-    expectedOutput: "A second clean row passes with topic git and minutes 15.",
-    checkYourAnswer: "This repeats the happy path with new data. If the test only passes for python and 30, the parser is memorizing the example instead of parsing rows.",
+    starterCode: "from pathlib import Path\ndef test_parse_second_valid_row():\n    assert parse_row('2026-05-08,git,15')['topic'] == 'git'\n    assert parse_row('2026-05-08,git,15')['minutes'] == 15\np = Path('sample.csv')\nprint(p.exists())",
+    expectedOutput: "A second clean row passes with topic git and minutes 15.\nFalse (or True if file present)",
+    checkYourAnswer: "This repeats the happy path with new data. If the test only passes for python and 30, the parser is memorizing the example instead of parsing rows. pathlib keeps paths clean.",
     tier: "replicate"
   },
   {
@@ -130,7 +130,7 @@ const pythonImportLesson = proofLesson({
   evidencePrompt: "Capture the import statement, the data being processed, and the output printed by the script.",
   language: "Python",
   tools: ["Python 3", "terminal"],
-  synopsis: "You are learning how to borrow pre-written code using Python's import statement so you do not have to reimplement everything yourself.",
+  synopsis: "How do you borrow Python's built-in superpowers (JSON parsing, CSV reading)?",
   prerequisites: [
     "Understand how a Python script runs top-to-bottom.",
     "Know the difference between defining a function and calling it.",
@@ -285,7 +285,7 @@ const fileInputLesson = proofLesson({
   slug: "python-file-input",
   title: "Files Make Practice Real",
   summary: "Move from toy functions to repeatable input and output.",
-  bodyMarkdown: "A useful beginner script can read a small file, validate each row, and report what it skipped. Keep parsing separate from printing so tests can inspect the result.",
+  bodyMarkdown: "A useful beginner script can read a small file, validate each row, and report what it skipped. Keep parsing separate from printing so tests can inspect the result. Use pathlib.Path for paths instead of strings.",
   estimatedMinutes: 10,
   difficulty: "foundation",
   skillIds: ["skill-python-functions", "skill-testing-debugging"],
@@ -294,7 +294,7 @@ const fileInputLesson = proofLesson({
   evidencePrompt: "Capture the sample input, rejected-row behavior, and command output.",
   language: "Python",
   tools: ["Python 3", "CSV or text file", "terminal"],
-  synopsis: "You are learning how a beginner Python script reads real input. A row is one line from the file, and a parser is the code that turns that line into structured data or a clear rejection.",
+  synopsis: "How do you load 1000 study sessions from a file without typing them by hand?",
   prerequisites: [
     "Complete or understand the function lesson.",
     "Have a tiny sample file with at least one valid row and one broken row."
@@ -307,6 +307,7 @@ const fileInputLesson = proofLesson({
   guidedExercise: "Create two sample rows, one valid and one malformed, then return accepted sessions plus rejected reasons.",
   missionConnection: "This feeds both CLI Study Tracker and Study Data Cleaner.",
   reflectionPrompt: "What malformed row did you handle explicitly, and what row would still be risky?",
+  commonMistakes: ["Forgetting to close the file (not using 'with')", "Assuming the file path is relative to the script instead of the working directory"],
   practiceStarter: "rows = [\n  \"2026-05-07,python,30\",\n  \"bad-row\",\n]\n\n# Write parse_rows(rows) so it returns accepted sessions and rejected reasons.\naccepted, rejected = parse_rows(rows)\nprint(accepted)\nprint(rejected)",
   practiceExpected: "[{'date': '2026-05-07', 'topic': 'python', 'minutes': 30}]\n[{'row': 'bad-row', 'reason': 'expected 3 columns'}]",
   practiceCheck: "You should see one accepted session and one rejected row. Accepted means the row became usable data. Rejected means the row was kept with a reason so the user can fix it.",
@@ -358,9 +359,9 @@ const fileInputLesson = proofLesson({
     sequence: 1,
     version: "1.0.0",
     lessonKind: "run_file",
-    teaches: ["py.file.input", "py.parser.separation"],
+    teaches: ["py.file.input", "py.parser.separation", "py.pathlib"],
     requires: ["py.function.def", "py.try_except"],
-    visibleCodeConcepts: ["py.file.input", "py.parser.separation"],
+    visibleCodeConcepts: ["py.file.input", "py.parser.separation", "py.pathlib"],
     quizConcepts: ["py.file.input", "py.parser.separation"],
     proofOutputs: ["terminal_stdout"]
   }
@@ -389,6 +390,16 @@ fileInputLesson.depth = {
       tinyExample: "parse(['a,b,c'])",
       commonMistake: "Putting 'open()' inside the row parser, which makes writing automated tests extremely difficult.",
       repairHint: "Accept lists of strings or raw string blocks, and let the caller handle file opening.",
+      usedIn: ["learn", "practice"]
+    },
+    {
+      conceptId: "py.pathlib",
+      definition: "Object-oriented path handling with pathlib.Path for joining, reading, and checking files without manual string ops or os.path.",
+      mentalModel: "Think of Path as a smart file address object. p = Path('data/sessions.csv'); p.exists() tells truth without string hacks.",
+      syntaxShape: "from pathlib import Path\np = Path('sessions.csv')\ntext = p.read_text()",
+      tinyExample: "p = Path('log.txt'); print(p.suffix)",
+      commonMistake: "Hardcoding '/' or '\\\\' in paths instead of using Path / operator or joinpath.",
+      repairHint: "Use from pathlib import Path; p = Path(dir) / filename",
       usedIn: ["learn", "practice"]
     }
   ],
@@ -463,7 +474,7 @@ const parserTestsLesson = proofLesson({
   evidencePrompt: "Capture the failing test first, the fixed parser, and the final test command output.",
   language: "Python",
   tools: ["Python 3", "pytest or unittest", "terminal"],
-  synopsis: "You are learning how to turn parser behavior into repeatable checks. A test is a small example your code must satisfy every time: clean input should become data, and bad input should become a clear error.",
+  synopsis: "What if one line in your 5000-row file breaks the whole program?",
   prerequisites: [
     "Understand the parser's expected input format.",
     "Have a parser function or planned parser contract ready."
@@ -512,6 +523,7 @@ const parserTestsLesson = proofLesson({
     requires: ["py.file.input", "py.parser.separation"],
     visibleCodeConcepts: ["py.test.assertions", "py.test.failures"],
     quizConcepts: ["py.test.assertions", "py.test.failures"],
+    usesButDoesNotTeach: ["py.csv"],
     proofOutputs: ["terminal_stdout"]
   }
 });
@@ -613,7 +625,7 @@ const cliArgumentsLesson = proofLesson({
   evidencePrompt: "Record the command shape, parsed dictionary, output summary, and one invalid argument case you would test next.",
   language: "Python",
   tools: ["Python 3", "terminal", "argparse"],
-  synopsis: "You are learning how a Python script becomes a reusable command. The user-facing part reads flags from the terminal, and the internal logic works with clean values such as topic and minutes.",
+  synopsis: "How does your program know which file to work on without editing the code?",
   prerequisites: [
     "Know how to write a function that returns a dictionary.",
     "Know how to convert text minutes into an integer safely."
@@ -626,6 +638,7 @@ const cliArgumentsLesson = proofLesson({
   guidedExercise: "Write a small argparse parser for a topic and minutes pair, then build the summary from the parsed result.",
   missionConnection: "This is the command boundary for the CLI Study Tracker mission.",
   reflectionPrompt: "Which part of your code knows about --topic, and which part only cares about a parsed dictionary?",
+  commonMistakes: ["Confusing --flags with positional arguments", "Forgetting type=int on numeric arguments"],
   practiceStarter: "import argparse\n\nargs = [\"--topic\", \"python\", \"--minutes\", \"30\"]\n\ndef build_parser():\n    parser = argparse.ArgumentParser(prog=\"study_tracker\")\n    # Add --topic and --minutes here.\n    return parser\n\ndef parse_cli(args):\n    namespace = build_parser().parse_args(args)\n    return {}\n\nparsed = parse_cli(args)\nsummary = \"\"\nprint(parsed)\nprint(summary)",
   practiceExpected: "{'topic': 'python', 'minutes': 30}\npython: 30 minutes",
   practiceCheck: "The parser should return data, not print inside itself. If minutes is still '30' as text, check whether the --minutes argument uses type=int so Python converts it to the number 30.",
@@ -769,7 +782,7 @@ const fileBackedCliLesson = proofLesson({
   evidencePrompt: "Record the sample CSV, the exact command, the output, and one bad-file or bad-row case you would test next.",
   language: "Python",
   tools: ["Python 3", "argparse", "CSV file input", "terminal"],
-  synopsis: "You are learning how a Python script becomes a reproducible local tool. Reproducible means another person can run the same command with the same input file and get the same result.",
+  synopsis: "Your CSV reader works. Your CLI handles arguments. What happens when you combine them?",
   prerequisites: [
     "Know how argparse parses --input style flags.",
     "Know how session rows should become dictionaries with numeric minutes."
@@ -939,7 +952,7 @@ const cliPolishLesson = proofLesson({
   evidencePrompt: "Record the --help output, one default run, one explicit --format json run, and one invalid format or minutes error.",
   language: "Python",
   tools: ["Python 3", "argparse", "terminal", "--help output"],
-  synopsis: "You are learning how to make a Python CLI understandable and resilient. Resilient means it gives useful guidance when the user forgets a flag or enters a value the tool does not support.",
+  synopsis: "Your tool works — but would anyone else know how to use it?",
   prerequisites: [
     "Know how to build an argparse parser with --input.",
     "Know that parsed arguments should stay separate from file reading and report logic."
@@ -1114,7 +1127,7 @@ const outputFileLesson = proofLesson({
   evidencePrompt: "Record the command, the created output file path, the file contents, and one note explaining what should happen if the file already exists.",
   language: "Python",
   tools: ["Python 3", "argparse", "output files", "terminal"],
-  synopsis: "You are learning how to make a Python CLI leave behind a report artifact. An artifact is a saved result, such as a report file, that someone can inspect after the command finishes.",
+  synopsis: "How do you save your results to a file instead of just printing them?",
   prerequisites: [
     "Know how argparse parses --input style flags.",
     "Know how the tracker calculates sessions and total minutes."
@@ -1284,7 +1297,7 @@ const rejectedRowReportLesson = proofLesson({
   evidencePrompt: "Record the sample bad input, the accepted-count output, the rejected report, and one row you would add to your regression tests.",
   language: "Python",
   tools: ["Python 3", "CSV-like rows", "rejected-row report", "terminal"],
-  synopsis: "You are learning how to handle messy file input professionally. The clean rows should still work, and the rejected rows should be reported clearly enough for a beginner to repair the file.",
+  synopsis: "Your parser cleaned 990 of 1000 rows. How do you tell the user which 10 failed?",
   prerequisites: [
     "Know how to parse a comma-separated row.",
     "Know why non-numeric minutes should be rejected clearly."
@@ -1434,7 +1447,7 @@ const portfolioProofLesson = proofLesson({
   evidencePrompt: "Capture the terminal output of your running script, README status, check output, and reflection.",
   language: "Python plus Markdown",
   tools: ["README", "Git", "test output"],
-  synopsis: "You are learning how to package a Python practice script so another person can understand, run, verify, and evaluate it without needing a private explanation from you.",
+  synopsis: "You've built a real CLI tool. How do you prove it works to someone who's hiring?",
   prerequisites: [
     "Have a small Python script or mission repo.",
     "Have at least one command that runs or tests the work."
@@ -1598,7 +1611,7 @@ const coreReviewLesson = proofLesson({
   evidencePrompt: "Record the command output, rejected-row output, module architecture explanation, failure diagnosis, and improvement note.",
   language: "Python project review",
   tools: ["CLI output", "rejected-row report", "review note"],
-  synopsis: "You are learning to evaluate your own Python utility like a reviewer. That means explaining the structure, proving behavior with commands, inspecting one failure, and improving one weakness.",
+  synopsis: "Before moving to professional Python — does your tool actually work start to finish?",
   prerequisites: [
     "Have completed the core Python CLI lessons.",
     "Have at least one command and one failure case to inspect."
@@ -1737,326 +1750,126 @@ coreReviewLesson.depth = {
 // ---------------------------------------------------------------------------
 
 export const level5Quizzes: Quiz[] = [
-  {
-    id: "quiz-python-file-input",
-    lessonId: "lesson-python-file-input",
-    title: "File input checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-file-1",
-        prompt: "What does this code output?\n```python\na, r = parse_rows([\"2026-05-07,python,30\"])\nprint(len(a), len(r))\n```",
-        choices: ["1 0", "0 1", "1 1"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.parser.separation"],
-        explanation: "The valid 3-field row passes parsing so one row is accepted and zero are rejected."
-      },
-      {
-        id: "question-python-file-2",
-        prompt: "Your Study Tracker returns 0 total minutes. Which part of this code is broken?\n```python\nif len(parts) != 3:\n    rejected.append(...)\nelse:\n    try:\n        minutes = int(parts[2])\n    except ValueError:\n        rejected.append(...)\n```",
-        choices: ["The len(parts) check is wrong", "The try/except silently rejects rows with non-numeric minutes", "The parser splits on commas instead of tabs"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.file.input"],
-        explanation: "The except catches bad minutes and moves the row to rejected, so minutes are not counted."
-      },
-      {
-        id: "question-python-file-3",
-        prompt: "Why should parse_rows return both accepted and rejected lists instead of stopping at the first bad row?",
-        choices: ["So every row is automatically corrected", "So the program never reports errors", "So valid rows can be processed while bad rows are reported for repair"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.file.input"],
-        explanation: "Returning both lists lets valid data succeed and shows the user exactly what input needs fixing."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-parser-tests",
-    lessonId: "lesson-python-parser-tests",
-    title: "Parser test checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-parser-tests-1",
-        prompt: "What does this test validate?\n```python\ndef test_rejects_bad_minutes():\n    result = parse_row(\"2026-05-07,python,soon\")\n    assert result[\"error\"] == \"minutes must be a number\"\n```",
-        choices: ["That the parser works correctly on valid rows", "That non-numeric minutes produce the expected error message", "That the test will fail silently"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.test.failures"],
-        explanation: "The test proves the parser rejects invalid minutes with the correct error message."
-      },
-      {
-        id: "question-python-parser-tests-2",
-        prompt: "Your test_parse_valid_row passes even after the parser returns empty dictionaries. What went wrong?",
-        choices: ["The parser handles valid rows perfectly", "The test function was never called", "The test does not assert on the return value, so it passes regardless"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.test.assertions"],
-        explanation: "A test that never inspits the result with an assertion will pass even when the function produces wrong output."
-      },
-      {
-        id: "question-python-parser-tests-3",
-        prompt: "Why is it important to test both valid rows and malformed rows in the same parser test suite?",
-        choices: ["Because malformed rows prove the parser handles errors while valid rows prove it extracts data correctly", "Because only malformed rows matter in production", "Because valid rows are always the same"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.test.failures"],
-        explanation: "Both success and failure tests together give confidence the parser handles real messy input."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-cli-arguments",
-    lessonId: "lesson-python-cli-arguments",
-    title: "CLI arguments checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-cli-1",
-        prompt: "What does this code output?\n```python\nparsed = parse_cli([\"--topic\", \"git\", \"--minutes\", \"15\"])\nprint(parsed[\"topic\"])\n```",
-        choices: ["python", "15", "git"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.cli.arguments"],
-        explanation: "The argparse parser extracts 'git' from the --topic argument flag."
-      },
-      {
-        id: "question-python-cli-2",
-        prompt: "Your CLI script crashes with '--minutes soon'. What happens inside argparse?",
-        choices: ["Argparse rejects 'soon' because type=int validates the input at the CLI boundary", "Argparse converts 'soon' to 0 silently", "Argparse ignores the invalid argument"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.argparse.parser"],
-        explanation: "With type=int, argparse validates the input and rejects non-numeric values before business logic runs."
-      },
-      {
-        id: "question-python-cli-3",
-        prompt: "Why should parse_cli return a dictionary instead of printing output directly?",
-        choices: ["Because dictionaries cannot be tested", "So the parsed arguments can be tested separately from the display logic", "Because argparse does not support printing"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.cli.arguments"],
-        explanation: "Returning parsed data keeps argument parsing independent and testable separate from output formatting."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-file-backed-cli",
-    lessonId: "lesson-python-file-backed-cli",
-    title: "File-backed CLI checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-file-backed-cli-1",
-        prompt: "What does this code block do?\n```python\ndef read_sessions(csv_text):\n    f = StringIO(csv_text.strip())\n    reader = csv.DictReader(f)\n    sessions = []\n    for row in reader:\n        sessions.append({\"topic\": row[\"topic\"], \"minutes\": int(row[\"minutes\"])})\n    return sessions\n```",
-        choices: ["It parses CSV text into session dictionaries with numeric minutes", "It reads a file from disk and returns session dictionaries", "It writes sessions to a CSV file"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.cli.file_backed"],
-        explanation: "The function reads CSV text from a string, not a file, converting each row into a session dictionary with int minutes."
-      },
-      {
-        id: "question-python-file-backed-cli-2",
-        prompt: "Your run_cli always prints '2 sessions, 45 minutes' regardless of which input file is used. What is the likely cause?",
-        choices: ["The CSV reader can only read one file", "The file format is wrong", "The summary is hardcoded instead of calculated from the file data"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.cli.integration"],
-        explanation: "A changing input file should produce different output. A fixed result means the summary is not being read from the file."
-      },
-      {
-        id: "question-python-file-backed-cli-3",
-        prompt: "What should run_cli do with the --input flag value it receives from argparse?",
-        choices: ["Print the flag value without reading any file", "Use the flag as the file path and pass the contents to read_sessions", "Ignore the flag and open a hardcoded file"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.cli.integration"],
-        explanation: "The coordinator function should pass the parsed input path to the file reader so the specified file is used."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-cli-polish",
-    lessonId: "lesson-python-cli-polish",
-    title: "CLI polish checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-cli-polish-1",
-        prompt: "What does this argparse configuration do?\n```python\nparser.add_argument('--format',\n    choices=['text', 'json'],\n    default='text')\n```",
-        choices: ["It allows any string value for --format", "It restricts --format to text or json with a default of text", "It rejects the --format flag entirely"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.cli.constraints"],
-        explanation: "The choices parameter tells argparse to reject any value not in the list, while default provides a fallback."
-      },
-      {
-        id: "question-python-cli-polish-2",
-        prompt: "A user runs 'study-tracker --format xml' and gets an error. How should the CLI tell the user what formats are valid?",
-        choices: ["Crash with an unhelpful traceback", "Silently convert xml to text", "Let argparse reject it automatically and argparse --help shows valid choices"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.cli.help_defaults"],
-        explanation: "Argparse rejects invalid choices and the --help documentation shows the user which values are accepted."
-      },
-      {
-        id: "question-python-cli-polish-3",
-        prompt: "Why should description= be passed to ArgumentParser in a portfolio project?",
-        choices: ["So --help shows what the command does, helping reviewers run the tool without instruction", "So the parser runs faster", "So the script can avoid testing"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.cli.help_defaults"],
-        explanation: "A description makes the CLI self-documenting through --help output."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-output-file",
-    lessonId: "lesson-python-output-file",
-    title: "Output file checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-output-file-1",
-        prompt: "What does this code do?\n```python\nwith open(path, 'w') as f:\n    f.write(content)\n```",
-        choices: ["It reads a file from disk", "It appends content to an existing file", "It opens a file for writing, overwriting existing content"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.file.output"],
-        explanation: "The 'w' mode opens the file for writing and overwrites any existing content in the file."
-      },
-      {
-        id: "question-python-output-file-2",
-        prompt: "Your --output flag is ignored and the report always saves to 'summary.txt'. What is the most likely cause?",
-        choices: ["The write_report function uses a hardcoded path instead of the parsed --output argument", "The file system is read-only", "The report format is not supported"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.cli.artifacts"],
-        explanation: "The output destination should come from the argparse result, not from a hardcoded string."
-      },
-      {
-        id: "question-python-output-file-3",
-        prompt: "Why separate format_report (creates text) from write_report (saves to file)?",
-        choices: ["Because files cannot be written from functions", "So formatting logic can be tested without creating real files", "Because format_report should always fail"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.file.output"],
-        explanation: "Separating formatting from I/O makes both parts independently testable."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-rejected-row-report",
-    lessonId: "lesson-python-rejected-row-report",
-    title: "Rejected-row report checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-rejected-row-report-1",
-        prompt: "What does this code output?\n```python\nrejected = [{\"row_number\": 2, \"reason\": \"expected 3 columns\"}]\nprint(f\"row {rejected[0]['row_number']}: {rejected[0]['reason']}\")\n```",
-        choices: ["row 2: expected 3 columns", "row 1: expected 3 columns", "row 2: bad input"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.report.row_numbers"],
-        explanation: "The f-string formats the row_number and reason into a human-readable rejection line."
-      },
-      {
-        id: "question-python-rejected-row-report-2",
-        prompt: "Your rejected-row report shows 'row 0: expected 3 columns' but the text editor shows line 1. What went wrong?",
-        choices: ["The file has headers that shift the numbering", "The row numbering uses zero-based indices instead of 1-based", "The report is written in the wrong language"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.report.row_numbers"],
-        explanation: "Using enumerate without start=1 gives 0-based indices that confuse non-programmers viewing files in editors."
-      },
-      {
-        id: "question-python-rejected-row-report-3",
-        prompt: "Why include the raw bad row string in the rejection report instead of just the line number?",
-        choices: ["So the program runs slower", "So the report output looks more technical", "So the user can see the exact input that failed without opening the source file"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.report.rejections"],
-        explanation: "Including the raw row makes the report self-contained so a user can identify the issue without cross-referencing the file."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-portfolio-proof",
-    lessonId: "lesson-python-portfolio-proof",
-    title: "Portfolio proof checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-proof-1",
-        prompt: "What README section does this code define?\n```markdown\n## Verify\n\npython -m pytest\n\nExpected:\n2 passed\n```",
-        choices: ["A section listing the project author", "A section telling reviewers how to verify the project works", "A section hiding test output"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.proof.readme"],
-        explanation: "The Verify section documents the exact command and expected output a reviewer should run to confirm the project works."
-      },
-      {
-        id: "question-python-proof-2",
-        prompt: "A reviewer clones your repo and cannot run the tool because they get import errors. What is missing from your README?",
-        choices: ["Colorful decorations", "The author's biography", "Setup steps such as Python version and installation instructions"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.proof.readme"],
-        explanation: "A reviewer-friendly README includes prerequisites and setup steps, not just verification commands."
-      },
-      {
-        id: "question-python-proof-3",
-        prompt: "Why is a ## Known gaps section valuable in a portfolio project?",
-        choices: ["It honestly shows the project's boundaries and builds reviewer trust", "It makes the project look incomplete", "It replaces all testing"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.proof.gaps"],
-        explanation: "Known gaps demonstrate self-awareness about project limitations, increasing credibility with reviewers."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-core-review",
-    lessonId: "lesson-python-core-review",
-    title: "Core review checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-core-review-1",
-        prompt: "What does this review snippet describe?\n```python\nreview = {\n    \"architecture\": \"CLI -> parser -> report\",\n    \"commands\": [\"--help\", \"--input sessions.csv\"]\n}\n```",
-        choices: ["The project's test coverage statistics", "The project's file count", "The project's data flow architecture and verification commands"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.gate.architecture"],
-        explanation: "The review names how data flows through the program and the commands used to verify behavior."
-      },
-      {
-        id: "question-python-core-review-2",
-        prompt: "Your review gate says the module is complete but there is no failure inspection recorded. What is missing?",
-        choices: ["Evidence that the project handles bad input correctly", "The project's git history", "A list of all file names"],
-        correctChoiceIndex: 0,
-        conceptIds: ["py.gate.review"],
-        explanation: "A review gate must show how the program behaves under failure conditions, not just the happy path."
-      },
-      {
-        id: "question-python-core-review-3",
-        prompt: "What makes a review improvement note actionable for a maintainer?",
-        choices: ["It speaks in general terms like 'make it better'", "It names a specific component and a concrete next step", "It lists every possible feature the project could have"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.gate.review"],
-        explanation: "An actionable improvement names a target (such as 'add parser tests for missing topic') and a reason it matters."
-      }
-    ]
-  },
-  {
-    id: "quiz-python-import",
-    lessonId: "lesson-python-import",
-    title: "Import statement checkpoint",
-    passingScore: 80,
-    questions: [
-      {
-        id: "question-python-import-1",
-        prompt: "What does this code do?\n```python\nimport json\ndata = json.loads('{\"topic\": \"python\"}')\nprint(data[\"topic\"])\n```",
-        choices: ["Prints the raw JSON text unchanged", "Prints the string python from the parsed JSON dictionary", "Throws a NameError because import is misspelled"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.import"],
-        explanation: "json.loads() converts a JSON string into a Python dictionary, so printing data[\"topic\"] gives the value 'python'."
-      },
-      {
-        id: "question-python-import-2",
-        prompt: "Your script uses csv.DictReader but you get a NameError. What is the most likely cause?",
-        choices: ["Python does not support CSV parsing", "The CSV file is empty", "The csv module was not imported before use"],
-        correctChoiceIndex: 2,
-        conceptIds: ["py.import"],
-        explanation: "NameError means Python does not know what csv is. The import csv statement must appear at the top of the file."
-      },
-      {
-        id: "question-python-import-3",
-        prompt: "Why place import statements at the top of a file rather than inside a function body?",
-        choices: ["Because imports run faster at the top of the file", "So the module is loaded once and available throughout the file, making dependencies easy to find", "Because Python does not allow imports inside functions"],
-        correctChoiceIndex: 1,
-        conceptIds: ["py.import"],
-        explanation: "Putting imports at the top makes dependencies visible and ensures the module is loaded once before any code uses it."
-      }
-    ]
-  },
+  codeReadingQuiz(
+    "quiz-python-file-input",
+    "lesson-python-file-input",
+    "File input checkpoint",
+    'a, r = parse_rows(["2026-05-07,python,30"])\nprint(len(a), len(r))',
+    "parser separation",
+    "1 0",
+    "0 1",
+    "1 1",
+    "The valid 3-field row passes parsing so one row is accepted and zero are rejected.",
+    ["py.parser.separation"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-parser-tests",
+    "lesson-python-parser-tests",
+    "Parser test checkpoint",
+    'def test_rejects_bad_minutes():\n    result = parse_row("2026-05-07,python,soon")\n    assert result["error"] == "minutes must be a number"',
+    "test failures",
+    "That non-numeric minutes produce the expected error message",
+    "That the parser works correctly on valid rows",
+    "That the test will fail silently",
+    "The test proves the parser rejects invalid minutes with the correct error message.",
+    ["py.test.failures"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-cli-arguments",
+    "lesson-python-cli-arguments",
+    "CLI arguments checkpoint",
+    'parsed = parse_cli(["--topic", "git", "--minutes", "15"])\nprint(parsed["topic"])',
+    "cli arguments",
+    "git",
+    "python",
+    "15",
+    "The argparse parser extracts 'git' from the --topic argument flag.",
+    ["py.cli.arguments"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-file-backed-cli",
+    "lesson-python-file-backed-cli",
+    "File-backed CLI checkpoint",
+    'def read_sessions(csv_text):\n    f = StringIO(csv_text.strip())\n    reader = csv.DictReader(f)\n    sessions = []\n    for row in reader:\n        sessions.append({"topic": row["topic"], "minutes": int(row["minutes"])})\n    return sessions',
+    "cli file backed",
+    "It parses CSV text into session dictionaries with numeric minutes",
+    "It reads a file from disk and returns session dictionaries",
+    "It writes sessions to a CSV file",
+    "The function reads CSV text from a string, not a file, converting each row into a session dictionary with int minutes.",
+    ["py.cli.file_backed"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-cli-polish",
+    "lesson-python-cli-polish",
+    "CLI polish checkpoint",
+    'parser.add_argument("--format",\n    choices=["text", "json"],\n    default="text")',
+    "cli constraints",
+    "It restricts --format to text or json with a default of text",
+    "It allows any string value for --format",
+    "It rejects the --format flag entirely",
+    "The choices parameter tells argparse to reject any value not in the list, while default provides a fallback.",
+    ["py.cli.constraints"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-output-file",
+    "lesson-python-output-file",
+    "Output file checkpoint",
+    'with open(path, "w") as f:\n    f.write(content)',
+    "file output",
+    "It opens a file for writing, overwriting existing content",
+    "It reads a file from disk",
+    "It appends content to an existing file",
+    "The 'w' mode opens the file for writing and overwrites any existing content in the file.",
+    ["py.file.output"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-rejected-row-report",
+    "lesson-python-rejected-row-report",
+    "Rejected-row report checkpoint",
+    'rejected = [{"row_number": 2, "reason": "expected 3 columns"}]\nprint(f"row {rejected[0][\'row_number\']}: {rejected[0][\'reason\']}")',
+    "report rejections",
+    "row 2: expected 3 columns",
+    "row 1: expected 3 columns",
+    "row 2: bad input",
+    "The f-string formats the row_number and reason into a human-readable rejection line.",
+    ["py.report.row_numbers"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-portfolio-proof",
+    "lesson-python-portfolio-proof",
+    "Portfolio proof checkpoint",
+    '## Verify\n\npython -m pytest\n\nExpected:\n2 passed',
+    "proof readme",
+    "A section telling reviewers how to verify the project works",
+    "A section listing the project author",
+    "A section hiding test output",
+    "The Verify section documents the exact command and expected output a reviewer should run to confirm the project works.",
+    ["py.proof.readme"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-core-review",
+    "lesson-python-core-review",
+    "Core review checkpoint",
+    'review = {\n    "architecture": "CLI -> parser -> report",\n    "commands": ["--help", "--input sessions.csv"]\n}',
+    "gate review",
+    "The project's data flow architecture and verification commands",
+    "The project's test coverage statistics",
+    "The project's file count",
+    "The review names how data flows through the program and the commands used to verify behavior.",
+    ["py.gate.architecture"]
+  ),
+  codeReadingQuiz(
+    "quiz-python-import",
+    "lesson-python-import",
+    "Import statement checkpoint",
+    'import json\ndata = json.loads(\'{"topic": "python"}\')\nprint(data["topic"])',
+    "import",
+    "Prints the string python from the parsed JSON dictionary",
+    "Prints the raw JSON text unchanged",
+    "Throws a NameError because import is misspelled",
+    "json.loads() converts a JSON string into a Python dictionary, so printing data[\"topic\"] gives the value 'python'.",
+    ["py.import"]
+  ),
 ];
 
 export const level5Lessons: Lesson[] = [
