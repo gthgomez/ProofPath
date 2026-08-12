@@ -108,3 +108,5 @@ Avoid:
 - "ML engineer from beginner lessons."
 - "Cloud architect as a beginner path."
 - Any job guarantee, salary promise, or standalone prompt-engineering career claim.
+
+**2026-06-26 Python update (AC5):** Complete 0-9 spine + 3 slices documented. See python-roadmap-2026-05-07.md and the next-design doc.

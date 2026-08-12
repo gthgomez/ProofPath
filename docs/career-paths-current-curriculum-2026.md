@@ -149,3 +149,5 @@ Avoid:
 - "ML engineer from beginner lessons."
 - "Cloud architect as a beginner path."
 - Any job guarantee, salary promise, or standalone prompt-engineering career claim.
+
+**2026-06-26 Python spine update:** The Python Fundamentals track (core + professional + dashboard + resilience + ops) is now complete through level 9 with 110 lessons, all Python quizzes emitting 5 questions at 80% threshold, 3 new integrated proof slice lessons, and full wiring. See docs/python-lessons-next-design-2026-06-26.md.

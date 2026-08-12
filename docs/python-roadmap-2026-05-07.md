@@ -1,5 +1,7 @@
 # Python Roadmap - CareerForge
 
+**Updated 2026-06-26 after improvements (design):** 0-9 spine complete with resilience (L8: retry/backoff/cache/circuit) + ops (L9: env/CI/secrets/deploy/monitor). All Python quizzes now 5Q/80%. Missions for api-resilience/ops wired + richer artifacts. Guard mechanics + pathlib explicit capsules/exercises. Early false-positive warns suppressed. Depth parity + review sims added. Full verify clean. See docs/python-lessons-next-design-2026-06-26.md .
+
 ## Professor Goal
 
 The Python path should feel like one long apprenticeship, not a shelf of unrelated topics. Every lesson should answer:
