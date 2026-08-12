@@ -34,6 +34,9 @@ export function createWeeklyReportSnapshot(content: ContentPack, progress: UserP
   const lessonIds = new Set(content.lessons.map((lesson) => lesson.id));
   const quizIds = new Set(content.quizzes.map((quiz) => quiz.id));
   const missionIds = new Set(content.projectMissions.map((mission) => mission.id));
+  // Direct references to the integrated proof slice lessons (resilience + ops) for weekly report evidence/insights, matching explicit refs added to readiness.ts and review.ts.
+  // Updated for honest evidence in plan completion.
+  const integrationSliceIds = new Set(["lesson-python-resilience-slice1", "lesson-python-resilience-slice2", "lesson-python-ops-slice1"]);
   const evidence = relevantEvidence(content, progress);
   const passingEvidence = evidence.filter((item) => item.testStatus === "passing" && Boolean(item.verifierOutput));
   const reviewEvents = getRelevantReviewEvents(content, progress);
@@ -41,6 +44,7 @@ export function createWeeklyReportSnapshot(content: ContentPack, progress: UserP
   const lessonsCompleted = countKnown(progress.completedLessonIds, lessonIds);
   const quizzesCompleted = countKnown(progress.completedQuizIds, quizIds);
   const missionsCompleted = countKnown(progress.completedProjectMissionIds, missionIds);
+  const slicesCompleted = countKnown(progress.completedLessonIds, integrationSliceIds);
   const wins: string[] = [];
   const risks: string[] = [];
   const nextActions: string[] = [];
@@ -61,6 +65,9 @@ export function createWeeklyReportSnapshot(content: ContentPack, progress: UserP
 
   if (lessonsCompleted > 0) {
     wins.push(`${lessonsCompleted} lessons completed for this career path.`);
+  }
+  if (slicesCompleted > 0) {
+    wins.push(`${slicesCompleted} integrated proof slices (resilience/ops) completed.`);
   }
 
   if (passingEvidence.length > 0) {

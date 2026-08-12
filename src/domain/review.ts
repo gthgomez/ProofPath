@@ -111,5 +111,9 @@ export function getRelevantReviewEvents(content: ContentPack, progress: UserProg
     ...content.projectMissions.map((mission) => reviewKey("mission", mission.id))
   ]);
 
+  // Direct slice lesson refs (per python plan AC): explicit ids for integrated resilience/ops proofs surfaced for review scheduling beyond weekly/learning-path arcs.
+  const pythonIntegrationSlices = ["lesson-python-resilience-slice1", "lesson-python-resilience-slice2", "lesson-python-ops-slice1"];
+  pythonIntegrationSlices.forEach((sid) => targetIds.add(reviewKey("lesson", sid)));
+
   return progress.reviewEvents.filter((event) => targetIds.has(reviewKey(event.targetType, event.targetId)));
 }

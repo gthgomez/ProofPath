@@ -111,12 +111,14 @@ export const lessonWorkshopSchema = z.object({
   practice: z.object({
     starterCode: nonEmptyString,
     expectedOutput: nonEmptyString,
-    checkYourAnswer: nonEmptyString
+    checkYourAnswer: nonEmptyString,
+    tier: z.enum(["replicate", "diagnose", "synthesize", "review-sim"]).optional()
   }),
   practiceReps: z.array(z.object({
     starterCode: nonEmptyString,
     expectedOutput: nonEmptyString,
-    checkYourAnswer: nonEmptyString
+    checkYourAnswer: nonEmptyString,
+    tier: z.enum(["replicate", "diagnose", "synthesize", "review-sim"]).optional()
   })).optional(),
   miniProject: z.object({
     title: nonEmptyString,

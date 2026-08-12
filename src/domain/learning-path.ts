@@ -214,12 +214,45 @@ const moduleLessonArcs: Record<string, LessonArc[]> = {
       lessonIndexes: [1],
       missionHint: "Use confusion matrices to find model failure modes."
     }
+  ],
+  "module-python-api-resilience": [
+    {
+      id: "python-api-resilience-patterns",
+      title: "Resilience Patterns",
+      lessonIndexes: [0, 1, 2, 3],
+      missionHint: "Add retry, backoff, cache, and circuit breaker to the API client."
+    },
+    {
+      id: "python-api-resilience-slices",
+      title: "Integration Slices",
+      lessonIndexes: [4, 5],
+      missionHint: "The integrated proof slices for the mission."
+    }
+  ],
+  "module-python-ops": [
+    {
+      id: "python-ops-production",
+      title: "Production Ops",
+      lessonIndexes: [0, 1, 2, 3, 4],
+      missionHint: "Wire CI, secrets boundary, deployment runbook, and monitoring."
+    },
+    {
+      id: "python-ops-slice",
+      title: "Ops Integration Slice",
+      lessonIndexes: [5],
+      missionHint: "The integrated ops proof slice."
+    }
   ]
 };
 
 export function getLessonArcs(moduleItem: Module, lessons: Lesson[]): LessonArc[] {
-  if (moduleItem.id === "module-python-core" && lessons.length >= 17) {
-    return pythonCoreLessonArcs;
+  if (moduleItem.id === "module-python-core") {
+    return pythonCoreLessonArcs
+      .map((arc) => ({
+        ...arc,
+        lessonIndexes: arc.lessonIndexes.filter((lessonIndex) => lessonIndex < lessons.length)
+      }))
+      .filter((arc) => arc.lessonIndexes.length > 0);
   }
 
   const configuredArcs = moduleLessonArcs[moduleItem.id];

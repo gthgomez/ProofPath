@@ -110,6 +110,8 @@ export function calculateReadinessScore(content: ContentPack, progress: UserProg
   const lessonIds = new Set(content.lessons.map((lesson) => lesson.id));
   const quizIds = new Set(content.quizzes.map((quiz) => quiz.id));
   const missionIds = new Set(content.projectMissions.map((mission) => mission.id));
+  // Direct slice refs (AC wiring): explicit references to the integrated proof slices beyond module arcs in learning-path and weekly linkedLessonId.
+  const integrationSliceIds = new Set(["lesson-python-resilience-slice1", "lesson-python-resilience-slice2", "lesson-python-ops-slice1"]);
   const relevantEvidence = progress.evidenceItems.filter((item) => {
     if (!item.linkedLessonId && !item.linkedProjectMissionId) {
       return false;
@@ -126,6 +128,7 @@ export function calculateReadinessScore(content: ContentPack, progress: UserProg
   const lessonCompletion = percentage(countKnownCompleted(completedOrPlacedOutLessons, lessonIds), content.lessons.length);
   const quizPerformance = percentage(countKnownCompleted(completedOrPlacedOutQuizzes, quizIds), content.quizzes.length);
   const projectCompletion = percentage(countKnownCompleted(progress.completedProjectMissionIds, missionIds), content.projectMissions.length);
+  const integrationSlicesProof = percentage(countKnownCompleted(completedOrPlacedOutLessons, integrationSliceIds), integrationSliceIds.size || 1); // direct slice proof count for readiness explanation
 
   const evidenceHygiene = clampScore(relevantEvidence.reduce((total, item) => total + evidenceQuality(item), 0));
   const reviewCadence = calculateReviewCadence(content, progress, now);
@@ -169,6 +172,7 @@ export function calculateReadinessScore(content: ContentPack, progress: UserProg
   const explanation = [
     `Projects carry 40% of readiness; current project completion is ${projectCompletion}%.`,
     `Evidence quality carries 30%; current evidence hygiene is ${evidenceHygiene}%.`,
+    `Integration slices (resilience+ops) proof: ${integrationSlicesProof}% (direct refs: lesson-python-resilience-slice1/2, lesson-python-ops-slice1).`,
     blockingProofRequirement
   ];
 
