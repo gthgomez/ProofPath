@@ -18,7 +18,7 @@ describe("review queue", () => {
     expect(cards).toHaveLength(1);
     expect(cards[0]?.title).toBe("Define and Call a Function");
     expect(cards[0]?.isDue).toBe(true);
-    expect(cards[0]?.recallPrompt.toLowerCase()).toContain("explain the lesson idea");
+    expect(cards[0]?.recallPrompt.toLowerCase()).toContain("without opening the lesson");
     expect(cards[0]?.answerHint).toContain("def name()");
   });
 

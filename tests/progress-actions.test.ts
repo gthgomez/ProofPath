@@ -323,30 +323,30 @@ describe("progress actions", () => {
 
   it("completes lessons, mini-projects, and quizzes via fastTrackLessons", () => {
     const progress = createInitialProgress(NOW);
-    const targetLessons = ["lesson-python-values", "lesson-python-collections"];
-    const targetQuizzes = ["quiz-python-values", "quiz-python-collections"];
+    const targetLessons = ["lesson-python-values", "lesson-python-lists"];
+    const targetQuizzes = ["quiz-python-values", "quiz-python-lists"];
 
     const updated = fastTrackLessons(progress, targetLessons, targetQuizzes, NOW);
 
     expect(updated.completedLessonIds).toContain("lesson-python-values");
-    expect(updated.completedLessonIds).toContain("lesson-python-collections");
+    expect(updated.completedLessonIds).toContain("lesson-python-lists");
     expect(updated.completedLessonMiniProjectIds).toContain("lesson-python-values");
-    expect(updated.completedLessonMiniProjectIds).toContain("lesson-python-collections");
+    expect(updated.completedLessonMiniProjectIds).toContain("lesson-python-lists");
     expect(updated.completedQuizIds).toContain("quiz-python-values");
-    expect(updated.completedQuizIds).toContain("quiz-python-collections");
+    expect(updated.completedQuizIds).toContain("quiz-python-lists");
   });
 
   it("skips lessons and quizzes via placementSkip without completion or review items", () => {
     const progress = createInitialProgress(NOW);
-    const targetLessons = ["lesson-python-values", "lesson-python-collections"];
-    const targetQuizzes = ["quiz-python-values", "quiz-python-collections"];
+    const targetLessons = ["lesson-python-values", "lesson-python-lists"];
+    const targetQuizzes = ["quiz-python-values", "quiz-python-lists"];
 
     const updated = placementSkip(progress, targetLessons, targetQuizzes, NOW);
 
     expect(updated.placedOutLessonIds).toContain("lesson-python-values");
-    expect(updated.placedOutLessonIds).toContain("lesson-python-collections");
+    expect(updated.placedOutLessonIds).toContain("lesson-python-lists");
     expect(updated.placedOutQuizIds).toContain("quiz-python-values");
-    expect(updated.placedOutQuizIds).toContain("quiz-python-collections");
+    expect(updated.placedOutQuizIds).toContain("quiz-python-lists");
 
     // Must NOT grant actual completion
     expect(updated.completedLessonIds).not.toContain("lesson-python-values");

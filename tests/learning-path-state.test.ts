@@ -26,7 +26,7 @@ const pythonModule = {
     "lesson-python-zero-change-rerun",
     "lesson-python-zero-first-error",
     "lesson-python-values",
-    "lesson-python-collections",
+    "lesson-python-lists",
     "lesson-python-decisions",
     "lesson-python-loops",
     "lesson-python-foundation-capstone",
@@ -60,11 +60,9 @@ describe("learning path state model", () => {
       "Python Basics",
       "Variables and Output",
       "Collections and Control Flow",
-      "Functions",
-      "Debugging and Assertions",
-      "File I/O and CLI"
+      "Functions"
     ]);
-    expect(arcs.flatMap((arc) => arc.lessonIndexes)).toHaveLength(39);
+    expect(arcs.flatMap((arc) => arc.lessonIndexes)).toHaveLength(20);
   });
 
   it("groups Python Professional and Integration into depth arcs", () => {

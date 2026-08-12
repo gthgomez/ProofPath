@@ -43,7 +43,8 @@ describe("role routing", () => {
       "lesson-python-zero-first-script",
       "lesson-python-zero-change-rerun",
       "lesson-python-zero-first-error",
-      "lesson-python-values"
+      "lesson-python-values",
+      "lesson-python-string-indexing"
     ];
     let withFirstLesson = progress;
     for (const lessonId of lessonsToComplete) {
