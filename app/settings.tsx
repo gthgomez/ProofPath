@@ -1,3 +1,4 @@
+import { Link } from "expo-router";
 import { useState, type ReactElement } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle } from "@/ui/primitives";
@@ -70,6 +71,16 @@ export default function SettingsScreen(): ReactElement {
             );
           })}
         </View>
+      </Panel>
+
+      <Panel>
+        <SectionTitle>Privacy</SectionTitle>
+        <BodyText>Read how CareerForge Mobile stores data locally, blocks sandbox network access, and deletes progress on reset.</BodyText>
+        <Link href="/privacy" asChild>
+          <ButtonShell accessibilityHint="Opens the privacy policy screen." tone="teal" variant="secondary">
+            Privacy policy
+          </ButtonShell>
+        </Link>
       </Panel>
 
       <Panel accessibilityLabel="Danger zone">

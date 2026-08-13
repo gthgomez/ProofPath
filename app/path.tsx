@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Link, Redirect } from "expo-router";
 import { contentPack } from "@/content/seed";
 import { getLessonsForModule, getModulesForTrack } from "@/domain/content";
+import { unshippedTrackSummaries } from "@/content/roles";
 import { evaluatePathProofGate, getFutureUnlocksForRole, getTracksForRole, getPathNodes } from "@/domain/role-routing";
 import type { Difficulty, Module, ProjectMission } from "@/domain/types";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
@@ -133,12 +134,32 @@ export default function LearningPathScreen(): ReactElement {
           {futureUnlocks.length > 0 ? (
             <View style={styles.unlockGrid}>
               <SectionTitle style={styles.futureTitle}>Future paths</SectionTitle>
-              {futureUnlocks.map((unlock) => (
-                <SubPanel key={unlock.id}>
-                  <SectionTitle>{unlock.title}</SectionTitle>
-                  <MutedText>{unlock.label} · {unlock.kind}</MutedText>
-                </SubPanel>
-              ))}
+              {futureUnlocks.map((unlock) => {
+                const isUnshipped = !unlock.availableInContent;
+                const tone = isUnshipped ? "ink" : unlock.gateComplete ? "green" : "amber";
+                const statusLabel = isUnshipped
+                  ? "Not shipped yet"
+                  : unlock.gateComplete
+                    ? "On roadmap"
+                    : "Complete gate first";
+
+                return (
+                  <SubPanel key={unlock.id}>
+                    <Row>
+                      <SectionTitle style={styles.futureUnlockTitle}>{unlock.title}</SectionTitle>
+                      <Badge tone={tone}>{statusLabel}</Badge>
+                    </Row>
+                    <MutedText>
+                      {isUnshipped
+                        ? unshippedTrackSummaries[unlock.id]
+                          ?? "Planned curriculum — lessons are not in the app yet. There is nothing to unlock or review here."
+                        : unlock.gateComplete
+                          ? `${unlock.kind === "path" ? "Career path" : "Track"} is in the app and ready to prioritize after this gate.`
+                          : `Shipped ${unlock.kind}. Finish the readiness gate above before treating this as your next focus.`}
+                    </MutedText>
+                  </SubPanel>
+                );
+              })}
             </View>
           ) : null}
         </Panel>
@@ -415,6 +436,9 @@ const styles = StyleSheet.create({
   },
   futureTitle: {
     marginTop: spacing.md
+  },
+  futureUnlockTitle: {
+    flex: 1
   },
   trackSummary: {
     marginBottom: spacing.md

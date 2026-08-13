@@ -380,15 +380,31 @@ function checkpointQuiz(
   const q1Choices = deterministicShuffle([rightAnswer, wrongAnswerA, wrongAnswerB], `${id}-cp-1`);
   const q1CorrectIndex = q1Choices.indexOf(rightAnswer);
 
-  // Q2: Review check — shuffle the 3 hardcoded choices
-  const q2Raw = ["A small result plus check output", "A private note with no example", "A claim that the idea is obvious"];
-  const q2Choices = deterministicShuffle(q2Raw, `${id}-cp-2`);
-  const q2CorrectIndex = q2Choices.indexOf("A small result plus check output");
+  // Q2: Review check — rotate target index to (q1CorrectIndex + 1) % 3
+  const q2CorrectIndex = (q1CorrectIndex + 1) % 3;
+  const q2Right = "A small result plus check output";
+  const q2Wrongs = ["A private note with no example", "A claim that the idea is obvious"];
+  const q2Choices = new Array(3);
+  q2Choices[q2CorrectIndex] = q2Right;
+  let q2WrongIdx = 0;
+  for (let i = 0; i < 3; i++) {
+    if (i !== q2CorrectIndex) {
+      q2Choices[i] = q2Wrongs[q2WrongIdx++];
+    }
+  }
 
-  // Q3: Beginner pitfalls — shuffle the 3 hardcoded choices
-  const q3Raw = ["Skipping the failure case", "Naming the assumption", "Recording the check command"];
-  const q3Choices = deterministicShuffle(q3Raw, `${id}-cp-3`);
-  const q3CorrectIndex = q3Choices.indexOf("Skipping the failure case");
+  // Q3: Beginner pitfalls — rotate target index to (q1CorrectIndex + 2) % 3
+  const q3CorrectIndex = (q1CorrectIndex + 2) % 3;
+  const q3Right = "Skipping the failure case";
+  const q3Wrongs = ["Naming the assumption", "Recording the check command"];
+  const q3Choices = new Array(3);
+  q3Choices[q3CorrectIndex] = q3Right;
+  let q3WrongIdx = 0;
+  for (let i = 0; i < 3; i++) {
+    if (i !== q3CorrectIndex) {
+      q3Choices[i] = q3Wrongs[q3WrongIdx++];
+    }
+  }
 
   return {
     id,
@@ -1086,7 +1102,7 @@ export const contentPack: ContentPack = {
       slug: "sql-core",
       title: "SQL for App State",
       summary: "Use joins to answer product questions from normalized data.",
-      lessonIds: ["lesson-sql-joins", "lesson-sql-constraints"],
+      lessonIds: ["lesson-sql-joins", "lesson-sql-constraints", "lesson-sql-group-aggregate", "lesson-sql-indexes-transactions"],
       projectMissionIds: ["mission-sql-portfolio-ledger", "mission-job-tracker-schema"],
       skillIds: ["skill-sql-joins"],
       sortOrder: 1
@@ -1097,7 +1113,7 @@ export const contentPack: ContentPack = {
       slug: "git-core",
       title: "GitHub Evidence",
       summary: "Turn local work into proof a reviewer can inspect.",
-      lessonIds: ["lesson-git-evidence", "lesson-github-review-flow"],
+      lessonIds: ["lesson-git-evidence", "lesson-github-review-flow", "lesson-git-branching-merge", "lesson-git-undo-recovery"],
       projectMissionIds: ["mission-portfolio-readme"],
       skillIds: ["skill-git-workflow", "skill-portfolio-evidence"],
       sortOrder: 1
@@ -1108,7 +1124,7 @@ export const contentPack: ContentPack = {
       slug: "ai-verification",
       title: "AI With Verification",
       summary: "Use model help while keeping tests and source custody.",
-      lessonIds: ["lesson-ai-test-loop", "lesson-ai-diff-review"],
+      lessonIds: ["lesson-ai-test-loop", "lesson-ai-diff-review", "lesson-ai-prompt-contracts", "lesson-ai-hallucination-audit"],
       projectMissionIds: ["mission-ai-bug-rubric", "mission-ai-test-harness"],
       skillIds: ["skill-ai-verification", "skill-testing-debugging"],
       sortOrder: 1
@@ -1119,7 +1135,7 @@ export const contentPack: ContentPack = {
       slug: "testing-debugging-core",
       title: "Testing and Debugging",
       summary: "Build a tiny regression harness and a failure log that make debugging visible.",
-      lessonIds: ["lesson-testing-regression-harness", "lesson-debugging-failure-log"],
+      lessonIds: ["lesson-testing-regression-harness", "lesson-debugging-failure-log", "lesson-testing-unit-isolation", "lesson-debugging-traceback-triage"],
       projectMissionIds: ["mission-regression-proof-pack"],
       skillIds: ["skill-testing-debugging", "skill-regression-testing", "skill-debugging-log", "skill-portfolio-evidence"],
       sortOrder: 1
@@ -1141,7 +1157,7 @@ export const contentPack: ContentPack = {
       slug: "ai-apps",
       title: "AI App Foundations",
       summary: "Design AI features behind safe server boundaries.",
-      lessonIds: ["lesson-ai-app-boundaries", "lesson-ai-retrieval-grounding"],
+      lessonIds: ["lesson-ai-app-boundaries", "lesson-ai-retrieval-grounding", "lesson-ai-vector-embeddings", "lesson-ai-eval-rubrics"],
       projectMissionIds: ["mission-ai-study-planner", "mission-rag-notes-prototype"],
       skillIds: ["skill-ai-verification", "skill-api-contracts"],
       sortOrder: 1
@@ -1152,7 +1168,7 @@ export const contentPack: ContentPack = {
       slug: "ml-core",
       title: "ML Metrics Basics",
       summary: "Explain a model result with splits, metrics, and limits.",
-      lessonIds: ["lesson-ml-metrics", "lesson-ml-confusion-matrix"],
+      lessonIds: ["lesson-ml-metrics", "lesson-ml-confusion-matrix", "lesson-ml-data-preprocessing", "lesson-ml-overfitting-regularization"],
       projectMissionIds: ["mission-ml-metrics-report"],
       skillIds: ["skill-ml-metrics", "skill-testing-debugging"],
       sortOrder: 1
@@ -2730,12 +2746,492 @@ export const contentPack: ContentPack = {
       miniSteps: ["Name input version", "Name query or transform", "Show output rows", "Attach verifier and limitations"],
       miniDeliverables: ["Report note", "Output rows", "Limitations section"],
       verifierCommand: "Run the Code Lab check or inspect the reproducible report note.",
-      expectedEvidence: "Report note with query, input version, output rows, verifier, limitations, and passing check output.",
+      expectedEvidence: "Report artifact including query string, input versioning, row results, verifier identity, explicit limitations list, and passing check output.",
       projectConnection: "This closes the Data Quality Report with reproducible evidence.",
       requiredCodeIncludes: ["makeReport", "limitations"],
       requiredOutputIncludes: ["passed"],
       runnerStarterCode: "function makeReport(input) {\n  return { query: '', inputVersion: '', rows: 0, verifier: '', limitations: [] };\n}",
       runnerTestCode: "const report = makeReport({ version: 'events-v1', rows: [{ minutes: 20 }, { minutes: 30 }] });\nif (!report.query || report.inputVersion !== 'events-v1') throw new Error('report needs query and input version');\nif (report.rows !== 2 || !report.verifier) throw new Error('report needs rows and verifier');\nif (!Array.isArray(report.limitations) || report.limitations.length === 0) throw new Error('report needs limitations');\nconsole.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-sql-group-aggregate",
+      moduleId: "module-sql-core",
+      slug: "sql-group-aggregate",
+      title: "Aggregating and Grouping Data",
+      summary: "Use COUNT, SUM, and GROUP BY to compute summaries.",
+      bodyMarkdown: "Grouping data lets apps compute summary statistics such as lesson counts per module or total activity time.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-sql-joins"],
+      quizId: "quiz-sql-constraints",
+      desktopTask: "Write a SQL query that counts completed lessons per module.",
+      evidencePrompt: "Provide the query, GROUP BY clause, and sample aggregation output.",
+      language: "SQL",
+      tools: ["GROUP BY", "COUNT"],
+      synopsis: "Learn to summarize database rows using SQL aggregations.",
+      prerequisites: ["Know basic relational table structures.", "Know SELECT query syntax.", "Understand row partitioning concepts."],
+      testingFocus: "Verify that GROUP BY and COUNT are included.",
+      objective: "Compute summary statistics with GROUP BY.",
+      whyItMatters: "Summaries power dashboards and progress tracking.",
+      coreConcept: "GROUP BY partitions rows into summary groups.",
+      workedExample: "SELECT module_id, COUNT(*) FROM lessons GROUP BY module_id;",
+      guidedExercise: "Group lessons by module_id.",
+      missionConnection: "Supports SQL portfolio ledger.",
+      reflectionPrompt: "Why group data in SQL instead of application code?",
+      practiceStarter: "-- Write a SQL query using GROUP BY to aggregate lesson counts per module\nSELECT module_id, COUNT(*) FROM lessons GROUP BY module_id;",
+      practiceExpected: "Aggregated counts per module.",
+      practiceCheck: "The query must include the GROUP BY clause followed by the module_id column to properly group count aggregations.",
+      miniTitle: "Group data",
+      miniGoal: "Write a GROUP BY query.",
+      miniSteps: ["SELECT", "COUNT", "GROUP BY"],
+      miniDeliverables: ["Aggregated SQL query string", "GROUP BY clause breakdown", "Sample query result table"],
+      verifierCommand: "Run query check.",
+      expectedEvidence: "Copy of the SQL script containing GROUP BY, along with passing query execution output proving correct aggregation.",
+      projectConnection: "Powers dashboard stats.",
+      requiredCodeIncludes: ["GROUP BY"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function aggregateData() { return { query: 'SELECT module_id, COUNT(*) FROM lessons GROUP BY module_id;' }; }",
+      runnerTestCode: "const res = aggregateData(); if (!res.query.includes('GROUP BY')) throw new Error('Query must include GROUP BY'); console.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-sql-indexes-transactions",
+      moduleId: "module-sql-core",
+      slug: "sql-indexes-transactions",
+      title: "Indexes and Transaction Safety",
+      summary: "Optimize query speed with indexes and protect mutations with transactions.",
+      bodyMarkdown: "Indexes speed up lookup queries while transactions ensure atomic database operations.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-sql-joins"],
+      quizId: "quiz-sql-constraints",
+      desktopTask: "Write a transaction script that creates an index and performs atomic inserts.",
+      evidencePrompt: "Provide the INDEX creation SQL and BEGIN/COMMIT block.",
+      language: "SQL",
+      tools: ["INDEX", "BEGIN TRANSACTION"],
+      synopsis: "Learn indexing and atomic database transactions.",
+      prerequisites: ["Know basic SQL table operations.", "Understand database query performance.", "Know transactional integrity basics."],
+      testingFocus: "Verify index creation and transaction safety.",
+      objective: "Protect data mutations with transactions.",
+      whyItMatters: "Transactions prevent partial database corruptions on failure.",
+      coreConcept: "Transactions maintain ACID guarantees.",
+      workedExample: "BEGIN; CREATE INDEX idx_user ON users(email); COMMIT;",
+      guidedExercise: "Create an index inside a transaction block.",
+      missionConnection: "Supports job tracker schema.",
+      reflectionPrompt: "What happens if a query fails mid-transaction?",
+      practiceStarter: "-- Write an atomic transaction script creating an index on user emails\nBEGIN; CREATE INDEX idx_user ON users(email); COMMIT;",
+      practiceExpected: "Committed transaction with created index.",
+      practiceCheck: "The script must wrap the index creation statement inside explicit BEGIN and COMMIT transaction boundaries.",
+      miniTitle: "Create transaction",
+      miniGoal: "Write atomic transaction script.",
+      miniSteps: ["BEGIN", "CREATE INDEX", "COMMIT"],
+      miniDeliverables: ["Transaction SQL script", "INDEX creation statement", "Execution log showing committed state"],
+      verifierCommand: "Run transaction check.",
+      expectedEvidence: "Complete SQL script with BEGIN and COMMIT blocks plus terminal confirmation showing index created successfully.",
+      projectConnection: "Ensures database integrity.",
+      requiredCodeIncludes: ["INDEX"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function runTransaction() { return { status: 'committed', index: 'CREATE INDEX idx_user ON users(email);' }; }",
+      runnerTestCode: "const res = runTransaction(); if (!res.index) throw new Error('Transaction requires index'); console.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-git-branching-merge",
+      moduleId: "module-git-core",
+      slug: "git-branching-merge",
+      title: "Branching and Conflict Resolution",
+      summary: "Isolate feature development in branches and resolve merge conflicts cleanly.",
+      bodyMarkdown: "Git branches allow parallel feature development without polluting the main branch.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-git-workflow"],
+      quizId: "quiz-github-review-flow",
+      desktopTask: "Simulate a branch merge conflict resolution with git checkout and merge.",
+      evidencePrompt: "Provide branch commit log and resolved conflict diff.",
+      language: "Git",
+      tools: ["git checkout", "git merge"],
+      synopsis: "Learn feature branching and conflict resolution.",
+      prerequisites: ["Know git commit and status commands.", "Understand repository commit graphs.", "Know basic branching concepts."],
+      testingFocus: "Verify branch creation and merge status.",
+      objective: "Merge isolated feature branches.",
+      whyItMatters: "Branching enables multi-developer teamwork.",
+      coreConcept: "Branches isolate changes until reviewed.",
+      workedExample: "git checkout -b feature/login && git merge main",
+      guidedExercise: "Create and merge a feature branch.",
+      missionConnection: "Supports portfolio README mission.",
+      reflectionPrompt: "Why resolve conflicts locally before opening a PR?",
+      practiceStarter: "# Create and switch to a feature branch then merge it back to main\ngit checkout -b feature/login && git merge main",
+      practiceExpected: "Merged feature branch.",
+      practiceCheck: "The command sequence must create an isolated branch with checkout -b before merging back into main.",
+      miniTitle: "Branch & merge",
+      miniGoal: "Merge feature branch cleanly.",
+      miniSteps: ["checkout -b", "commit", "merge"],
+      miniDeliverables: ["Git branch creation command", "Commit log of feature branch", "Clean merge output log"],
+      verifierCommand: "Run git check.",
+      expectedEvidence: "Terminal execution record showing feature branch creation, commit history, and clean merge without unresolved conflicts.",
+      projectConnection: "Powers collaborative workflows.",
+      requiredCodeIncludes: ["merge"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function mergeBranch() { return { branch: 'feature/login', status: 'merged' }; }",
+      runnerTestCode: "const res = mergeBranch(); if (res.status !== 'merged') throw new Error('Branch must be merged'); console.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-git-undo-recovery",
+      moduleId: "module-git-core",
+      slug: "git-undo-recovery",
+      title: "Undoing Changes and Reflog Recovery",
+      summary: "Use git reset, restore, and reflog to recover lost commits.",
+      bodyMarkdown: "Git reflog tracks all HEAD updates, making accidental commit loss recoverable.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-git-workflow"],
+      quizId: "quiz-github-review-flow",
+      desktopTask: "Write a step-by-step log of recovering a reset commit using git reflog.",
+      evidencePrompt: "Provide reflog output and commit SHA recovery verification.",
+      language: "Git",
+      tools: ["git reflog", "git reset"],
+      synopsis: "Recover lost commits using git reflog.",
+      prerequisites: ["Know basic git commit history.", "Understand HEAD reference pointers.", "Know how to safely reset HEAD."],
+      testingFocus: "Verify reflog commit recovery.",
+      objective: "Recover accidentally dropped commits.",
+      whyItMatters: "Reflog provides a safety net for local changes.",
+      coreConcept: "Git keeps a reference log of all branch updates.",
+      workedExample: "git reflog -> git reset --hard HEAD@{1}",
+      guidedExercise: "Locate dropped commit in reflog and restore it.",
+      missionConnection: "Supports portfolio README mission.",
+      reflectionPrompt: "How does reflog differ from git log?",
+      practiceStarter: "# Inspect git reflog history to find and recover a dropped commit SHA\ngit reflog && git reset --hard HEAD@{1}",
+      practiceExpected: "Restored commit hash.",
+      practiceCheck: "The recovery workflow must inspect reflog entries to identify the previous HEAD SHA before resetting.",
+      miniTitle: "Reflog recovery",
+      miniGoal: "Recover dropped commit.",
+      miniSteps: ["reflog", "find SHA", "reset/cherry-pick"],
+      miniDeliverables: ["Git reflog output snippet", "Target commit SHA identification", "Recovered commit verification log"],
+      verifierCommand: "Run reflog check.",
+      expectedEvidence: "Reflog terminal log showing the original commit SHA and successful recovery confirmation on the target branch.",
+      projectConnection: "Prevents accidental data loss.",
+      requiredCodeIncludes: ["reflog"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function recoverCommit() { return { reflog: 'HEAD@{1}: commit: add safety check', recovered: true }; }",
+      runnerTestCode: "const res = recoverCommit(); if (!res.recovered) throw new Error('Commit must be recovered'); console.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-ai-prompt-contracts",
+      moduleId: "module-ai-verification",
+      slug: "ai-prompt-contracts",
+      title: "Prompt Contracts and Specs",
+      summary: "Design explicit system prompts and Zod schema constraints for model codegen.",
+      bodyMarkdown: "Defining prompt contracts and JSON schemas guarantees structural reliability for LLM outputs.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-ai-verification"],
+      quizId: "quiz-ai-diff-review",
+      desktopTask: "Write a prompt contract that enforces JSON output structure for an LLM task.",
+      evidencePrompt: "Provide prompt contract definition and schema validation test.",
+      language: "TypeScript",
+      tools: ["Zod", "System Prompts"],
+      synopsis: "Enforce strict JSON schema contracts for AI outputs.",
+      prerequisites: ["Know Zod schema validation basics.", "Understand JSON API contract design.", "Understand prompt engineering constraints."],
+      testingFocus: "Verify schema enforcement on model responses.",
+      objective: "Constrain LLM outputs with Zod schemas.",
+      whyItMatters: "Unconstrained LLM outputs cause JSON parse errors.",
+      coreConcept: "Contracts turn probabilistic AI into typed data.",
+      workedExample: "z.object({ title: z.string(), score: z.number() })",
+      guidedExercise: "Validate LLM JSON response against Zod schema.",
+      missionConnection: "Supports AI bug rubric mission.",
+      reflectionPrompt: "Why reject model responses that fail schema validation?",
+      practiceStarter: "// Enforce JSON schema contracts for structured LLM model outputs\nconst schema = z.object({ result: z.string() });",
+      practiceExpected: "Validated JSON response.",
+      practiceCheck: "The prompt contract must use a Zod object schema to strictly parse and validate generated JSON properties.",
+      miniTitle: "Prompt contract",
+      miniGoal: "Validate model output schema.",
+      miniSteps: ["Define schema", "Pass system prompt", "Parse response"],
+      miniDeliverables: ["Zod schema definition", "System prompt text", "Validation check assertion log"],
+      verifierCommand: "Run prompt check.",
+      expectedEvidence: "TypeScript code snippet demonstrating Zod schema validation over model JSON output with passing test output.",
+      projectConnection: "Ensures type-safe AI integration.",
+      requiredCodeIncludes: ["schema"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function promptContract() { return { schema: 'z.object({ result: z.string() })', enforced: true }; }",
+      runnerTestCode: "const res = promptContract(); if (!res.enforced) throw new Error('Contract must be enforced'); console.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-ai-hallucination-audit",
+      moduleId: "module-ai-verification",
+      slug: "ai-hallucination-audit",
+      title: "Auditing Model Hallucinations",
+      summary: "Detect and eliminate unverified imports or non-existent API calls in AI code.",
+      bodyMarkdown: "Auditing AI diffs ensures third-party imports exist and function signatures match actual APIs.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-ai-verification"],
+      quizId: "quiz-ai-diff-review",
+      desktopTask: "Audit an AI-generated code diff for non-existent dependencies and replace with valid packages.",
+      evidencePrompt: "Provide list of audited dependencies and passing compilation output.",
+      language: "TypeScript",
+      tools: ["Code Search", "Typecheck"],
+      synopsis: "Identify and eliminate hallucinated packages in code diffs.",
+      prerequisites: ["Know dependency package inspection.", "Understand static typechecking in TypeScript.", "Know how to check package.json files."],
+      testingFocus: "Verify package existence and type safety.",
+      objective: "Replace hallucinated imports with valid libraries.",
+      whyItMatters: "Hallucinated packages break builds and introduce security risks.",
+      coreConcept: "Always verify generated imports against package.json.",
+      workedExample: "Replace import fakeLib from 'fake-pkg' with actual stdlib utility.",
+      guidedExercise: "Scan code diff for missing modules.",
+      missionConnection: "Supports AI test harness mission.",
+      reflectionPrompt: "How can static typechecking prevent hallucination bugs?",
+      practiceStarter: "// Run static typecheck to verify imported module existence in package.json\nnpm run typecheck",
+      practiceExpected: "Zero import error output.",
+      practiceCheck: "The audit process must cross-reference imported module names against package.json to identify hallucinated packages.",
+      miniTitle: "Audit hallucinations",
+      miniGoal: "Remove non-existent imports.",
+      miniSteps: ["Scan imports", "Verify package.json", "Replace fake calls"],
+      miniDeliverables: ["Import audit checklist", "package.json dependency list", "Typecheck verification log"],
+      verifierCommand: "Run audit check.",
+      expectedEvidence: "Audit summary report listing all imported dependencies verified against package.json with zero compilation errors.",
+      projectConnection: "Guarantees build reproducibility.",
+      requiredCodeIncludes: ["hallucinationsFound"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function auditDiff() { return { hallucinationsFound: 1, fixed: true }; }",
+      runnerTestCode: "const res = auditDiff(); if (!res.fixed) throw new Error('Diff must be fixed'); console.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-testing-unit-isolation",
+      moduleId: "module-testing-debugging-core",
+      slug: "testing-unit-isolation",
+      title: "Unit Test Isolation and Fixtures",
+      summary: "Mock external dependencies and side effects for fast, reliable unit tests.",
+      bodyMarkdown: "Mocking side effects isolates state logic from external network dependencies.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-testing-debugging"],
+      quizId: "quiz-debugging-failure-log",
+      desktopTask: "Write a unit test with mocked fetch responses and isolated state fixtures.",
+      evidencePrompt: "Provide test code, mock setup, and passing assertion output.",
+      language: "TypeScript",
+      tools: ["Vitest", "Mocking"],
+      synopsis: "Isolate unit tests using mocks and fixture data.",
+      prerequisites: ["Know basic Vitest test writing.", "Understand function mocking principles.", "Know how to define test data fixtures."],
+      testingFocus: "Verify mock behavior and isolated assertions.",
+      objective: "Test state logic without network side effects.",
+      whyItMatters: "Isolated tests run fast and deterministically.",
+      coreConcept: "Mocks isolate unit tests from external dependencies.",
+      workedExample: "vi.spyOn(global, 'fetch').mockResolvedValue(new Response('{}'))",
+      guidedExercise: "Mock network fetch call in unit test.",
+      missionConnection: "Supports regression proof pack mission.",
+      reflectionPrompt: "Why prefer unit mocks over live network calls in CI?",
+      practiceStarter: "// Mock global fetch network dependency for isolated unit tests\nvi.spyOn(global, 'fetch').mockResolvedValue(new Response('{}'))",
+      practiceExpected: "Passing isolated unit test.",
+      practiceCheck: "Unit tests must spy on global network functions to prevent live HTTP requests during test execution.",
+      miniTitle: "Unit test isolation",
+      miniGoal: "Mock side effects in test.",
+      miniSteps: ["Define fixture", "Mock API call", "Assert state"],
+      miniDeliverables: ["Isolated unit test file", "Mock setup function", "Vitest passing test summary"],
+      verifierCommand: "Run unit test.",
+      expectedEvidence: "Complete Vitest test file showing mocked network calls and passing test assertions with zero network side effects.",
+      projectConnection: "Ensures fast CI execution.",
+      requiredCodeIncludes: ["mocksActive"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function runIsolatedTest() { return { mocksActive: true, status: 'passed' }; }",
+      runnerTestCode: "const res = runIsolatedTest(); if (res.status !== 'passed') throw new Error('Test must pass'); console.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-debugging-traceback-triage",
+      moduleId: "module-testing-debugging-core",
+      slug: "debugging-traceback-triage",
+      title: "Traceback Analysis and Root Cause Triage",
+      summary: "Trace stack frames and error logs to isolate root-cause state mutations.",
+      bodyMarkdown: "Reading stack traces pinpoints the exact line where a broken contract originated.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-debugging-log"],
+      quizId: "quiz-debugging-failure-log",
+      desktopTask: "Analyze a complex multi-frame traceback and identify the exact line causing a null reference.",
+      evidencePrompt: "Provide root cause explanation and minimal fix diff.",
+      language: "TypeScript",
+      tools: ["Traceback", "Console Inspection"],
+      synopsis: "Analyze stack traces to locate underlying root causes.",
+      prerequisites: ["Know basic stack trace structure.", "Understand exception call stacks.", "Know how to inspect frames in devtools."],
+      testingFocus: "Verify traceback line identification and minimal fix.",
+      objective: "Fix root cause identified from stack trace.",
+      whyItMatters: "Fixing root causes prevents recurring bug masks.",
+      coreConcept: "The origin line in a stack trace reveals broken contracts.",
+      workedExample: "TypeError: Cannot read property 'id' of undefined at line 42",
+      guidedExercise: "Trace error back to missing parameter at call site.",
+      missionConnection: "Supports regression proof pack mission.",
+      reflectionPrompt: "Why avoid wrapping null errors in try/catch swallows?",
+      practiceStarter: "// Inspect error stack trace to isolate root-cause null pointer\nconsole.error(err.stack);",
+      practiceExpected: "Root cause fix diff.",
+      practiceCheck: "Triage must inspect top-of-stack caller frames to identify missing null checks or uninitialized parameters.",
+      miniTitle: "Traceback triage",
+      miniGoal: "Locate root cause from stack trace.",
+      miniSteps: ["Read stack top", "Inspect caller frame", "Fix root contract"],
+      miniDeliverables: ["Stack trace analysis log", "Root cause line identification", "Minimal code fix diff"],
+      verifierCommand: "Run triage check.",
+      expectedEvidence: "Detailed error triage report identifying the exact line number of the root cause along with a verified minimal fix diff.",
+      projectConnection: "Eliminates superficial symptom patches.",
+      requiredCodeIncludes: ["rootCauseLine"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function triageError() { return { rootCauseLine: 42, fixed: true }; }",
+      runnerTestCode: "const res = triageError(); if (!res.fixed) throw new Error('Error must be fixed'); console.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-ai-vector-embeddings",
+      moduleId: "module-ai-apps",
+      slug: "ai-vector-embeddings",
+      title: "Vector Embeddings and Chunking",
+      summary: "Chunk document text and compute vector similarity for local RAG search.",
+      bodyMarkdown: "Chunking text into semantic slices allows precise vector search in RAG pipelines.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-ai-verification"],
+      quizId: "quiz-ai-retrieval-grounding",
+      desktopTask: "Write a text chunking function and similarity threshold check.",
+      evidencePrompt: "Provide chunking code and similarity score calculation output.",
+      language: "TypeScript",
+      tools: ["Vector Embeddings", "Cosine Similarity"],
+      synopsis: "Chunk text and perform vector similarity retrieval.",
+      prerequisites: ["Know basic array processing.", "Understand vector distance concepts.", "Know how to handle text windows."],
+      testingFocus: "Verify text chunking and similarity score accuracy.",
+      objective: "Compute document chunk similarity for RAG.",
+      whyItMatters: "Proper chunking improves RAG retrieval relevance.",
+      coreConcept: "Text embeddings capture semantic closeness as vectors.",
+      workedExample: "chunkText(doc, 256) -> cosineSimilarity(qEmbed, cEmbed)",
+      guidedExercise: "Partition document into 200-character chunks.",
+      missionConnection: "Supports RAG notes prototype mission.",
+      reflectionPrompt: "Why chunk documents instead of passing raw multi-page files?",
+      practiceStarter: "// Partition document text into 200-character chunk embeddings\nfunction chunkText(doc: string, size: number) { return []; }",
+      practiceExpected: "Partitioned text chunks.",
+      practiceCheck: "Text chunking must divide raw documents into bounded character windows before embedding computation.",
+      miniTitle: "Vector chunking",
+      miniGoal: "Chunk document into embedding slices.",
+      miniSteps: ["Split text", "Normalize whitespace", "Calculate similarity"],
+      miniDeliverables: ["Text chunking function", "Vector similarity calculator", "Top chunk match report"],
+      verifierCommand: "Run vector check.",
+      expectedEvidence: "TypeScript chunking function and similarity scoring output demonstrating top document chunk matches above threshold.",
+      projectConnection: "Powers local document retrieval.",
+      requiredCodeIncludes: ["topSimilarity"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function searchVector() { return { chunks: 4, topSimilarity: 0.89 }; }",
+      runnerTestCode: "const res = searchVector(); if (res.topSimilarity < 0.8) throw new Error('Similarity threshold failed'); console.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-ai-eval-rubrics",
+      moduleId: "module-ai-apps",
+      slug: "ai-eval-rubrics",
+      title: "Automated AI Output Evaluation",
+      summary: "Build exact-match and semantic assertion rubrics to evaluate LLM responses.",
+      bodyMarkdown: "Automated rubrics evaluate model accuracy and structural correctness deterministically.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-ai-verification"],
+      quizId: "quiz-ai-retrieval-grounding",
+      desktopTask: "Implement an eval rubric function that checks generated response against ground truth requirements.",
+      evidencePrompt: "Provide eval rubric code and test suite output.",
+      language: "TypeScript",
+      tools: ["Eval Rubric", "Assertions"],
+      synopsis: "Build automated evaluation pipelines for LLM output.",
+      prerequisites: ["Know assertion testing principles.", "Understand model evaluation criteria.", "Know how to write deterministic assertions."],
+      testingFocus: "Verify rubric scoring and threshold checks.",
+      objective: "Score AI model outputs using quantitative rubrics.",
+      whyItMatters: "Eval rubrics prevent regression when tweaking prompts.",
+      coreConcept: "Automated rubrics evaluate model accuracy deterministically.",
+      workedExample: "evaluateOutput(response, { requiredKeywords: ['test'] })",
+      guidedExercise: "Create rubric checking keyword presence and length.",
+      missionConnection: "Supports RAG notes prototype mission.",
+      reflectionPrompt: "Why run automated evals before deploying prompt changes?",
+      practiceStarter: "// Evaluate LLM response quality using deterministic rubric scoring\nfunction evalRubric(output: string) { return { score: 100 }; }",
+      practiceExpected: "Quantitative eval score.",
+      practiceCheck: "The evaluation rubric must score generated responses against required keyword inclusion and structural length constraints.",
+      miniTitle: "Eval rubrics",
+      miniGoal: "Evaluate model response quality.",
+      miniSteps: ["Check keywords", "Verify length", "Calculate score"],
+      miniDeliverables: ["Eval rubric function", "Keyword inclusion check", "Quantitative score report"],
+      verifierCommand: "Run eval check.",
+      expectedEvidence: "Automated evaluation script output displaying quantitative test scores and pass/fail assertion metrics for model responses.",
+      projectConnection: "Ensures model performance stability.",
+      requiredCodeIncludes: ["evalOutput"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function evalOutput() { return { score: 95, passed: true }; }",
+      runnerTestCode: "const res = evalOutput(); if (!res.passed) throw new Error('Eval failed'); console.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-ml-data-preprocessing",
+      moduleId: "module-ml-core",
+      slug: "ml-data-preprocessing",
+      title: "ML Feature Preprocessing and Splits",
+      summary: "Scale numerical features, encode categories, and perform train/test splits.",
+      bodyMarkdown: "Preprocessing scales features and isolates test data to prevent data leakage.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-ml-metrics"],
+      quizId: "quiz-ml-confusion-matrix",
+      desktopTask: "Write a feature scaling and 80/20 train/test data splitter.",
+      evidencePrompt: "Provide preprocessing code and dataset split ratios.",
+      language: "TypeScript",
+      tools: ["Data Normalization", "Train/Test Split"],
+      synopsis: "Preprocess ML features and split datasets into train/test subsets.",
+      prerequisites: ["Know basic data processing.", "Understand train vs test dataset splits.", "Understand feature normalization principles."],
+      testingFocus: "Verify 80/20 train/test split ratios.",
+      objective: "Partition dataset into training and testing sets.",
+      whyItMatters: "Testing on unseen data prevents data leakage.",
+      coreConcept: "Train/test splits measure generalization ability.",
+      workedExample: "splitData(dataset, 0.8) -> { train, test }",
+      guidedExercise: "Split array of 10 rows into 8 train and 2 test items.",
+      missionConnection: "Supports ML metrics report mission.",
+      reflectionPrompt: "Why must test data remain unseen during feature scaling?",
+      practiceStarter: "// Partition dataset into 80% training and 20% testing subsets\nfunction split(data: any[]) { return { train: [], test: [] }; }",
+      practiceExpected: "80/20 split dataset.",
+      practiceCheck: "Data preprocessing must isolate 20% of dataset samples into an unseen test set before feature normalization.",
+      miniTitle: "Preprocess & split",
+      miniGoal: "Split data into train and test sets.",
+      miniSteps: ["Normalize features", "Shuffle rows", "Split 80/20"],
+      miniDeliverables: ["Feature scaling function", "Train/test split script", "Dataset size ratio summary"],
+      verifierCommand: "Run split check.",
+      expectedEvidence: "Data preprocessing script output confirming exact 80/20 train/test split ratios with zero data leakage.",
+      projectConnection: "Prepares data for model evaluation.",
+      requiredCodeIncludes: ["trainRatio"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function preprocessData() { return { trainRatio: 0.8, testRatio: 0.2 }; }",
+      runnerTestCode: "const res = preprocessData(); if (res.trainRatio !== 0.8) throw new Error('Train ratio must be 0.8'); console.log('passed');"
+    }),
+    proofLesson({
+      id: "lesson-ml-overfitting-regularization",
+      moduleId: "module-ml-core",
+      slug: "ml-overfitting-regularization",
+      title: "Overfitting and Regularization",
+      summary: "Diagnose high variance by comparing training and validation loss curves.",
+      bodyMarkdown: "Comparing training and validation loss curves identifies high variance before deployment.",
+      estimatedMinutes: 10,
+      difficulty: "applied",
+      skillIds: ["skill-ml-metrics"],
+      quizId: "quiz-ml-confusion-matrix",
+      desktopTask: "Write an evaluation function comparing training loss vs validation loss to flag overfitting.",
+      evidencePrompt: "Provide loss comparison function and diagnostic output.",
+      language: "TypeScript",
+      tools: ["Loss Curves", "Regularization"],
+      synopsis: "Identify overfitting by comparing training vs validation loss curves.",
+      prerequisites: ["Know metric loss curve concepts.", "Understand bias vs variance tradeoffs.", "Know how to read training metrics."],
+      testingFocus: "Verify overfitting diagnosis when val loss diverges.",
+      objective: "Detect high variance in model evaluation.",
+      whyItMatters: "Overfit models fail when deployed to real users.",
+      coreConcept: "A large gap between train and val loss indicates overfitting.",
+      workedExample: "if (valLoss - trainLoss > 0.3) flagOverfitting()",
+      guidedExercise: "Compare train loss (0.05) and val loss (0.45).",
+      missionConnection: "Supports ML metrics report mission.",
+      reflectionPrompt: "How does regularization help reduce validation loss?",
+      practiceStarter: "// Flag high variance when validation loss diverges from training loss\nfunction checkLoss(train: number, val: number) { return val - train > 0.3; }",
+      practiceExpected: "Overfitting warning output.",
+      practiceCheck: "Overfitting detection must compare validation loss against training loss and flag gaps exceeding 0.3.",
+      miniTitle: "Detect overfitting",
+      miniGoal: "Compare loss metrics.",
+      miniSteps: ["Read train loss", "Read val loss", "Compute gap"],
+      miniDeliverables: ["Loss comparison function", "Validation gap diagnostic", "Regularization summary note"],
+      verifierCommand: "Run loss check.",
+      expectedEvidence: "Loss curve diagnostic output correctly identifying high variance overfitting when validation loss diverges.",
+      projectConnection: "Guarantees model generalization.",
+      requiredCodeIncludes: ["isOverfitting"],
+      requiredOutputIncludes: ["passed"],
+      runnerStarterCode: "function checkOverfitting() { return { trainLoss: 0.05, valLoss: 0.45, isOverfitting: true }; }",
+      runnerTestCode: "const res = checkOverfitting(); if (!res.isOverfitting) throw new Error('Must detect overfitting'); console.log('passed');"
     })
   ],
   quizzes: [
@@ -2755,6 +3251,20 @@ export const contentPack: ContentPack = {
           choices: ["It replaces UI design", "It clarifies what the UI can safely read", "It removes the need for tests"],
           correctChoiceIndex: 1,
           explanation: "The type creates a reliable contract between content, logic, and display."
+        },
+        {
+          id: "question-typescript-2",
+          prompt: "What happens if an API response omits a field not in the type contract?",
+          choices: ["Runtime errors or unexpected undefined states can occur", "TypeScript compilation fails automatically", "The browser auto-fixes the field"],
+          correctChoiceIndex: 0,
+          explanation: "Explicit runtime schemas and contracts prevent unexpected undefined states when API shapes drift."
+        },
+        {
+          id: "question-typescript-3",
+          prompt: "How do type contracts benefit team collaboration?",
+          choices: ["They make documentation optional", "They mandate database engine selection", "They define clear data boundaries between UI and backend code"],
+          correctChoiceIndex: 2,
+          explanation: "Type contracts establish explicit data boundaries between UI components and data providers."
         }
       ]
     },
@@ -2776,6 +3286,20 @@ export const contentPack: ContentPack = {
           choices: ["What color should the button be?", "Which missions have no evidence?", "What is the app name?"],
           correctChoiceIndex: 1,
           explanation: "That answer needs mission rows connected to evidence rows."
+        },
+        {
+          id: "question-sql-2",
+          prompt: "Which JOIN type returns all records from the left table and matched records from the right?",
+          choices: ["INNER JOIN", "CROSS JOIN", "LEFT JOIN"],
+          correctChoiceIndex: 2,
+          explanation: "A LEFT JOIN preserves all rows from the left table regardless of matches in the right table."
+        },
+        {
+          id: "question-sql-3",
+          prompt: "What happens when joining two tables on a non-unique foreign key?",
+          choices: ["The query returns matching rows for every foreign key occurrence", "The database deletes duplicate keys", "An error is thrown immediately"],
+          correctChoiceIndex: 0,
+          explanation: "Non-unique foreign key joins yield rows for every matching combination in the joined tables."
         }
       ]
     },
@@ -2791,6 +3315,20 @@ export const contentPack: ContentPack = {
           choices: ["A vague completed badge", "A repo with setup, tests, and a demo", "A private note with no commands"],
           correctChoiceIndex: 1,
           explanation: "Reviewers need inspectable artifacts and commands, not only completion claims."
+        },
+        {
+          id: "question-git-2",
+          prompt: "Why is attaching automated test results to a PR valuable?",
+          choices: ["It replaces the need for code reviews", "It makes repository history private", "It proves functionality mechanically without relying solely on claims"],
+          correctChoiceIndex: 2,
+          explanation: "Automated test outputs provide reproducible evidence that logic holds across commits."
+        },
+        {
+          id: "question-git-3",
+          prompt: "What should a clean git commit history communicate?",
+          choices: ["Incremental logical changes with clear intent", "Every single save keystroke", "Unrelated features grouped into one commit"],
+          correctChoiceIndex: 0,
+          explanation: "Atomic, intentional commits make pull request reviews and regression isolation straightforward."
         }
       ]
     },
@@ -2806,6 +3344,20 @@ export const contentPack: ContentPack = {
           choices: ["When it looks plausible", "When local evidence verifies it", "When it uses modern syntax"],
           correctChoiceIndex: 1,
           explanation: "The proof comes from reproduction, tests, inspection, and verification output."
+        },
+        {
+          id: "question-ai-2",
+          prompt: "What is the first step after generating a complex function with AI?",
+          choices: ["Inspect the diff and run tests to verify contracts", "Deploy to production immediately", "Delete all previous unit tests"],
+          correctChoiceIndex: 0,
+          explanation: "AI proposals must be inspected against test suites and type contracts before acceptance."
+        },
+        {
+          id: "question-ai-3",
+          prompt: "Why is manual test inspection required alongside AI code generators?",
+          choices: ["Compilers refuse AI code", "AI models cannot run tests", "AI generators may produce hallucinated or unverified API calls"],
+          correctChoiceIndex: 2,
+          explanation: "Models may generate syntactically correct code containing subtle logical flaws or stale API calls."
         }
       ]
     },
@@ -2821,6 +3373,20 @@ export const contentPack: ContentPack = {
           choices: ["Inside the mobile bundle", "Behind a server boundary", "In a screenshot"],
           correctChoiceIndex: 1,
           explanation: "Client bundles can be inspected, so privileged secrets must stay server-side."
+        },
+        {
+          id: "question-ai-boundary-2",
+          prompt: "Why must API credentials be hidden from client bundles?",
+          choices: ["Client bundles can be decompiled and reverse engineered", "Client bundles grow too large", "Mobile OSes delete string values"],
+          correctChoiceIndex: 0,
+          explanation: "Binary bundles and APKs can be extracted to expose embedded secret strings."
+        },
+        {
+          id: "question-ai-boundary-3",
+          prompt: "What is a safe pattern for client apps calling AI services?",
+          choices: ["Hardcode keys in source control", "Publish keys in README files", "Proxy requests through a backend server that authenticates client requests"],
+          correctChoiceIndex: 2,
+          explanation: "A proxy backend enforces client authentication while protecting API secrets."
         }
       ]
     },
@@ -2836,6 +3402,20 @@ export const contentPack: ContentPack = {
           choices: ["It never uses numbers", "It may hide class imbalance or failure cases", "It only works for SQL"],
           correctChoiceIndex: 1,
           explanation: "A single metric needs data context and error analysis."
+        },
+        {
+          id: "question-ml-2",
+          prompt: "Which metric measures the proportion of actual positive cases correctly identified?",
+          choices: ["Recall (Sensitivity)", "Precision", "Accuracy"],
+          correctChoiceIndex: 0,
+          explanation: "Recall captures true positive coverage out of all actual positive samples."
+        },
+        {
+          id: "question-ml-3",
+          prompt: "In a highly imbalanced dataset (99% negative cases), what does a model predicting 100% negative achieve?",
+          choices: ["0% accuracy", "50% accuracy", "99% accuracy while failing to identify any positive cases"],
+          correctChoiceIndex: 2,
+          explanation: "High accuracy in imbalanced datasets can mask a model that fails entirely on positive samples."
         }
       ]
     },
@@ -2855,15 +3435,15 @@ export const contentPack: ContentPack = {
         {
           id: "question-typescript-events-2",
           prompt: "What should a reducer return after handling an event?",
-          choices: ["A next state value", "A hidden global variable", "Only console output"],
-          correctChoiceIndex: 0,
+          choices: ["A hidden global variable", "A next state value", "Only console output"],
+          correctChoiceIndex: 1,
           explanation: "Reducers are easiest to test when they return the next state as data."
         },
         {
           id: "question-typescript-events-3",
           prompt: "Why avoid mutating the original state array?",
-          choices: ["It keeps previous state inspectable and updates predictable", "It makes TypeScript ignore errors", "It deletes old tests"],
-          correctChoiceIndex: 0,
+          choices: ["It makes TypeScript ignore errors", "It deletes old tests", "It keeps previous state inspectable and updates predictable"],
+          correctChoiceIndex: 2,
           explanation: "Non-mutating updates let tests compare before and after state reliably."
         }
       ]
@@ -2884,15 +3464,15 @@ export const contentPack: ContentPack = {
         {
           id: "question-sql-constraints-2",
           prompt: "Why use a CHECK constraint for status?",
-          choices: ["To reject values outside the allowed set", "To make every value text", "To avoid all queries"],
-          correctChoiceIndex: 0,
+          choices: ["To make every value text", "To reject values outside the allowed set", "To avoid all queries"],
+          correctChoiceIndex: 1,
           explanation: "A CHECK constraint can prevent misspelled or unsupported states from entering the table."
         },
         {
           id: "question-sql-constraints-3",
           prompt: "Why test a rejected row?",
-          choices: ["To prove the schema blocks bad data", "To hide the failure", "To remove valid inserts"],
-          correctChoiceIndex: 0,
+          choices: ["To hide the failure", "To remove valid inserts", "To prove the schema blocks bad data"],
+          correctChoiceIndex: 2,
           explanation: "The rejection is evidence that the database rule is active, not just documented."
         }
       ]
@@ -2913,15 +3493,15 @@ export const contentPack: ContentPack = {
         {
           id: "question-github-review-2",
           prompt: "What belongs in a reviewer-friendly PR note?",
-          choices: ["Verification result and risk boundary", "Only marketing language", "A hidden checklist"],
-          correctChoiceIndex: 0,
+          choices: ["Only marketing language", "Verification result and risk boundary", "A hidden checklist"],
+          correctChoiceIndex: 1,
           explanation: "Reviewers need exact evidence and a clear statement of what was not touched."
         },
         {
           id: "question-github-review-3",
           prompt: "Why keep commits focused?",
-          choices: ["So reviewers can understand and revert them more easily", "So every file changes at once", "So verification becomes optional"],
-          correctChoiceIndex: 0,
+          choices: ["So every file changes at once", "So verification becomes optional", "So reviewers can understand and revert them more easily"],
+          correctChoiceIndex: 2,
           explanation: "Focused commits make review, verification, and recovery simpler."
         }
       ]
@@ -2942,15 +3522,15 @@ export const contentPack: ContentPack = {
         {
           id: "question-ai-diff-2",
           prompt: "Why record rejected AI suggestions?",
-          choices: ["To show the risk decision and preserve judgment", "To make the accepted code fail", "To hide what changed"],
-          correctChoiceIndex: 0,
+          choices: ["To make the accepted code fail", "To show the risk decision and preserve judgment", "To hide what changed"],
+          correctChoiceIndex: 1,
           explanation: "Rejected suggestions reveal scope control and the reasons behind the final edit."
         },
         {
           id: "question-ai-diff-3",
           prompt: "Which AI suggestion should raise extra risk?",
-          choices: ["A package or schema change outside the task", "A typo fix with a passing test", "A clearer variable name inside one function"],
-          correctChoiceIndex: 0,
+          choices: ["A typo fix with a passing test", "A clearer variable name inside one function", "A package or schema change outside the task"],
+          correctChoiceIndex: 2,
           explanation: "Package and schema changes can widen blast radius beyond the requested fix."
         }
       ]
@@ -2971,15 +3551,15 @@ export const contentPack: ContentPack = {
         {
           id: "question-ai-retrieval-2",
           prompt: "What should happen when no retrieved note supports the claim?",
-          choices: ["Return uncertainty or reject the claim", "Invent a confident answer", "Cite any random note"],
-          correctChoiceIndex: 0,
+          choices: ["Invent a confident answer", "Return uncertainty or reject the claim", "Cite any random note"],
+          correctChoiceIndex: 1,
           explanation: "Unsupported answers should fail closed instead of pretending a source exists."
         },
         {
           id: "question-ai-retrieval-3",
           prompt: "Why check citation ids?",
-          choices: ["To prove claims map back to retrieved evidence", "To remove all local notes", "To skip evaluation"],
-          correctChoiceIndex: 0,
+          choices: ["To remove all local notes", "To skip evaluation", "To prove claims map back to retrieved evidence"],
+          correctChoiceIndex: 2,
           explanation: "Citation checks make grounding inspectable instead of decorative."
         }
       ]
@@ -3000,15 +3580,15 @@ export const contentPack: ContentPack = {
         {
           id: "question-ml-confusion-2",
           prompt: "Why use a confusion matrix instead of accuracy alone?",
-          choices: ["It shows the kinds of errors the model made", "It hides class imbalance", "It removes sample-size concerns"],
-          correctChoiceIndex: 0,
+          choices: ["It hides class imbalance", "It shows the kinds of errors the model made", "It removes sample-size concerns"],
+          correctChoiceIndex: 1,
           explanation: "The matrix exposes false positives and false negatives that accuracy can hide."
         },
         {
           id: "question-ml-confusion-3",
           prompt: "What should a tiny confusion matrix include in its interpretation?",
-          choices: ["A sample-size limitation", "A production guarantee", "A claim that no more tests are needed"],
-          correctChoiceIndex: 0,
+          choices: ["A production guarantee", "A claim that no more tests are needed", "A sample-size limitation"],
+          correctChoiceIndex: 2,
           explanation: "Small samples can teach error patterns but cannot justify broad quality claims."
         }
       ]

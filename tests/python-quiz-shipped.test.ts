@@ -36,4 +36,32 @@ describe('shipped python quizzes (contentPack)', () => {
       }
     });
   }
+
+  it('all quizzes in contentPack with 3+ questions have balanced correctChoiceIndex distribution (< 75% bias)', () => {
+    for (const quiz of contentPack.quizzes) {
+      if (quiz.questions.length < 3) continue;
+      const counts: Record<number, number> = {};
+      quiz.questions.forEach((q: any) => {
+        counts[q.correctChoiceIndex] = (counts[q.correctChoiceIndex] || 0) + 1;
+      });
+      const max = Math.max(...Object.values(counts));
+      const ratio = max / quiz.questions.length;
+      expect(ratio, `Quiz ${quiz.id} has bias ratio ${ratio}`).toBeLessThan(0.75);
+    }
+  });
+
+  it('python quiz Q3–Q5 distractors vary by concept (no shared generic template)', () => {
+    const genericQ3 = "Never — this is just theory";
+    const genericQ4 = "A logic error from misunderstanding what the function returns";
+    const genericQ5 = "Extract a helper function for the repeated logic";
+
+    for (const quiz of pythonQuizzes) {
+      const q3 = quiz.questions[2];
+      const q4 = quiz.questions[3];
+      const q5 = quiz.questions[4];
+      expect(q3?.choices.join("|")).not.toContain(genericQ3);
+      expect(q4?.choices.join("|")).not.toContain(genericQ4);
+      expect(q5?.choices.join("|")).not.toContain(genericQ5);
+    }
+  });
 });

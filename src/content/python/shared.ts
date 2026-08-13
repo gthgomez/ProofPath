@@ -482,33 +482,25 @@ export function codeReadingQuiz(
   const q2Shuffled = deterministicShuffle(q2Raw, `${id}-cr-2-${rot}`);
   const q2CorrectIndex = q2Shuffled.indexOf(q2CorrectPhrase);
 
-  // Q3: Application (rot+1 for different slot)
-  const q3CorrectPhrase = "When processing or inspecting session data";
-  let q3Raw = cycleCorrectFirst([
-    "Never — this is just theory",
-    "Only when installing Python on a new computer",
-    q3CorrectPhrase
-  ], q3CorrectPhrase, (rot + 1) % 3);
-  const q3Shuffled = deterministicShuffle(q3Raw, `${id}-cr-3-${(rot+1)%3}`);
+  // Q3–Q5: concept-specific distractors so quizzes do not share identical wrong-answer phrases
+  const q3CorrectPhrase = `When applying ${concept} to Study Tracker session data`;
+  const q3WrongA = `Never — ${concept} is only background theory here`;
+  const q3WrongB = `Only while installing Python or creating a new project folder`;
+  let q3Raw = cycleCorrectFirst([q3WrongA, q3WrongB, q3CorrectPhrase], q3CorrectPhrase, (rot + 1) % 3);
+  const q3Shuffled = deterministicShuffle(q3Raw, `${id}-cr-3-${(rot + 1) % 3}`);
   const q3CorrectIndex = q3Shuffled.indexOf(q3CorrectPhrase);
 
-  // Q4: Debug (rot+2)
-  const q4CorrectPhrase = "A logic error from misunderstanding what the function returns";
-  let q4Raw = cycleCorrectFirst([
-    "A NameError from an undefined variable",
-    "A TypeError from mixing incompatible types",
-    q4CorrectPhrase
-  ], q4CorrectPhrase, (rot + 2) % 3);
-  const q4Shuffled = deterministicShuffle(q4Raw, `${id}-cr-4-${(rot+2)%3}`);
+  const q4CorrectPhrase = `Misunderstanding how ${concept} changes the result or output`;
+  const q4WrongA = `A NameError from a variable that ${concept} never defines`;
+  const q4WrongB = `A TypeError from mixing incompatible types around ${concept}`;
+  let q4Raw = cycleCorrectFirst([q4WrongA, q4WrongB, q4CorrectPhrase], q4CorrectPhrase, (rot + 2) % 3);
+  const q4Shuffled = deterministicShuffle(q4Raw, `${id}-cr-4-${(rot + 2) % 3}`);
   const q4CorrectIndex = q4Shuffled.indexOf(q4CorrectPhrase);
 
-  // Q5: Refactor (rot)
-  const q5CorrectPhrase = "Extract a helper function for the repeated logic";
-  let q5Raw = cycleCorrectFirst([
-    "Add more comments to explain each line",
-    q5CorrectPhrase,
-    "Rename all variables to be shorter"
-  ], q5CorrectPhrase, rot);
+  const q5CorrectPhrase = `Extract a helper that isolates the ${concept} logic`;
+  const q5WrongA = `Add line-by-line comments explaining ${concept}`;
+  const q5WrongB = `Shorten every variable name tied to ${concept}`;
+  let q5Raw = cycleCorrectFirst([q5WrongA, q5CorrectPhrase, q5WrongB], q5CorrectPhrase, rot);
   const q5Shuffled = deterministicShuffle(q5Raw, `${id}-cr-5-${rot}`);
   const q5CorrectIndex = q5Shuffled.indexOf(q5CorrectPhrase);
 
@@ -596,15 +588,31 @@ export function checkpointQuiz(
   const q1Choices = deterministicShuffle([rightAnswer, wrongAnswerA, wrongAnswerB], `${id}-cp-1`);
   const q1CorrectIndex = q1Choices.indexOf(rightAnswer);
 
-  // Q2: Review check — shuffle the 3 hardcoded choices
-  const q2Raw = ["A private note with no example", "A small result plus check output", "A claim that the idea is obvious"];
-  const q2Choices = deterministicShuffle(q2Raw, `${id}-cp-2`);
-  const q2CorrectIndex = q2Choices.indexOf("A small result plus check output");
+  // Q2: Review check — rotate target index to (q1CorrectIndex + 1) % 3
+  const q2CorrectIndex = (q1CorrectIndex + 1) % 3;
+  const q2Right = "A small result plus check output";
+  const q2Wrongs = ["A private note with no example", "A claim that the idea is obvious"];
+  const q2Choices = new Array<string>(3);
+  q2Choices[q2CorrectIndex] = q2Right;
+  let q2WrongIdx = 0;
+  for (let i = 0; i < 3; i++) {
+    if (i !== q2CorrectIndex) {
+      q2Choices[i] = q2Wrongs[q2WrongIdx++]!;
+    }
+  }
 
-  // Q3: Beginner pitfalls — shuffle the 3 hardcoded choices
-  const q3Raw = ["Naming the assumption", "Recording the check command", "Skipping the failure case"];
-  const q3Choices = deterministicShuffle(q3Raw, `${id}-cp-3`);
-  const q3CorrectIndex = q3Choices.indexOf("Skipping the failure case");
+  // Q3: Beginner pitfalls — rotate target index to (q1CorrectIndex + 2) % 3
+  const q3CorrectIndex = (q1CorrectIndex + 2) % 3;
+  const q3Right = "Skipping the failure case";
+  const q3Wrongs = ["Naming the assumption", "Recording the check command"];
+  const q3Choices = new Array<string>(3);
+  q3Choices[q3CorrectIndex] = q3Right;
+  let q3WrongIdx = 0;
+  for (let i = 0; i < 3; i++) {
+    if (i !== q3CorrectIndex) {
+      q3Choices[i] = q3Wrongs[q3WrongIdx++]!;
+    }
+  }
 
   return {
     id,

@@ -119,6 +119,15 @@ export const careerPathProgression = {
   }
 } as const;
 
+/** UI copy for specialization tracks planned on the roadmap but not yet in the content pack. */
+export const unshippedTrackSummaries: Record<string, string> = {
+  "track-analytics-systems": "Decision systems and reporting depth — planned after data-systems proof.",
+  "track-ai-security": "AI-specific threat modeling and guardrails — planned after AppSec proof.",
+  "track-privacy-governance": "Privacy reviews and data-governance habits — planned after AppSec proof.",
+  "track-ai-platform": "Platform ops for model-serving teams — planned after AI product proof.",
+  "track-product-analytics": "Product instrumentation and experiment readouts — planned after AI product proof."
+};
+
 export const pathProofGates: PathProofGate[] = [
   {
     id: PATH_PROOF_CORE_ID,
