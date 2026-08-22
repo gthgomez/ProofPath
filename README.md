@@ -1,4 +1,4 @@
-# CareerForge Mobile
+# ProofPath
 
 An offline-first React Native learning system that helps beginner CS students convert lessons into reviewer-ready portfolio evidence.
 
@@ -6,17 +6,19 @@ An offline-first React Native learning system that helps beginner CS students co
 
 ## 1. Product Summary
 
-CareerForge Mobile is a comprehensive career-readiness and technical learning application designed for software engineering students. Unlike typical educational platforms that prioritize passive video consumption or multiple-choice questions, CareerForge is built entirely around active engineering exercises, code sandbox verification, and project deliverables. It serves as a personal, local dashboard that guides students through structured learning paths, monitors their progress, and helps them build a validated portfolio of work.
+ProofPath is a comprehensive career-readiness and technical learning application designed for software engineering students. Unlike typical educational platforms that prioritize passive video consumption or multiple-choice questions, ProofPath is built entirely around active engineering exercises, code sandbox verification, and project deliverables. It serves as a personal, local dashboard that guides students through structured learning paths, monitors their progress, and helps them build a validated portfolio of work.
 
 ---
 
 ## 2. Core Differentiator: Proof-First Learning
 
-Most course platforms award certificates of completion for merely clicking through screens. CareerForge rejects this model, enforcing a **Proof-First Philosophy**:
+Most course platforms award certificates of completion for merely clicking through screens. ProofPath rejects this model, enforcing a **Proof-First Philosophy**:
 
 * **No Free Completion:** Passing quizzes or reading material is not enough. To complete a lesson, students must complete an applied mini-project, run checks in the editor, and verify their code.
 * **Portfolio Missions:** The core of the learning progression is the **Build Mission**. Each mission requires tangible deliverables (e.g., repository URLs, commit hashes, specific verifier outputs, and written reflections).
 * **Telemetry & Readiness:** The **Career Readiness Score** requires actual evidence hygiene. Bypassing lessons via placement tests (diagnostic mastery) unblocks navigation but does *not* inflate the portfolio readiness score until the student provides concrete evidence of completed missions.
+
+**Detailed docs:** [CLAUDE.md](CLAUDE.md) | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) | [STATUS.md](STATUS.md) | [QA_CHECKLIST.md](QA_CHECKLIST.md)
 
 ---
 
@@ -65,7 +67,7 @@ An offline-first data layer. All attempts, progress state, evidence items, and w
 
 ## 5. Sandbox Boundaries & Defensive Guardrails
 
-CareerForge includes a **Learner Sandbox with Defensive Guardrails** for run-testing code snippets and Code Labs. It is designed to guide beginners and catch syntax or logical bugs offline; **it is not an adversarial secure runtime.**
+ProofPath includes a **Learner Sandbox with Defensive Guardrails** for run-testing code snippets and Code Labs. It is designed to guide beginners and catch syntax or logical bugs offline; **it is not an adversarial secure runtime.**
 
 * **Native Python Runner:** A lightweight, regex-based offline verifier. It parses basic assignments and assertions. Standard control structures (like `if`, `for`, `def`) are intentionally unsupported in this offline fallback. If written, they fail gracefully with clean diagnostic errors instead of throwing crashes. Intermediate lessons requiring full control flow require the browser's webview Pyodide sandbox environment.
 * **TypeScript Execution:** Relies on lightweight JS transformation to strip types at runtime before running inside the local JavaScript runtime engine, rather than invoking a full, heavy TypeScript compiler.
@@ -106,7 +108,7 @@ All curriculum modules, code sandboxes, and domain logic are fully covered by au
 
 ## 7. Current Project Status
 
-CareerForge Mobile is currently in its local verification and sandbox testing phase. The application compiles cleanly for React Native/Expo and web environments. Local persistence is fully functional through the SQLite storage manager.
+ProofPath is currently in its local verification and sandbox testing phase. The application compiles cleanly for React Native/Expo and web environments. Local persistence is fully functional through the SQLite storage manager.
 
 ---
 
@@ -128,7 +130,7 @@ CareerForge Mobile is currently in its local verification and sandbox testing ph
 
 ## 9. Reviewer-Focused Architecture Note
 
-CareerForge Mobile represents a serious engineering project rather than a simple content app:
+ProofPath represents a serious engineering project rather than a simple content app:
 1. **Verifiable State Engine:** State is derived mathematically using the pure reconciliation logic in `reconcileDerivedProgress`.
 2. **Defensive Sandbox Pipeline:** Code execution is structured defensively with AST-like checking and regex validation to provide direct compiler diagnostics back to mobile learners.
 3. **Robust Local-First Persistence:** Implements a serialization queue using React refs to coordinate SQLite writes on low-spec mobile storage arrays.
