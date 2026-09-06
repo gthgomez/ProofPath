@@ -458,7 +458,10 @@ function phaseStatusForReason(
   }
 
   if (reason === "syntax_error") {
-    return index === 0 ? "failed" : "skipped";
+    // Parsing is the first gate. Later phases were never attempted, so keep
+    // them pending instead of implying that the runner deliberately skipped
+    // their work.
+    return index === 0 ? "failed" : "pending";
   }
 
   const verifyIndex = phases.findIndex((phase) => phase.includes("[verify]"));
@@ -473,13 +476,15 @@ function phaseStatusForReason(
 
   if (reason === "runtime_error" || reason === "timeout") {
     const failureIndex = executeIndex >= 0 ? executeIndex : Math.max(0, phases.length - 1);
-    return index < failureIndex ? "done" : index === failureIndex ? "failed" : "skipped";
+    return index < failureIndex ? "done" : index === failureIndex ? "failed" : "pending";
   }
 
   if (reason === "runner_error") {
-    return runMode === "run_checks" && verifyIndex >= 0
-      ? index < verifyIndex ? "done" : index === verifyIndex ? "failed" : "skipped"
-      : index === 0 ? "failed" : "skipped";
+    // A runner exception is raised while executing learner code (before the
+    // checks can run), so it has the same phase boundary as a runtime error.
+    // This avoids falsely reporting verification as failed when it never ran.
+    const failureIndex = executeIndex >= 0 ? executeIndex : 0;
+    return index < failureIndex ? "done" : index === failureIndex ? "failed" : "pending";
   }
 
   return "failed";
