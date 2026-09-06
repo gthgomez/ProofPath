@@ -35,9 +35,9 @@ TypeScript 5.9 (strict) · React Native 0.83 / Expo SDK 55 · Expo Router (file-
 
 **Blast radius:** LOW = single content file, UI component tweak, test fix · MEDIUM = multiple content files, domain logic change, runner modification · HIGH = `seed.ts` restructuring, schema changes, storage migrations, sandbox policy changes, new Expo native modules
 
-**Act without asking** (LOW, some MEDIUM): lesson content fixes (typos, missing fields, quiz answer shuffling) · UI/component changes within existing screens · test fixes for broken assertions · content validation warning cleanup · missing curriculum metadata additions
+**Execute within task authorization** (LOW, some MEDIUM): lesson content fixes (typos, missing fields, quiz answer shuffling) · UI/component changes within existing screens · test fixes for broken assertions · content validation warning cleanup · missing curriculum metadata additions
 
-**Pause and confirm** (HIGH, ambiguous MEDIUM): `seed.ts` structural changes (module/lesson registration IDs) · sandbox policy (`src/sandbox/policy.ts`) · storage schema migrations (`src/storage/progress-store.ts`) · new Expo native modules or permissions · `app.json`/`eas.json` build config changes · anything affecting the content integrity verification pipeline
+**Plan and verify more strongly** (HIGH, ambiguous MEDIUM): `seed.ts` structural changes (module/lesson registration IDs) · sandbox policy (`src/sandbox/policy.ts`) · storage schema migrations (`src/storage/progress-store.ts`) · new Expo native modules or permissions · `app.json`/`eas.json` build config changes · anything affecting the content integrity verification pipeline. This classification increases review, rollback, and verification requirements; it does not require a second confirmation for an already-authorized task.
 
 **Rule:** Fix the problem — not everything around it.
 
