@@ -186,7 +186,33 @@ describe("production-style sandbox workflow contracts", () => {
     });
 
     expect(attempt.terminalTranscript.filter((event) => event.type === "phase").map((event) => event.status))
-      .toEqual(["failed", "skipped", "skipped"]);
+      .toEqual(["failed", "pending", "pending"]);
     expect(attempt.terminalTranscript).toContainEqual({ type: "result", status: "failed", runtimeMs: 3, exitCode: 1, reason: "syntax_error" });
+  });
+
+  it("leaves verification pending when execution fails", () => {
+    const diagnostics = buildProblemDiagnostics({
+      language: "python",
+      stderr: "NameError: minutes is not defined"
+    });
+    const attempt = normalizeCodeRunAttempt({
+      id: "run-checks-runtime",
+      lessonId: "lesson-python-values",
+      language: "python",
+      runMode: "run_checks",
+      command: "careerforge checks study_session.py",
+      codeSnapshot: "print(minutes)",
+      stdout: "",
+      stderr: "NameError: minutes is not defined",
+      passed: false,
+      score: 0,
+      runtimeMs: 4,
+      testResults: [],
+      diagnostics,
+      createdAt: "2026-05-08T21:05:00.000Z"
+    });
+
+    expect(attempt.terminalTranscript.filter((event) => event.type === "phase").map((event) => event.status))
+      .toEqual(["done", "failed", "pending"]);
   });
 });
