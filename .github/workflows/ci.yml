@@ -9,7 +9,8 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Only cancel superseded pull-request runs; let main/scheduled runs finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -21,10 +22,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -32,20 +33,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate content integrity
-        run: npm run validate:content
-
-      - name: Content audit report
-        run: npm run report:content
-
-      - name: Sandbox redaction scan
-        run: npm run scan:redaction
-
-      - name: Type-check
-        run: npm run typecheck
-
-      - name: Unit / integration tests
-        run: npm test
+      # Single source of truth: keeps CI in lockstep with `npm run verify`
+      # (validate:content -> report:content -> scan:redaction -> typecheck -> test).
+      - name: Verify
+        run: npm run verify
 
       - name: Web export (build smoke)
         run: npx expo export --platform web
