@@ -46,13 +46,13 @@ const assignmentPracticeReps: LessonPracticeBlock[] = [
     tier: "replicate"
   },
   {
-    starterCode: '# Fix the bug: minutes should hold the integer 30, not the string "30".\nminutes = "30"\nprint("Minutes value is")\nprint(minutes)',
-    expectedOutput: "Minutes value is printed as\n30",
+    starterCode: '# Fix the bug: minutes should hold the integer 30, not the string "30".\nminutes = "30"\nprint("The minutes value is")\nprint(minutes)',
+    expectedOutput: "The minutes value is\n30",
     checkYourAnswer: "The bug is that minutes holds the string '30' instead of the integer 30. Remove the quotes so Python treats it as a number.",
     tier: "diagnose"
   },
   {
-    starterCode: '# Create three variables for a study tracker session:\n# topic (string), minutes (integer), and completed (boolean).\n# Assign any values you like and print all three.\n',
+    starterCode: '# Create three variables for a study tracker session:\n# topic (string) = "python", minutes (integer) = 45, completed (boolean) = False.\n# Print each on its own line with a label: topic is, minutes is, completed is.\n',
     expectedOutput: "topic is python\nminutes is 45\ncompleted is False",
     checkYourAnswer: "Define topic, minutes, and completed with the correct types. Strings need quotes, integers need none, booleans need capital T or F.",
     tier: "synthesize"
@@ -73,8 +73,8 @@ const printValuesPracticeReps: LessonPracticeBlock[] = [
     tier: "replicate"
   },
   {
-    starterCode: '# Fix the bug: the code prints the literal word instead of the stored value.\ntopic = "git"\nprint("topic")',
-    expectedOutput: "The printed value is\ngit",
+    starterCode: '# Fix the bug: the code prints the literal word instead of the stored value.\ntopic = "git basics"\nprint("Printed value is below")\nprint("topic")',
+    expectedOutput: "Printed value is below\ngit basics",
     checkYourAnswer: "The bug is that print(\"topic\") prints the literal word topic instead of the variable's value. Remove the quotes inside print() to print the variable.",
     tier: "diagnose"
   },
@@ -100,13 +100,13 @@ const numbersPracticeReps: LessonPracticeBlock[] = [
     tier: "replicate"
   },
   {
-    starterCode: 'session_a = 15\nsession_b = 10\ntotal = session_a - session_b\nprint("Total minutes is")\nprint(total)',
-    expectedOutput: "New total minutes value is\n25",
+    starterCode: 'session_a = 15\nsession_b = 10\ntotal = session_a - session_b\nprint("Total minutes for both sessions")\nprint(total)',
+    expectedOutput: "Total minutes for both sessions\n25",
     checkYourAnswer: "The bug is that the code subtracts instead of adding. Change the - to + so total becomes the sum of both sessions.",
     tier: "diagnose"
   },
   {
-    starterCode: '# Calculate the total minutes for three study sessions:\n# session_1 = 25, session_2 = 30, session_3 = 15.\n# Store the sum in a variable called grand_total and print it.\n',
+    starterCode: '# Calculate the total minutes for three study sessions:\n# session_1 = 25, session_2 = 30, session_3 = 15.\n# Store the sum in a variable called grand_total and print it.\n# Print the label "The grand total is" first, then print grand_total.\n',
     expectedOutput: "The grand total is\n70",
     checkYourAnswer: "Assign all three session variables, then add them with + and store the result in grand_total before printing.",
     tier: "synthesize"
@@ -133,7 +133,7 @@ const stringsPracticeReps: LessonPracticeBlock[] = [
     tier: "diagnose"
   },
   {
-    starterCode: '# Join the two strings topic = "python" and status = "completed"\n# into one message: "python-completed".\n# Then apply .upper() to make the result uppercase and print it.\n',
+    starterCode: '# Join the two strings topic = "python" and status = "completed"\n# into one message: "python-completed".\n# Then apply .upper() to make the result uppercase and print it.\n# Print the label "The final result is" first, then print the uppercase message.\n',
     expectedOutput: "The final result is\nPYTHON-COMPLETED",
     checkYourAnswer: "Use + to join the strings with a hyphen in between, then chain .upper() on the result and print it.",
     tier: "synthesize"
@@ -154,8 +154,8 @@ const fstringsPracticeReps: LessonPracticeBlock[] = [
     tier: "replicate"
   },
   {
-    starterCode: 'topic = "python"\nminutes = 30\nsummary = "{topic}: {minutes} min"\nprint(summary)',
-    expectedOutput: "The output is: python: 30 min",
+    starterCode: 'topic = "python"\nminutes = 30\nsummary = "{topic}: {minutes} minutes logged"\nprint(summary)',
+    expectedOutput: "python: 30 minutes logged",
     checkYourAnswer: "The bug is that the f prefix is missing before the opening quote. Add f before the string so Python replaces {} with variable values.",
     tier: "diagnose"
   },
@@ -1108,7 +1108,7 @@ const deprecatedValuesLesson = proofLesson({
   missionConnection: "This is the first slice of the CLI Study Tracker: one session that a learner and a test can inspect.",
   reflectionPrompt: "Which variable name made the program easier to read, and which value would you change to describe a different session?",
   practiceStarter: "topic = \"python\"\nminutes = 0\ncompleted = False\n\n# Change minutes to 30.\n# Then build the required summary using the values above.\n# Hint: summary = f\"{topic}\\n{minutes}\\nplanned\"\nsummary = \"\"\nprint(summary)",
-  practiceExpected: "python\n30\nplanned\n\nVerifier then prints: passed",
+  practiceExpected: "python\n30\nplanned",
   practiceCheck: "Check three things: minutes should be the number 30, summary should not stay empty, and each required value should print on its own line.",
   practiceReps: pythonValuePracticeReps,
   miniTitle: "Build one study-session summary",
@@ -1258,10 +1258,10 @@ export const level1Quizzes: Quiz[] = [
     "Arithmetic Checkpoint",
     "total = session_a + session_b\nprint(total)",
     "integer arithmetic",
-    "You must use // for integer division; / produces a float like 3.5",
-    "/ and // both produce the same result for whole-number division",
-    "You should use + for division because it is the most common operator",
-    "// performs floor division (drops the decimal). / performs true division and may return a float.",
+    "It adds session_a and session_b, stores the sum in total, and prints that sum",
+    "It divides session_a by session_b and drops the decimal remainder",
+    "It joins the two session values together into one piece of text",
+    "+ adds the two integer values, so total stores their sum, and print(total) displays it. For 30 and 20 that prints 50.",
     ["py.arithmetic"]
   ),
   codeReadingQuiz(

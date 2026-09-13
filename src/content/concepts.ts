@@ -808,6 +808,13 @@ export const conceptRegistry: ConceptDefinition[] = [
     introducedLevel: 8
   },
   {
+    id: "py.time",
+    label: "Time Module",
+    category: "python",
+    description: "Use time.time() and time.sleep() to measure elapsed time and pace retries.",
+    introducedLevel: 8
+  },
+  {
     id: "py.api.cache",
     label: "Caching Strategies",
     category: "api",

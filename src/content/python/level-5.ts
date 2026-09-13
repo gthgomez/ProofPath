@@ -162,7 +162,7 @@ const pythonImportLesson = proofLesson({
   requiredCodeIncludes: ["import json", "json.dumps"],
   requiredOutputIncludes: ["topic", "minutes", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "import json\n\nsession = {\"topic\": \"python\", \"minutes\": 30}\njson_text = json.dumps(session)\nprint(json_text)",
+  runnerStarterCode: "# TODO: import the json module at the very top of this file.\nsession = {\"topic\": \"python\", \"minutes\": 30}\n# TODO: serialize the session dict with json.dumps(session)\n# TODO: print the JSON string so the check can read it",
   runnerTestCode: "import json\ntry:\n    json.loads('{}')\n    result = json.dumps({\"topic\": \"python\", \"minutes\": 30})\n    assert 'topic' in result\n    assert 'python' in result\n    assert '30' in result\n    print('import json passed')\nexcept NameError:\n    print('json module not imported - add import json')",
   hiddenTests: [
     {
@@ -344,7 +344,7 @@ const fileInputLesson = proofLesson({
   requiredCodeIncludes: ["parse_rows", "rejected"],
   requiredOutputIncludes: ["bad-row", "expected 3 columns"],
   runnerLanguage: "python",
-  runnerStarterCode: "def parse_rows(rows):\n    # Return (accepted, rejected).\n    # Split each line, check columns count, build dictionaries.\n    accepted = []\n    rejected = []\n    for row in rows:\n        parts = row.strip().split(',')\n        if len(parts) != 3:\n            rejected.append({'row': row, 'reason': 'expected 3 columns'})\n        else:\n            try:\n                minutes = int(parts[2])\n                accepted.append({'date': parts[0], 'topic': parts[1], 'minutes': minutes})\n            except ValueError:\n                rejected.append({'row': row, 'reason': 'minutes must be a number'})\n    return accepted, rejected\n",
+  runnerStarterCode: "def parse_rows(rows):\n    # Return (accepted, rejected).\n    # TODO: split each row on commas and reject rows that do not have\n    #   exactly 3 columns with the reason 'expected 3 columns'.\n    # TODO: convert minutes with int(); when that fails, reject the row\n    #   with the reason 'minutes must be a number'.\n    # TODO: build an accepted dict {'date', 'topic', 'minutes'} per valid row.\n    accepted = []\n    rejected = []\n    # TODO: loop over rows here.\n    return accepted, rejected\n",
   runnerTestCode: "accepted, rejected = parse_rows(['2026-05-07,python,30', 'bad-row'])\nassert accepted == [{'date': '2026-05-07', 'topic': 'python', 'minutes': 30}]\nassert rejected == [{'row': 'bad-row', 'reason': 'expected 3 columns'}]\nprint('bad-row expected 3 columns passed')",
   hiddenTests: [
     {
@@ -494,7 +494,7 @@ const parserTestsLesson = proofLesson({
   requiredCodeIncludes: ["test_parse_valid_row", "test_rejects_bad_minutes"],
   requiredOutputIncludes: ["passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "def parse_row(row):\n    # Return a dict for valid rows or {'error': reason} for invalid rows.\n    parts = row.strip().split(',')\n    if len(parts) != 3:\n        return {'error': 'expected 3 columns'}\n    try:\n        minutes = int(parts[2])\n        return {'date': parts[0], 'topic': parts[1], 'minutes': minutes}\n    except ValueError:\n        return {'error': 'minutes must be a number'}\n\n\ndef test_parse_valid_row():\n    assert parse_row('2026-05-07,python,30')['minutes'] == 30\n\n\ndef test_rejects_bad_minutes():\n    result = parse_row('2026-05-07,python,soon')\n    assert result['error'] == 'minutes must be a number'\n",
+  runnerStarterCode: "def parse_row(row):\n    # Provided parser: returns a dict for valid rows or {'error': reason} for invalid rows.\n    parts = row.strip().split(',')\n    if len(parts) != 3:\n        return {'error': 'expected 3 columns'}\n    try:\n        minutes = int(parts[2])\n        return {'date': parts[0], 'topic': parts[1], 'minutes': minutes}\n    except ValueError:\n        return {'error': 'minutes must be a number'}\n\n\n# TODO: write test_parse_valid_row(): assert parse_row('2026-05-07,python,30')['minutes'] == 30\n# TODO: write test_rejects_bad_minutes(): assert parse_row('2026-05-07,python,soon')['error'] == 'minutes must be a number'\n",
   runnerTestCode: "test_parse_valid_row()\ntest_rejects_bad_minutes()\nprint('2 passed')",
   hiddenTests: [
     {
@@ -644,7 +644,7 @@ const cliArgumentsLesson = proofLesson({
   requiredCodeIncludes: ["argparse", "add_argument", "--topic", "--minutes", "type=int"],
   requiredOutputIncludes: ["python", "30", "minutes"],
   runnerLanguage: "python",
-  runnerStarterCode: "import argparse\n\nargs = [\"--topic\", \"python\", \"--minutes\", \"30\"]\n\ndef build_parser():\n    parser = argparse.ArgumentParser(prog=\"study_tracker\")\n    # Add --topic and --minutes here.\n    parser.add_argument('--topic', required=True)\n    parser.add_argument('--minutes', required=True, type=int)\n    return parser\n\ndef parse_cli(args):\n    namespace = build_parser().parse_args(args)\n    return {'topic': namespace.topic, 'minutes': namespace.minutes}\n\nparsed = parse_cli(args)\nsummary = f\"{parsed['topic']}: {parsed['minutes']} minutes\"\nprint(parsed)\nprint(summary)",
+  runnerStarterCode: "import argparse\n\nargs = [\"--topic\", \"python\", \"--minutes\", \"30\"]\n\ndef build_parser():\n    parser = argparse.ArgumentParser(prog=\"study_tracker\")\n    # TODO: add --topic here (a plain string flag).\n    # TODO: add --minutes here with type=int so argparse converts the text.\n    return parser\n\ndef parse_cli(args):\n    namespace = build_parser().parse_args(args)\n    return {'topic': namespace.topic, 'minutes': namespace.minutes}\n\nparsed = parse_cli(args)\nsummary = f\"{parsed['topic']}: {parsed['minutes']} minutes\"\nprint(parsed)\nprint(summary)",
   runnerTestCode: "assert parsed == {'topic': 'python', 'minutes': 30}\nassert summary == 'python: 30 minutes'\nprint('python cli 30 minutes passed')",
   hiddenTests: [
     {
@@ -819,13 +819,13 @@ const fileBackedCliLesson = proofLesson({
   requiredCodeIncludes: ["argparse", "--input", "csv", "read_sessions", "run_cli"],
   requiredOutputIncludes: ["2 sessions", "45 minutes", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "import argparse\nimport csv\nfrom io import StringIO\n\nSAMPLE_CSV = \"\"\"date,topic,minutes\n2026-05-07,python,30\n2026-05-08,git,15\n\"\"\"\n\ndef build_parser():\n    parser = argparse.ArgumentParser(prog=\"study_tracker\")\n    # Add --input here.\n    parser.add_argument('--input', required=True)\n    return parser\n\ndef read_sessions(csv_text):\n    # Parse CSV content\n    f = StringIO(csv_text.strip())\n    reader = csv.DictReader(f)\n    sessions = []\n    for row in reader:\n        sessions.append({'date': row['date'], 'topic': row['topic'], 'minutes': int(row['minutes'])})\n    return sessions\n\ndef run_cli(args, files):\n    namespace = build_parser().parse_args(args)\n    sessions = read_sessions(files[namespace.input])\n    total_minutes = sum(session[\"minutes\"] for session in sessions)\n    return f\"{len(sessions)} sessions, {total_minutes} minutes\"\n\noutput = run_cli([\"--input\", \"sessions.csv\"], {\"sessions.csv\": SAMPLE_CSV})\nprint(output)",
+  runnerStarterCode: "import argparse\nimport csv\nfrom io import StringIO\n\nSAMPLE_CSV = \"\"\"date,topic,minutes\n2026-05-07,python,30\n2026-05-08,git,15\n\"\"\"\n\ndef build_parser():\n    parser = argparse.ArgumentParser(prog=\"study_tracker\")\n    parser.add_argument('--input', required=True)\n    return parser\n\ndef read_sessions(csv_text):\n    # TODO: parse the CSV text into a list of dicts with 'date', 'topic',\n    #   and integer 'minutes' keys. Hint: csv.DictReader(StringIO(csv_text.strip()))\n    #   yields one row dict per line after the header.\n    return []\n\ndef run_cli(args, files):\n    namespace = build_parser().parse_args(args)\n    sessions = read_sessions(files[namespace.input])\n    total_minutes = sum(session[\"minutes\"] for session in sessions)\n    sessions_noun = \"session\" if len(sessions) == 1 else \"sessions\"\n    return f\"{len(sessions)} {sessions_noun}, {total_minutes} minutes\"\n\noutput = run_cli([\"--input\", \"sessions.csv\"], {\"sessions.csv\": SAMPLE_CSV})\nprint(output)",
   runnerTestCode: "assert read_sessions(SAMPLE_CSV) == [\n    {'date': '2026-05-07', 'topic': 'python', 'minutes': 30},\n    {'date': '2026-05-08', 'topic': 'git', 'minutes': 15},\n]\nassert output == '2 sessions, 45 minutes'\nprint('2 sessions 45 minutes passed')",
   hiddenTests: [
     {
       id: "file-backed-cli-uses-selected-file",
       name: "CLI uses the selected input file",
-      code: "other_csv = 'date,topic,minutes\\n2026-05-09,sql,20\\n'\nassert run_cli(['--input', 'other.csv'], {'other.csv': other_csv}) == '1 sessions, 20 minutes'"
+      code: "other_csv = 'date,topic,minutes\\n2026-05-09,sql,20\\n'\nassert run_cli(['--input', 'other.csv'], {'other.csv': other_csv}) == '1 session, 20 minutes'"
     }
   ],
   curriculum: {
@@ -989,7 +989,7 @@ const cliPolishLesson = proofLesson({
   requiredCodeIncludes: ["description", "help=", "default=", "choices", "--format", "--min-minutes"],
   requiredOutputIncludes: ["--input", "--format", "text", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "import argparse\n\n\ndef build_parser():\n    parser = argparse.ArgumentParser(\n        prog=\"study_tracker\",\n        description=\"Summarize study sessions from csv.\"\n    )\n    parser.add_argument('--input', required=True, help='Path to sessions csv')\n    parser.add_argument('--format', default='text', choices=['text', 'json'], help='Report format')\n    parser.add_argument('--min-minutes', default=0, type=int, help='Min minutes filter')\n    return parser\n\nparser = build_parser()\nparsed = parser.parse_args([\"--input\", \"sessions.csv\"])\nhelp_text = parser.format_help()\nprint(parsed.input)\nprint(parsed.format)\nprint(parsed.min_minutes)\nprint(\"--input\" in help_text)",
+  runnerStarterCode: "import argparse\n\n\ndef build_parser():\n    # TODO: pass description='Summarize study sessions from csv.' to ArgumentParser.\n    parser = argparse.ArgumentParser(prog=\"study_tracker\")\n    parser.add_argument('--input', required=True)\n    # TODO: add --format with default='text', choices=['text', 'json'], and help text.\n    # TODO: add --min-minutes with type=int, default=0, and help text.\n    return parser\n\nparser = build_parser()\nparsed = parser.parse_args([\"--input\", \"sessions.csv\"])\nhelp_text = parser.format_help()\nprint(parsed.input)\nprint(parsed.format)\nprint(parsed.min_minutes)\nprint(help_text)",
   runnerTestCode: "assert parsed.input == 'sessions.csv'\nassert parsed.format == 'text'\nassert parsed.min_minutes == 0\nassert '--input' in help_text\nassert '--format' in help_text\nassert '--min-minutes' in help_text\nassert 'Summarize study sessions' in help_text\nprint('cli help defaults passed')",
   hiddenTests: [
     {
@@ -1164,7 +1164,7 @@ const outputFileLesson = proofLesson({
   requiredCodeIncludes: ["--output", "format_report", "write_report", "summary.txt"],
   requiredOutputIncludes: ["summary.txt", "2 sessions", "45 minutes", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "import argparse\n\nsessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}]\nfiles = {}\n\ndef build_parser():\n    parser = argparse.ArgumentParser(prog=\"study_tracker\")\n    parser.add_argument('--output', default='summary.txt')\n    return parser\n\ndef format_report(sessions):\n    total_minutes = sum(s[\"minutes\"] for s in sessions)\n    return f\"{len(sessions)} sessions\\n{total_minutes} minutes\"\n\ndef write_report(path, content, files):\n    files[path] = content\n\nparsed = build_parser().parse_args([])\nreport = format_report(sessions)\nwrite_report(parsed.output, report, files)\nprint(parsed.output)\nprint(files.get(parsed.output, \"\"))",
+  runnerStarterCode: "import argparse\n\nsessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}]\nfiles = {}\n\ndef build_parser():\n    parser = argparse.ArgumentParser(prog=\"study_tracker\")\n    parser.add_argument('--output', default='summary.txt')\n    return parser\n\ndef format_report(sessions):\n    # TODO: return the report text: '{len(sessions)} sessions\\n{total} minutes'\n    #   with the total computed from the sessions' minutes.\n    return \"\"\n\ndef write_report(path, content, files):\n    files[path] = content\n\nparsed = build_parser().parse_args([])\nreport = format_report(sessions)\nwrite_report(parsed.output, report, files)\nprint(parsed.output)\nprint(files.get(parsed.output, \"\"))",
   runnerTestCode: "assert parsed.output == 'summary.txt'\nassert report == '2 sessions\\n45 minutes'\nassert files['summary.txt'] == report\nprint('summary.txt 2 sessions 45 minutes passed')",
   hiddenTests: [
     {
@@ -1315,7 +1315,7 @@ const rejectedRowReportLesson = proofLesson({
   requiredCodeIncludes: ["parse_rows", "rejected", "row_number", "reason", "build_rejected_report"],
   requiredOutputIncludes: ["row 2", "expected 3 columns", "row 3", "minutes must be a number", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "ROWS = [\n    \"2026-05-07,python,30\",\n    \"bad-row\",\n    \"2026-05-08,git,soon\",\n    \"2026-05-09,sql,20\",\n]\n\ndef parse_rows(rows):\n    accepted = []\n    rejected = []\n    for idx, row in enumerate(rows, start=1):\n        parts = row.strip().split(',')\n        if len(parts) != 3:\n            rejected.append({'row_number': idx, 'row': row, 'reason': 'expected 3 columns'})\n        else:\n            try:\n                minutes = int(parts[2])\n                accepted.append({'date': parts[0], 'topic': parts[1], 'minutes': minutes})\n            except ValueError:\n                rejected.append({'row_number': idx, 'row': row, 'reason': 'minutes must be a number'})\n    return accepted, rejected\n\ndef build_rejected_report(rejected):\n    if not rejected:\n        return 'no rejected rows'\n    lines = []\n    for r in rejected:\n        lines.append(f\"row {r['row_number']}: {r['reason']} -> {r['row']}\")\n    return '\\n'.join(lines)\n\naccepted, rejected = parse_rows(ROWS)\nreport = build_rejected_report(rejected)\nprint(f\"{len(accepted)} accepted\")\nprint(report)",
+  runnerStarterCode: "ROWS = [\n    \"2026-05-07,python,30\",\n    \"bad-row\",\n    \"2026-05-08,git,soon\",\n    \"2026-05-09,sql,20\",\n]\n\ndef parse_rows(rows):\n    accepted = []\n    rejected = []\n    for idx, row in enumerate(rows, start=1):\n        parts = row.strip().split(',')\n        if len(parts) != 3:\n            rejected.append({'row_number': idx, 'row': row, 'reason': 'expected 3 columns'})\n        else:\n            try:\n                minutes = int(parts[2])\n                accepted.append({'date': parts[0], 'topic': parts[1], 'minutes': minutes})\n            except ValueError:\n                rejected.append({'row_number': idx, 'row': row, 'reason': 'minutes must be a number'})\n    return accepted, rejected\n\ndef build_rejected_report(rejected):\n    # TODO: return 'no rejected rows' when the list is empty.\n    # TODO: otherwise build one line per rejection:\n    #   'row {row_number}: {reason} -> {raw row}'\n    return \"\"\n\naccepted, rejected = parse_rows(ROWS)\nreport = build_rejected_report(rejected)\nprint(f\"{len(accepted)} accepted\")\nprint(report)",
   runnerTestCode: "assert len(accepted) == 2\nassert accepted[0]['topic'] == 'python'\nassert accepted[1]['minutes'] == 20\nassert rejected == [\n    {'row_number': 2, 'row': 'bad-row', 'reason': 'expected 3 columns'},\n    {'row_number': 3, 'row': '2026-05-08,git,soon', 'reason': 'minutes must be a number'},\n]\nassert 'row 2: expected 3 columns -> bad-row' in report\nassert 'row 3: minutes must be a number -> 2026-05-08,git,soon' in report\nprint('row 2 row 3 rejected report passed')",
   hiddenTests: [
     {
@@ -1484,7 +1484,7 @@ const portfolioProofLesson = proofLesson({
   requiredCodeIncludes: ["## Verify", "## Known gaps"],
   requiredOutputIncludes: ["passed"],
   runnerLanguage: "javascript",
-  runnerStarterCode: "const readme = `## Verify\npython -m pytest\n2 passed\n\n## Known gaps\nSample data is small.`;",
+  runnerStarterCode: "// TODO: under ## Verify, add the exact check command AND its expected output\n// (the expected output must contain the word 'passed').\n// TODO: under ## Known gaps, name at least one honest limitation.\nconst readme = `## My Project\n\n## Verify\n\n## Known gaps\n`;",
   runnerTestCode: "if (!readme.includes('## Verify')) throw new Error('missing Verify section');\nif (!readme.includes('## Known gaps')) throw new Error('missing Known gaps section');\nif (!readme.includes('passed')) throw new Error('missing passing output');\nconsole.log('passed README proof');",
   hiddenTests: [],
   curriculum: {
@@ -1753,11 +1753,11 @@ export const level5Quizzes: Quiz[] = [
       },
       {
         id: "question-python-file-2",
-        prompt: "Your Study Tracker returns 0 total minutes. Which part of this code is broken?\n```python\nif len(parts) != 3:\n    rejected.append(...)\nelse:\n    try:\n        minutes = int(parts[2])\n    except ValueError:\n        rejected.append(...)\n```",
-        choices: ["The len(parts) check is wrong", "The try/except silently rejects rows with non-numeric minutes", "The parser splits on commas instead of tabs"],
+        prompt: "Your Study Tracker returns 0 total minutes, and rejected stays empty even though the file contains '2026-05-07,python,soon'. Which part of this code is broken?\n```python\nfor row in rows:\n    parts = row.split(',')\n    if len(parts) != 3:\n        rejected.append({'row': row, 'reason': 'expected 3 columns'})\n    else:\n        try:\n            accepted.append({'minutes': int(parts[2])})\n        except ValueError:\n            pass\n```",
+        choices: ["The len(parts) check is wrong", "The except branch silently drops rows with non-numeric minutes instead of recording them in rejected", "The parser splits on commas instead of tabs"],
         correctChoiceIndex: 1,
         conceptIds: ["py.file.input"],
-        explanation: "The except catches bad minutes and moves the row to rejected, so minutes are not counted."
+        explanation: "The bare pass hides the bad row: minutes are never counted and no rejection is reported. The except branch should append a rejection record with a reason, as the column-count branch does."
       },
       {
         id: "question-python-file-3",
@@ -1789,7 +1789,7 @@ export const level5Quizzes: Quiz[] = [
         choices: ["The parser handles valid rows perfectly", "The test function was never called", "The test does not assert on the return value, so it passes regardless"],
         correctChoiceIndex: 2,
         conceptIds: ["py.test.assertions"],
-        explanation: "A test that never inspits the result with an assertion will pass even when the function produces wrong output."
+        explanation: "A test that never inspects the result with an assertion will pass even when the function produces wrong output."
       },
       {
         id: "question-python-parser-tests-3",

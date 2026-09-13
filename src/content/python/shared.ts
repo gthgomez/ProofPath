@@ -344,25 +344,147 @@ export function proofLesson(input: ProofLessonInput): Lesson {
 }
 
 /**
+ * Avalanche finalizer (murmur3 fmix32). Quiz seeds within one quiz differ only
+ * in a trailing character ("-cp-1/2/3", "-cr-1..5"), which leaves near-identical
+ * DJB2 states; without a mixing step the derived permutations collapse onto a
+ * single position. This bijection spreads each state over the full 32-bit range.
+ */
+function avalancheMix32(value: number): number {
+  let h = value >>> 0;
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
+/**
  * Deterministic shuffle keyed to a seed string. The same seed always produces
  * the same permutation, so quiz choice order is stable across reruns but varies
  * between different quiz IDs (preventing answer position bias).
  */
 export function deterministicShuffle<T>(array: T[], seed: string): T[] {
-  // DJB2 hash: convert seed string into a numeric state
-  let hash = 5381;
+  // DJB2 hash: convert seed string into a 32-bit state, then avalanche-mix it
+  let state = 5381;
   for (let i = 0; i < seed.length; i++) {
-    hash = ((hash << 5) + hash) + seed.charCodeAt(i);
-    hash = hash & 0x7fffffff;
+    state = ((state << 5) + state + seed.charCodeAt(i)) >>> 0;
   }
-  // Fisher-Yates shuffle driven by a linear congruential generator
+  state = avalancheMix32(state ^ 0x7feb352d);
+  // Fisher-Yates shuffle driven by an xorshift32 generator. Index selection
+  // uses a multiply-shift (high 32 bits of state * n) instead of a modulo, so
+  // low-entropy bits never decide the swap position — the previous LCG +
+  // modulo combination collapsed 3-element permutations onto one swap index
+  // and forced the correct answer toward a single position.
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
-    hash = (hash * 1103515245 + 12345) & 0x7fffffff;
-    const j = hash % (i + 1);
+    state ^= state << 13;
+    state >>>= 0;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    state >>>= 0;
+    const j = Math.floor((state * (i + 1)) / 4294967296);
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
+}
+
+/**
+ * Lower a quiz's passingScore so a learner can miss one question. Scoring is
+ * Math.round((correct / total) * 100), so an n-question quiz capped at
+ * floor(((n - 1) / n) * 100) still passes with one miss. This never raises the
+ * bar; it only lowers a threshold that a one-miss attempt could not reach.
+ */
+export function normalizeQuizPassingScore(quiz: Quiz): Quiz {
+  const n = quiz.questions.length;
+  if (n <= 1) return quiz;
+  const allowed = Math.floor(((n - 1) / n) * 100);
+  return { ...quiz, passingScore: Math.min(quiz.passingScore, allowed) };
+}
+
+/**
+ * Balance the correct-answer position across an assembled quiz. Independent
+ * per-question shuffling cannot guarantee per-quiz balance for small question
+ * counts, so this pass assigns each question a target slot drawn from a round
+ * robin of the minimum choice count and deterministically shuffles those slots.
+ * The choice set and which choice is correct are preserved; only the order and
+ * the stored correct index change.
+ */
+export function balanceQuizChoices(quiz: Quiz): Quiz {
+  const questions = quiz.questions;
+  const n = questions.length;
+  if (n <= 1) return quiz;
+  const k = Math.min(...questions.map((q) => q.choices.length));
+  if (k <= 1) return quiz;
+  const slots = Array.from({ length: n }, (_, i) => i % k);
+  const shuffledSlots = deterministicShuffle(slots, `${quiz.id}-balance`);
+  const balanced = questions.map((question, i) => {
+    const target = shuffledSlots[i];
+    const choices = [...question.choices];
+    const correct = choices[question.correctChoiceIndex];
+    const others = choices.filter((_, index) => index !== question.correctChoiceIndex);
+    const rebuilt: string[] = [];
+    let cursor = 0;
+    for (let position = 0; position < choices.length; position++) {
+      if (position === target) rebuilt.push(correct);
+      else rebuilt.push(others[cursor++]);
+    }
+    return { ...question, choices: rebuilt, correctChoiceIndex: target };
+  });
+  return { ...quiz, questions: balanced };
+}
+
+/**
+ * Detect snippets that are terminal transcripts or shell/path fragments rather
+ * than Python code (for example "$ python hello.py" or a bare workspace path).
+ * A "modified version" question is meaningless for those, so the caller drops
+ * it instead of mutating text that was never a runnable program.
+ */
+function isShellOrPathFragment(snippet: string): boolean {
+  const firstLine = snippet.split("\n", 1)[0] ?? "";
+  return /^\s*\$/.test(firstLine)
+    || /^\/[\w.-]+\//.test(firstLine)
+    || /^\s*(python|pip|source|mkdir|cd|ls|export)\s+[-\w./]/.test(firstLine);
+}
+
+/**
+ * Detect unterminated string literals or unmatched (), [], or {} in a snippet.
+ * Prepending a valid print to a snippet with unbalanced delimiters leaves the
+ * program a SyntaxError, so the "modified version" question would present a
+ * false marked answer and must be dropped instead.
+ */
+function hasUnbalancedDelimiters(code: string): boolean {
+  const stack: string[] = [];
+  let inSingle = false;
+  let inDouble = false;
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i];
+    if (ch === "\\") { i++; continue; }
+    if (ch === "'" && !inDouble) { inSingle = !inSingle; continue; }
+    if (ch === '"' && !inSingle) { inDouble = !inDouble; continue; }
+    if (inSingle || inDouble) continue;
+    if (ch === "(" || ch === "[" || ch === "{") stack.push(ch);
+    else if (ch === ")" || ch === "]" || ch === "}") stack.pop();
+  }
+  return inSingle || inDouble || stack.length > 0;
+}
+
+/**
+ * Build the "modified version" snippet for the output-prediction question.
+ * Prepends a well-formed top-level print so the modified program is always
+ * syntactically valid and always observably different (an extra first output
+ * line) — even when the original snippet ends in an error or never finishes.
+ * Returns null when the snippet cannot be safely mutated (it is a shell/path
+ * fragment or starts indented, so no mutation can produce a genuinely
+ * different, valid program), in which case the caller drops the question
+ * instead of shipping a snippet that is identical in behavior.
+ */
+function buildModifiedSnippet(codeSnippet: string): string | null {
+  const firstLine = codeSnippet.split("\n", 1)[0] ?? "";
+  if (/^\s/.test(firstLine) || isShellOrPathFragment(codeSnippet) || hasUnbalancedDelimiters(codeSnippet)) {
+    return null;
+  }
+  return `print("modified version")\n${codeSnippet}`;
 }
 
 /**
@@ -387,13 +509,17 @@ export function codeReadingQuiz(
   const q1Shuffled = deterministicShuffle(q1Choices, `${id}-cr-1`);
   const q1CorrectIndex = q1Shuffled.indexOf(rightAnswer);
 
-  // Q2: Output prediction — shuffle the 3 hardcoded scenario choices
-  const q2Raw = [
-    "It would produce the exact same output",
-    "It would produce a different output or error",
-    "The program would not run at all"
-  ];
-  const q2Shuffled = deterministicShuffle(q2Raw, `${id}-cr-2`);
+  // Q2: Output prediction against a genuinely modified snippet. When no safe
+  // mutation exists the question is dropped rather than shown against identical
+  // code, where the marked-correct choice would be false.
+  const modifiedSnippet = buildModifiedSnippet(codeSnippet);
+  const q2Shuffled = modifiedSnippet
+    ? deterministicShuffle([
+      "It would produce the exact same output",
+      "It would produce a different output or error",
+      "The program would not run at all"
+    ], `${id}-cr-2`)
+    : [];
   const q2CorrectIndex = q2Shuffled.indexOf("It would produce a different output or error");
 
   // Q3: Application — shuffle the 3 hardcoded application choices
@@ -423,53 +549,61 @@ export function codeReadingQuiz(
   const q5Shuffled = deterministicShuffle(q5Raw, `${id}-cr-5`);
   const q5CorrectIndex = q5Shuffled.indexOf("Extract a helper function for the repeated logic");
 
+  const questions: Quiz["questions"] = [
+    {
+      id: `${id}-cr-1`,
+      prompt: `Look at this code:\n\`\`\`python\n${codeSnippet}\n\`\`\`\nWhat does it produce or do?`,
+      choices: q1Shuffled,
+      correctChoiceIndex: q1CorrectIndex,
+      explanation,
+      conceptIds
+    }
+  ];
+
+  if (modifiedSnippet) {
+    questions.push({
+      id: `${id}-cr-2`,
+      prompt: `What would happen if you ran this version of the code?\n\`\`\`python\n${modifiedSnippet}\n\`\`\``,
+      choices: q2Shuffled,
+      correctChoiceIndex: q2CorrectIndex,
+      explanation: "Changing code changes behavior. Always predict the output before running.",
+      conceptIds
+    });
+  }
+
+  questions.push(
+    {
+      id: `${id}-cr-3`,
+      prompt: `In the Study Tracker project, where would you apply ${concept}?`,
+      choices: q3Shuffled,
+      correctChoiceIndex: q3CorrectIndex,
+      explanation: "This concept helps you build the Study Tracker feature that reads, validates, or reports on sessions.",
+      conceptIds
+    },
+    {
+      id: `${id}-cr-4`,
+      prompt: `What is the most likely bug someone would introduce in this code?`,
+      choices: q4Shuffled,
+      correctChoiceIndex: q4CorrectIndex,
+      explanation: "Logic errors are the most common real-world bug — the code runs but produces wrong results.",
+      conceptIds
+    },
+    {
+      id: `${id}-cr-5`,
+      prompt: `What single change would most improve this code?`,
+      choices: q5Shuffled,
+      correctChoiceIndex: q5CorrectIndex,
+      explanation: "Extracting a helper function for repeated logic follows the DRY (Don't Repeat Yourself) principle, making code more maintainable.",
+      conceptIds
+    }
+  );
+
   return {
     id,
     lessonId,
     title,
-    passingScore: 80,
-    questions: [
-      {
-        id: `${id}-cr-1`,
-        prompt: `Look at this code:\n\`\`\`python\n${codeSnippet}\n\`\`\`\nWhat does it produce or do?`,
-        choices: q1Shuffled,
-        correctChoiceIndex: q1CorrectIndex,
-        explanation,
-        conceptIds
-      },
-      {
-        id: `${id}-cr-2`,
-        prompt: `What would happen if you ran this version of the code?\n\`\`\`python\n${wrongAnswerA.includes("print") ? codeSnippet.replace(/print\([^)]+\)/, 'print("wrong")') : codeSnippet.replace(wrongAnswerA.includes("=") ? /[a-z_]+ = / : /print/, "x = 1\n    print")}\n\`\`\``,
-        choices: q2Shuffled,
-        correctChoiceIndex: q2CorrectIndex,
-        explanation: "Changing code changes behavior. Always predict the output before running.",
-        conceptIds
-      },
-      {
-        id: `${id}-cr-3`,
-        prompt: `In the Study Tracker project, where would you apply ${concept}?`,
-        choices: q3Shuffled,
-        correctChoiceIndex: q3CorrectIndex,
-        explanation: "This concept helps you build the Study Tracker feature that reads, validates, or reports on sessions.",
-        conceptIds
-      },
-      {
-        id: `${id}-cr-4`,
-        prompt: `What is the most likely bug someone would introduce in this code?`,
-        choices: q4Shuffled,
-        correctChoiceIndex: q4CorrectIndex,
-        explanation: "Logic errors are the most common real-world bug — the code runs but produces wrong results.",
-        conceptIds
-      },
-      {
-        id: `${id}-cr-5`,
-        prompt: `What single change would most improve this code?`,
-        choices: q5Shuffled,
-        correctChoiceIndex: q5CorrectIndex,
-        explanation: "Extracting a helper function for repeated logic follows the DRY (Don't Repeat Yourself) principle, making code more maintainable.",
-        conceptIds
-      }
-    ]
+    passingScore: questions.length > 0 ? Math.floor(((questions.length - 1) / questions.length) * 100) : 0,
+    questions
   };
 }
 

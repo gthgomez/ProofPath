@@ -11,7 +11,7 @@ const readTracebackLesson = proofLesson({
   slug: "python-read-traceback",
   title: "Read a Traceback",
   summary: "Learn to read Python's error report so you know where to look and what went wrong.",
-  bodyMarkdown: "Run this code. It WILL crash. READ the error message — that's the lesson. A traceback is Python's error log. It lists the call chain that led to the failure, ending with the exception name and a short message. The last two lines are almost always the most useful: they show where the error occurred and what kind of error it was.",
+  bodyMarkdown: "Run this code. It WILL crash. READ the error message — that's the lesson. A traceback is Python's error log. It lists the call chain that led to the failure, ending with the exception name and a short message. The last two lines are almost always the most useful: they show where the error occurred and what kind of error it was.\n\nThen make the failure readable: keep the buggy line, but run it inside try/except so the NameError is caught, and PRINT the error type and message to stdout — for example: NameError: name 'undefined_variable' is not defined.",
   estimatedMinutes: 4,
   difficulty: "foundation",
   skillIds: ["skill-python-basics", "skill-testing-debugging"],
@@ -25,12 +25,12 @@ const readTracebackLesson = proofLesson({
     "Have run at least one Python file that produced output.",
     "Understand how to run files in the terminal."
   ],
-  testingFocus: "Trigger an error deliberately and read the three key parts of the traceback.",
+  testingFocus: "Trigger a NameError deliberately, catch it with try/except, and print the readable error line (exception type and message) so the check confirms you captured both parts.",
   objective: "Identify the file, line number, and exception type from a Python traceback.",
   whyItMatters: "Every beginner sees tracebacks daily. The difference between a stuck learner and a productive one is knowing what to read first.",
   coreConcept: "A traceback starts with 'Traceback (most recent call last)'. Each indented File / line block shows one step in the call stack. The last line names the exception and gives a short message. Read the last line first.",
   workedExample: "NameError: name 'topic' is not defined tells you the exception is NameError and the missing name is topic. File 'study.py', line 3 tells you where to look.",
-  guidedExercise: "Run a file with a missing variable, read the traceback, and write the exception name and line number.",
+  guidedExercise: "Run the file with the missing variable, read the traceback, then wrap the buggy line in try/except NameError and print the error type and message.",
   missionConnection: "When the Study Tracker receives bad input it will raise exceptions. Reading the traceback is how you debug the parser.",
   reflectionPrompt: "Which line of the traceback tells you what kind of problem occurred, and which line tells you where?",
   practiceStarter: "# This code has a deliberate error.\n# Run it, read the traceback, and identify the exception type and line number.\nprint(undefined_variable)",
@@ -51,7 +51,7 @@ const readTracebackLesson = proofLesson({
     },
     {
       starterCode: "# Write code that deliberately triggers a TypeError by adding a string \n# and an integer without conversion. Run it and read the traceback.\n# Expected: TypeError about str and int.\n# Then write the FIXED version below the buggy one.\n\n# Buggy version:\n",
-      expectedOutput: "TypeError: unsupported operand type(s) for +: 'str' and 'int' — then write a corrected version that converts the string.",
+      expectedOutput: "TypeError: can only concatenate str (not \"int\") to str — then write a corrected version that converts the string.",
       checkYourAnswer: "Deliberately trigger a TypeError (e.g., '5' + 10). Read the traceback to confirm it says TypeError, then write the fix using int('5') + 10.",
       tier: "synthesize"
     }
@@ -65,13 +65,23 @@ const readTracebackLesson = proofLesson({
     "A sentence on the difference between NameError and syntax errors"
   ],
   verifierCommand: "python read_traceback.py",
-  expectedEvidence: "Traceback text ending in NameError plus your written annotation explaining file and line location.",
+  expectedEvidence: "A run that catches the NameError and prints the readable error line, for example NameError: name 'undefined_variable' is not defined, plus your annotation explaining why the name was undefined.",
   projectConnection: "The Study Tracker parser will raise ValueError for bad CSV rows. Reading that traceback starts the fix.",
-  requiredCodeIncludes: ["undefined_variable"],
+  requiredCodeIncludes: ["undefined_variable", "try", "except", "NameError"],
   requiredOutputIncludes: ["NameError"],
   runnerLanguage: "python",
-  runnerStarterCode: "# This code has a deliberate error.\n# Run it, read the traceback, then answer the proof prompt.\nprint(undefined_variable)",
-  runnerTestCode: "print('traceback-read passed')",
+  runnerStarterCode: "# Step 1: run this file as-is and read the traceback. It WILL crash with a NameError.\n# Step 2: keep the buggy line, but run it inside try/except NameError so the crash\n# is handled, and PRINT the error type and message to stdout, for example:\n#   NameError: name 'undefined_variable' is not defined\nprint(undefined_variable)",
+  runnerTestCode: [
+    "# The learner's output above must contain the readable NameError line, and the",
+    "# buggy name must still be undefined: handle the crash, do not define it away.",
+    "try:",
+    "    print(undefined_variable)",
+    "except NameError:",
+    "    pass",
+    "else:",
+    "    raise AssertionError('undefined_variable should still be undefined - handle the crash, do not define the name.')",
+    "print('traceback-read passed')"
+  ].join("\n"),
   hiddenTests: [],
   curriculum: {
     level: 4,
@@ -85,6 +95,15 @@ const readTracebackLesson = proofLesson({
     proofOutputs: ["terminal_stdout"]
   }
 });
+
+// This lesson deliberately asks the learner to read and print a readable
+// NameError line, so the generic "error:"/"traceback" forbidden terms would
+// block the intended, correct output. Keep the meaningful guards only.
+readTracebackLesson.workshop.miniProject.tester.forbiddenOutputIncludes = [
+  "exception",
+  "syntaxerror",
+  "failed"
+];
 
 readTracebackLesson.depth = {
   primaryConceptId: "debug.traceback",
@@ -347,7 +366,7 @@ const typeErrorLesson = proofLesson({
   testingFocus: "Run the fixed version and confirm the output is an integer.",
   objective: "Fix a TypeError by converting or correcting the mismatched operand.",
   whyItMatters: "The Study Tracker reads minutes from CSV as strings. Adding them without conversion raises TypeError. This lesson gives you the fix.",
-  coreConcept: "TypeError: unsupported operand type(s) means you tried to use an operator with incompatible types. '30' + 20 fails because you cannot add a string and an integer. int('30') converts the string first.",
+  coreConcept: "A TypeError such as: can only concatenate str (not \"int\") to str means you tried to use an operator with incompatible types. '30' + 20 fails because you cannot add a string and an integer. int('30') converts the string first.",
   workedExample: "minutes = '30' + 20 raises TypeError. Fix: minutes = int('30') + 20 produces 50.",
   guidedExercise: "Read the TypeError, find the string that should be an integer, and wrap it in int().",
   missionConnection: "Every time the Study Tracker reads a minutes value from CSV it is a string. int() converts it before arithmetic.",
@@ -432,7 +451,7 @@ typeErrorLesson.depth = {
       conceptId: "debug.typeerror",
       definition: "An exception raised when an operation is applied to an operand of the wrong type.",
       mentalModel: "Think of TypeError as a type mismatch notice: the operation expects one type but received another.",
-      syntaxShape: "TypeError: unsupported operand type(s) for +: 'str' and 'int'",
+      syntaxShape: "TypeError: can only concatenate str (not \"int\") to str",
       tinyExample: "'30' + 20",
       commonMistake: "Trying to add a string and an integer without converting one of them first.",
       repairHint: "Wrap the string in int() before the operation: int('30') + 20",

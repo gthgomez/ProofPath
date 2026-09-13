@@ -23,6 +23,7 @@ type SqlJsModule = {
   Database: new () => {
     run: (sql: string) => void;
     exec: (sql: string) => Array<{ columns: string[]; values: unknown[][] }>;
+    close: () => void;
   };
 };
 
@@ -473,19 +474,21 @@ async function getSqlJs(): Promise<SqlJsModule> {
 
 async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
   const SQL = await getSqlJs();
-  const db = new SQL.Database();
   const testResults: CodeRunTestResult[] = [];
   const stdout: string[] = [];
   const stderr: string[] = [];
 
-  if (spec.setupCode) {
-    db.run(spec.setupCode);
-  }
-
   for (const [index, test] of [...spec.visibleTests, ...spec.hiddenTests].entries()) {
     const visible = index < spec.visibleTests.length;
+    // Each check gets a fresh database seeded by setupCode so learner scripts
+    // cannot leak state (for example a CREATE TABLE) into later checks.
+    const db = new SQL.Database();
 
     try {
+      if (spec.setupCode) {
+        db.run(spec.setupCode);
+      }
+
       const result = db.exec(code);
       const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n");
       stdout.push(output);
@@ -497,6 +500,8 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
     } catch (error) {
       stderr.push(error instanceof Error ? error.message : normalizeOutput(error));
       testResults.push(failResult(test, visible, error, spec.language));
+    } finally {
+      db.close();
     }
   }
 
@@ -514,14 +519,18 @@ async function runSqlFile(spec: LessonRunnerSpec, code: string): Promise<Pick<Co
   const stderr: string[] = [];
 
   try {
-    if (spec.setupCode) {
-      db.run(spec.setupCode);
-    }
+    try {
+      if (spec.setupCode) {
+        db.run(spec.setupCode);
+      }
 
-    const result = db.exec(code);
-    stdout.push(result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n"));
-  } catch (error) {
-    stderr.push(error instanceof Error ? error.message : String(error));
+      const result = db.exec(code);
+      stdout.push(result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n"));
+    } catch (error) {
+      stderr.push(error instanceof Error ? error.message : String(error));
+    }
+  } finally {
+    db.close();
   }
 
   return {

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { roleTargets } from "@/content/roles";
 import { contentPack } from "@/content/seed";
+import { conceptRegistry } from "@/content/concepts";
 import { contentPackSchema, roleTargetSchema } from "@/domain/schemas";
+import { validateSandboxSubmission } from "@/sandbox/policy";
 import { validateContent } from "../scripts/validate-content";
 
 describe("content pack", () => {
@@ -67,7 +69,14 @@ describe("content pack", () => {
         && check.checkPrompt.length >= 50
       ))).toBe(true);
       expect(lesson.workshop.miniProject.tester.requiredOutputIncludes.length).toBeGreaterThan(0);
-      expect(lesson.workshop.miniProject.tester.forbiddenOutputIncludes).toContain("traceback");
+      const forbiddenOutputIncludes = lesson.workshop.miniProject.tester.forbiddenOutputIncludes;
+      expect(forbiddenOutputIncludes.length).toBeGreaterThan(0);
+      // The read-traceback lesson deliberately asks the learner to print a
+      // readable NameError line, so it intentionally drops the generic
+      // "error:"/"traceback" terms that would block the correct output.
+      if (lesson.id !== "lesson-python-read-traceback") {
+        expect(forbiddenOutputIncludes).toContain("traceback");
+      }
       expect(lesson.workshop.miniProject.runnerSpec.allowNetwork).toBe(false);
       expect(lesson.workshop.miniProject.runnerSpec.visibleTests.length).toBeGreaterThan(0);
       expect(lesson.workshop.miniProject.runnerSpec.timeoutMs).toBeGreaterThan(0);
@@ -180,5 +189,301 @@ describe("content pack", () => {
   it("passes all static integrity rules (Groups A-G)", () => {
     const errors = validateContent();
     expect(errors).toEqual([]);
+  });
+});
+
+describe("structural invariants", () => {
+  const registeredConceptIds = new Set(conceptRegistry.map((concept) => concept.id));
+
+  // Module-python lessons that intentionally run in a non-Python sandbox (or are
+  // concept-only simulations). Shared by the sandbox-language test and the
+  // privileged setupCode test below.
+  const documentedSimulations = new Set([
+    "lesson-python-portfolio-proof",
+    "lesson-python-sqlite-persistence",
+    "lesson-python-env-config",
+    "lesson-python-ci-workflow",
+    "lesson-python-secrets-management",
+    "lesson-python-deployment-strategies",
+    "lesson-python-monitoring-basics"
+  ]);
+
+  function collectConceptIds(collect: (push: (id: string) => void) => void): string[] {
+    const ids: string[] = [];
+    collect((id) => ids.push(id));
+    return ids;
+  }
+
+  it("resolves every referenced concept id against the registry", () => {
+    const dangling: string[] = [];
+
+    for (const lesson of contentPack.lessons) {
+      const curriculum = lesson.curriculum;
+      if (curriculum) {
+        const curriculumIds = collectConceptIds((push) => {
+          for (const id of curriculum.teaches) push(id);
+          for (const id of curriculum.requires) push(id);
+          for (const id of curriculum.reinforces ?? []) push(id);
+          for (const id of curriculum.visibleCodeConcepts ?? []) push(id);
+          for (const id of curriculum.usesButDoesNotTeach ?? []) push(id);
+          for (const id of curriculum.quizConcepts ?? []) push(id);
+        });
+        for (const id of curriculumIds) {
+          if (!registeredConceptIds.has(id)) dangling.push(`lesson ${lesson.id} references unknown concept '${id}'`);
+        }
+      }
+
+      const depth = lesson.depth;
+      if (depth) {
+        const depthIds = collectConceptIds((push) => {
+          push(depth.primaryConceptId);
+          for (const id of depth.secondaryConceptIds) push(id);
+          for (const capsule of depth.conceptCapsules) push(capsule.conceptId);
+          for (const note of depth.codeWalkthrough) for (const id of note.conceptIds) push(id);
+          for (const edit of depth.guidedEdits) for (const id of edit.conceptIds) push(id);
+          for (const clinic of depth.errorClinic) for (const id of clinic.conceptIds) push(id);
+          for (const id of depth.codeLabBridge.usesConcepts) push(id);
+        });
+        for (const id of depthIds) {
+          if (!registeredConceptIds.has(id)) dangling.push(`lesson ${lesson.id} depth references unknown concept '${id}'`);
+        }
+      }
+    }
+
+    for (const quiz of contentPack.quizzes) {
+      for (const question of quiz.questions) {
+        for (const id of question.conceptIds ?? []) {
+          if (!registeredConceptIds.has(id)) dangling.push(`quiz ${quiz.id} question ${question.id} references unknown concept '${id}'`);
+        }
+      }
+    }
+
+    expect(dangling).toEqual([]);
+
+    // Rule Group L (scripts/validate-content.ts:716) enforces conceptIds only on
+    // quizzes whose lesson carries a depth block. Depth-less quizzes -- for
+    // example the non-Python inline quizzes assembled in seed.ts -- are a
+    // documented exception, so they are intentionally left unmapped rather than
+    // inventing concept ids for them.
+    const missingConceptMappings: string[] = [];
+    const lessonById = new Map(contentPack.lessons.map((lesson) => [lesson.id, lesson]));
+    for (const quiz of contentPack.quizzes) {
+      if (!lessonById.get(quiz.lessonId)?.depth) continue;
+      for (const question of quiz.questions) {
+        if (!question.conceptIds || question.conceptIds.length === 0) {
+          missingConceptMappings.push(`quiz ${quiz.id} question ${question.id} lacks conceptIds`);
+        }
+      }
+    }
+
+    expect(missingConceptMappings).toEqual([]);
+  });
+
+  it("keeps track and module containment bidirectional", () => {
+    const moduleById = new Map(contentPack.modules.map((moduleItem) => [moduleItem.id, moduleItem]));
+    const problems: string[] = [];
+
+    for (const track of contentPack.tracks) {
+      for (const moduleId of track.moduleIds) {
+        const moduleItem = moduleById.get(moduleId);
+        if (!moduleItem) {
+          problems.push(`track ${track.id} lists missing module '${moduleId}'`);
+        } else if (moduleItem.trackId !== track.id) {
+          problems.push(`track ${track.id} lists module '${moduleId}' whose trackId is '${moduleItem.trackId}'`);
+        }
+      }
+    }
+
+    for (const moduleItem of contentPack.modules) {
+      const track = contentPack.tracks.find((candidate) => candidate.id === moduleItem.trackId);
+      if (!track) {
+        problems.push(`module ${moduleItem.id} points at missing track '${moduleItem.trackId}'`);
+      } else if (!track.moduleIds.includes(moduleItem.id)) {
+        problems.push(`module ${moduleItem.id} is missing from track ${moduleItem.trackId}.moduleIds`);
+      }
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  it("has an acyclic concept-prerequisite graph (requires -> teaches)", () => {
+    const nodes = new Set<string>();
+    const edges = new Map<string, string[]>();
+    const indegree = new Map<string, number>();
+
+    for (const lesson of contentPack.lessons) {
+      if (lesson.curriculum?.deprecated) continue;
+      for (const requiredId of lesson.curriculum?.requires ?? []) nodes.add(requiredId);
+      for (const taughtId of lesson.curriculum?.teaches ?? []) nodes.add(taughtId);
+    }
+    for (const node of nodes) {
+      edges.set(node, []);
+      indegree.set(node, 0);
+    }
+
+    for (const lesson of contentPack.lessons) {
+      if (lesson.curriculum?.deprecated) continue;
+      for (const requiredId of lesson.curriculum?.requires ?? []) {
+        for (const taughtId of lesson.curriculum?.teaches ?? []) {
+          if (requiredId === taughtId) continue;
+          edges.get(requiredId)?.push(taughtId);
+          indegree.set(taughtId, (indegree.get(taughtId) ?? 0) + 1);
+        }
+      }
+    }
+
+    let queue = [...nodes].filter((node) => (indegree.get(node) ?? 0) === 0);
+    let drained = 0;
+    while (queue.length > 0) {
+      const next: string[] = [];
+      for (const node of queue) {
+        drained++;
+        for (const neighbor of edges.get(node) ?? []) {
+          indegree.set(neighbor, (indegree.get(neighbor) ?? 0) - 1);
+          if (indegree.get(neighbor) === 0) next.push(neighbor);
+        }
+      }
+      queue = next;
+    }
+
+    const stuck = [...nodes].filter((node) => (indegree.get(node) ?? 0) > 0);
+    expect(drained).toBe(nodes.size);
+    expect(stuck).toEqual([]);
+  });
+
+  it("keeps required lesson code inside the sandbox policy", () => {
+    const violations: string[] = [];
+    let scannedLessons = 0;
+
+    for (const lesson of contentPack.lessons) {
+      if (lesson.curriculum?.deprecated) continue;
+      scannedLessons++;
+      const spec = lesson.workshop.miniProject.runnerSpec;
+      const requiredLines = lesson.workshop.miniProject.tester.requiredCodeIncludes;
+      // Practice code is run through the same sandbox as the runner spec
+      // (app/lesson/[lessonId].tsx handleRunPractice), so the policy must accept
+      // it too. Include the practice starter and every practice rep.
+      const practiceCodes = [
+        lesson.workshop.practice.starterCode,
+        ...(lesson.workshop.practiceReps ?? []).map((practiceRep) => practiceRep.starterCode)
+      ];
+      const submission = [spec.starterCode, ...requiredLines, ...practiceCodes].join("\n");
+      for (const violation of validateSandboxSubmission(spec, submission)) {
+        violations.push(`lesson ${lesson.id} [${spec.language}] violates ${violation.rule}: ${violation.message}`);
+      }
+    }
+
+    expect(scannedLessons).toBeGreaterThan(0);
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps privileged runner setupCode to vetted schema-and-seed lessons", () => {
+    // setupCode runs WITHOUT the sandbox policy checks that gate learner code
+    // (see src/content/python/level-7.ts and src/sandbox/runner.ts), so it must
+    // stay limited to lesson schema plus seed statements. Lessons allowed to
+    // carry setupCode are the documented module-python simulations above plus the
+    // SQL lessons, whose runner legitimately seeds a read-only database so the
+    // learner only writes SELECT queries.
+    const setupCodeAllowedLessonIds = new Set([
+      ...documentedSimulations,
+      "lesson-sql-joins",
+      "lesson-sql-constraints"
+    ]);
+    const dangerousSetupStatement = /\b(DROP|ATTACH|DETACH|PRAGMA|load_extension|UPDATE|DELETE)\b/i;
+    const problems: string[] = [];
+    let setupCodeLessons = 0;
+
+    for (const lesson of contentPack.lessons) {
+      const setupCode = lesson.workshop.miniProject.runnerSpec.setupCode;
+      if (!setupCode) continue;
+      setupCodeLessons++;
+      if (!setupCodeAllowedLessonIds.has(lesson.id)) {
+        problems.push(`lesson ${lesson.id} defines privileged setupCode but is not a vetted setup lesson`);
+      }
+      const dangerous = setupCode.match(dangerousSetupStatement);
+      if (dangerous) {
+        problems.push(`lesson ${lesson.id} setupCode contains non-schema/seed statement '${dangerous[0]}'`);
+      }
+    }
+
+    expect(setupCodeLessons).toBeGreaterThan(0);
+    expect(problems).toEqual([]);
+  });
+
+  it("runs module-python lessons in the python sandbox except documented simulations", () => {
+    const problems: string[] = [];
+    let allowlistedFound = 0;
+
+    for (const lesson of contentPack.lessons) {
+      if (!lesson.moduleId.startsWith("module-python-")) continue;
+      if (documentedSimulations.has(lesson.id)) {
+        allowlistedFound++;
+        continue;
+      }
+      const language = lesson.workshop.miniProject.runnerSpec.language;
+      if (language !== "python") {
+        problems.push(`lesson ${lesson.id} runs in '${language}' sandbox but is not in the documented simulation allowlist`);
+      }
+    }
+
+    expect(allowlistedFound).toBe(documentedSimulations.size);
+    expect(problems).toEqual([]);
+  });
+
+  it("keeps quiz answer positions unbiased (no quiz >=80% at one index)", () => {
+    const biased: string[] = [];
+
+    for (const quiz of contentPack.quizzes) {
+      if (quiz.questions.length < 3) continue;
+      const counts = new Map<number, number>();
+      for (const question of quiz.questions) {
+        counts.set(question.correctChoiceIndex, (counts.get(question.correctChoiceIndex) ?? 0) + 1);
+      }
+      const maxCount = Math.max(...counts.values());
+      // Mirror scripts/validate-content.ts:1192, which warns when a single answer
+      // position holds >= 80% of a quiz's questions. Staying at least as strict as
+      // the validator keeps this invariant honest instead of trailing it.
+      if (maxCount / quiz.questions.length >= 0.8) {
+        biased.push(`${quiz.id}: ${maxCount}/${quiz.questions.length} questions share one correctChoiceIndex`);
+      }
+    }
+
+    expect(biased).toEqual([]);
+  });
+
+  it("gives every quiz at least three questions and a passingScore that tolerates one miss", () => {
+    const problems: string[] = [];
+
+    for (const quiz of contentPack.quizzes) {
+      const questionCount = quiz.questions.length;
+      if (questionCount < 3) {
+        problems.push(`quiz ${quiz.id} has only ${questionCount} questions`);
+      }
+      if (quiz.passingScore > 100) {
+        problems.push(`quiz ${quiz.id} passingScore ${quiz.passingScore} exceeds 100`);
+      }
+      if (questionCount === 0) continue;
+
+      // Replay the real grading in src/domain/progress.ts submitQuizAttempt:
+      // score = Math.round((correct / questionCount) * 100), passed = score >= passingScore.
+      // Find the smallest number of correct answers that actually passes.
+      let requiredCorrect = -1;
+      for (let correct = 0; correct <= questionCount; correct++) {
+        if (Math.round((correct / questionCount) * 100) >= quiz.passingScore) {
+          requiredCorrect = correct;
+          break;
+        }
+      }
+
+      if (requiredCorrect < 1) {
+        problems.push(`quiz ${quiz.id} can be passed with 0 correct answers (passingScore ${quiz.passingScore})`);
+      } else if (requiredCorrect > questionCount - 1) {
+        problems.push(
+          `quiz ${quiz.id} passingScore ${quiz.passingScore} needs a perfect ${requiredCorrect}/${questionCount}; a learner cannot miss even one question`
+        );
+      }
+    }
+
+    expect(problems).toEqual([]);
   });
 });

@@ -3,26 +3,26 @@ import { proofLesson, checkpointQuiz, codeReadingQuiz } from "./shared";
 
 const pythonListPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "topics = ['python', 'git', 'sql']\nsecond = ''\nprint(second)",
-    expectedOutput: "git\nIndex 1 is the second item because lists start at 0.",
+    starterCode: "topics = ['python', 'git', 'sql']\nsecond = ''\nprint(\"Second topic is below\")\nprint(second)",
+    expectedOutput: "Second topic is below\ngit",
     checkYourAnswer: "List positions start at 0. Index 0 is 'python', index 1 is 'git'. Make sure you access index 1, not index 2.",
     tier: "replicate"
   },
   {
-    starterCode: "mixed = [30, 15, 45]\nfirst = ''\nprint(first)",
-    expectedOutput: "30 is at index 0 in the list.",
+    starterCode: "mixed = [30, 15, 45]\nfirst = ''\nprint(\"First item is below\")\nprint(first)",
+    expectedOutput: "First item is below\n30",
     checkYourAnswer: "The first item in the list is at position 0. Access mixed[0] to get 30.",
     tier: "replicate"
   },
   {
-    starterCode: "items = [10, 20, 30]\n# Bug: the code tries to read an item beyond the list.\ntotal = items[3]\nprint(total)",
-    expectedOutput: "List index fix: access valid positions 0, 1, or 2 only.",
-    checkYourAnswer: "A list with 3 items has valid indices 0, 1, and 2. Index 3 is out of range. Fix by accessing an existing position.",
+    starterCode: "items = [10, 20, 30]\n# Bug: the code tries to read an item beyond the list.\nprint(\"Item read from list\")\ntotal = items[3]\nprint(total)",
+    expectedOutput: "Item read from list\n10",
+    checkYourAnswer: "A list with 3 items has valid indices 0, 1, and 2. Index 3 is out of range. Fix by reading the first item: total = items[0], which prints 10.",
     tier: "diagnose"
   },
   {
-    starterCode: "# Create a list called minutes_list that holds three numbers: 30, 15, and 45.\n# Then use the list to build a total.\nminutes_list = []\ntotal = 0\nprint(total)",
-    expectedOutput: "90 total minutes created from list items",
+    starterCode: "# Create a list called minutes_list that holds three numbers: 30, 15, and 45.\n# Then build the total by adding the items.\n# Print the label \"Total minutes from list:\" first, then print the total.\nminutes_list = []\ntotal = 0\nprint(\"Total minutes from list:\")\nprint(total)",
+    expectedOutput: "Total minutes from list:\n90",
     checkYourAnswer: "Create the list with three numbers, then add them up by index. Each number stays inside the list brackets separated by commas.",
     tier: "synthesize"
   }
@@ -78,31 +78,31 @@ const pythonRecordListPracticeReps: LessonPracticeBlock[] = [
 
 const pythonDecisionPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "minutes = 10\nlabel = \"\"\n# Use if/else so short sessions become quick.\nprint(label)",
+    starterCode: "minutes = 10\nlabel = \"\"\n# Use if/else so short sessions become quick.\n# Then print the result as: <label> session planned\nprint(label)",
     expectedOutput: "quick session planned",
     checkYourAnswer: "This is the branch the main example does not take. If it still prints focus, reread the comparison as a true-or-false question.",
     tier: "replicate"
   },
   {
-    starterCode: "completed = False\nmessage = \"\"\n# If completed is true, message is done. Otherwise message is keep going.\nprint(message)",
+    starterCode: "completed = False\nmessage = \"\"\n# If completed is true, message is done. Otherwise message is \"keep going until complete\".\nprint(message)",
     expectedOutput: "keep going until complete",
     checkYourAnswer: "Do not compare completed to the text \"False\". A boolean can be used directly in an if statement.",
     tier: "replicate"
   },
   {
-    starterCode: "errors = 0\nstatus = \"\"\n# If there are no errors, status is clean. Otherwise status is needs review.\nprint(status)",
+    starterCode: "errors = 0\nstatus = \"\"\n# If there are no errors, status is \"clean: no errors found\". Otherwise status is needs review.\nprint(status)",
     expectedOutput: "clean: no errors found",
     checkYourAnswer: "This rep practices equality. Ask whether errors == 0 is true for the starter value before you choose the branch.",
     tier: "replicate"
   },
   {
-    starterCode: "completed = True\n# Bug: the condition below compares a boolean to a string.\nif completed == \"True\":\n    message = \"done\"\nelse:\n    message = \"keep going\"\nprint(message)",
+    starterCode: "completed = True\n# Bug: the condition below compares a boolean to a string.\nif completed == \"True\":\n    message = \"done: session marked complete\"\nelse:\n    message = \"keep going\"\nprint(message)",
     expectedOutput: "done: session marked complete",
     checkYourAnswer: "The bug is comparing completed (a boolean) to the string \"True\". Remove the == comparison and use the boolean directly: if completed:",
     tier: "diagnose"
   },
   {
-    starterCode: "total_minutes = 45\n# From scratch: if total_minutes is more than 0, set report to \"study time logged\".\n# Otherwise, set report to \"no study time yet\". Print the report.\nreport = \"\"\nprint(report)",
+    starterCode: "total_minutes = 45\n# From scratch: if total_minutes is more than 0, set report to \"study time logged\".\n# Otherwise, set report to \"no study time yet\".\n# Then print the result as: <report> report\nreport = \"\"\nprint(report)",
     expectedOutput: "study time logged report",
     checkYourAnswer: "You need the full if/else structure. The condition checks whether total_minutes > 0. If the output is blank, your if/else never assigned report to either branch.",
     tier: "synthesize"
@@ -111,8 +111,8 @@ const pythonDecisionPracticeReps: LessonPracticeBlock[] = [
 
 const pythonLoopPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"sql\", \"minutes\": 20}]\ncount = 0\n# Count each session with a loop.\nprint(count)",
-    expectedOutput: "3 sessions counted\nCount one session during each loop pass.",
+    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"sql\", \"minutes\": 20}]\ncount = 0\n# Count each session with a loop.\nprint(\"Session count is below\")\nprint(count)",
+    expectedOutput: "Session count is below\n3",
     checkYourAnswer: "The count should change once per record. If it stays zero, the loop body never updated the running count.",
     tier: "replicate"
   },
@@ -123,14 +123,14 @@ const pythonLoopPracticeReps: LessonPracticeBlock[] = [
     tier: "replicate"
   },
   {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"python\", \"minutes\": 25}]\npython_minutes = 0\n# Add minutes only when topic is python.\nprint(python_minutes)",
-    expectedOutput: "55 python minutes\nOnly python records are included in this total.",
+    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"python\", \"minutes\": 25}]\npython_minutes = 0\n# Add minutes only when topic is python.\nprint(\"Python minutes are below\")\nprint(python_minutes)",
+    expectedOutput: "Python minutes are below\n55",
     checkYourAnswer: "This combines a loop with a decision. The total should skip git and include both python records.",
     tier: "synthesize"
   },
   {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}]\ntotal = 0\n# Bug: this loop resets the total on each pass.\nfor session in sessions:\n    total = 0\n    total = total + session[\"minutes\"]\nprint(total)",
-    expectedOutput: "45 total minutes accumulated",
+    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}]\ntotal = 0\n# Bug: this loop resets the total on each pass.\nfor session in sessions:\n    total = 0\n    total = total + session[\"minutes\"]\nprint(\"Total minutes accumulated:\")\nprint(total)",
+    expectedOutput: "Total minutes accumulated:\n45",
     checkYourAnswer: "The total always ends up as 15 because total = 0 inside the loop resets it on each pass. Move total = 0 before the loop so it accumulates correctly.",
     tier: "diagnose"
   }
@@ -138,14 +138,14 @@ const pythonLoopPracticeReps: LessonPracticeBlock[] = [
 
 const pythonFoundationCapstonePracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}]\ntotal_minutes = 0\n# Add each session's minutes with a loop.\nprint(total_minutes)",
-    expectedOutput: "45 total minutes counted",
+    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}]\ntotal_minutes = 0\n# Add each session's minutes with a loop.\nprint(\"Total minutes counted:\")\nprint(total_minutes)",
+    expectedOutput: "Total minutes counted:\n45",
     checkYourAnswer: "This rep isolates the total before the full capstone. If the answer is 0, the loop did not update total_minutes. If it is only 15 or 30, only one record was counted.",
     tier: "replicate"
   },
   {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"sql\", \"minutes\": 45}]\nfocus_count = 0\n# Count sessions where minutes is 30 or more.\nprint(focus_count)",
-    expectedOutput: "2 focus sessions counted",
+    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"sql\", \"minutes\": 45}]\nfocus_count = 0\n# Count sessions where minutes is 30 or more.\nprint(\"Focus sessions counted:\")\nprint(focus_count)",
+    expectedOutput: "Focus sessions counted:\n2",
     checkYourAnswer: "This rep checks the decision inside the loop. A 30-minute session counts because the condition is greater than or equal to 30.",
     tier: "replicate"
   },
@@ -156,9 +156,9 @@ const pythonFoundationCapstonePracticeReps: LessonPracticeBlock[] = [
     tier: "replicate"
   },
   {
-    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"python\", \"minutes\": 25}]\ntotal_minutes = 0\nfocus_count = 0\n# Bug: the output shows 70 minutes but focus_count stays 0. Fix the missing logic.\nfor session in sessions:\n    total_minutes = total_minutes + session[\"minutes\"]\nprint(total_minutes)\nprint(focus_count)",
-    expectedOutput: "70 minutes, 2 focus sessions counted",
-    checkYourAnswer: "The focus_count is never incremented because no if decision exists inside the loop. Add if session['minutes'] >= 30: focus_count = focus_count + 1 in the loop body.",
+    starterCode: "sessions = [{\"topic\": \"python\", \"minutes\": 30}, {\"topic\": \"git\", \"minutes\": 15}, {\"topic\": \"python\", \"minutes\": 25}]\ntotal_minutes = 0\nfocus_count = 0\n# Bug: the output shows 70 minutes but focus_count stays 0. Fix the missing logic.\nfor session in sessions:\n    total_minutes = total_minutes + session[\"minutes\"]\nprint(\"Minutes and focus count:\")\nprint(total_minutes)\nprint(focus_count)",
+    expectedOutput: "Minutes and focus count:\n70\n1",
+    checkYourAnswer: "The focus_count is never incremented because no if decision exists inside the loop. Add if session['minutes'] >= 30: focus_count = focus_count + 1 in the loop body, so the count prints 1.",
     tier: "diagnose"
   },
   {
@@ -532,8 +532,8 @@ export const level2Lessons: Lesson[] = [
     missionConnection: "This prepares the grouping function in the next lesson, where loops become reusable logic.",
     reflectionPrompt: "What value changes on each loop pass, and what would the total be if you added a third 20-minute session?",
     practiceStarter: "sessions = [\n    {\"topic\": \"python\", \"minutes\": 30},\n    {\"topic\": \"git\", \"minutes\": 15},\n]\ntotal_minutes = 0\n\n# Use a for loop to add each session's minutes.\nprint(total_minutes)",
-    practiceExpected: "total minutes: 45\n\nVerifier then prints: passed",
-    practiceCheck: "Your own output should show the total is 45. If it is 15 or 30, your loop is only counting one record. If it is 0, the addition never happened. The final passed line comes from the check.",
+    practiceExpected: "total minutes: 45",
+    practiceCheck: "Your own output should show the total is 45. If it is 15 or 30, your loop is only counting one record. If it is 0, the addition never happened.",
     practiceReps: pythonLoopPracticeReps,
     miniTitle: "Total study minutes",
     miniGoal: "Create the first automation slice by looping over study sessions and calculating total minutes.",
@@ -633,7 +633,7 @@ export const level2Lessons: Lesson[] = [
         level: 2,
         sequence: 7,
         version: "1.0.0",
-        teaches: ["py.string"],
+        teaches: [],
         requires: ["py.variable.assignment"],
         usesButDoesNotTeach: ["py.assertion"],
         reinforces: ["py.string"]
@@ -731,12 +731,12 @@ export const level2Lessons: Lesson[] = [
     whyItMatters: "Without the module guard, importing a file runs all its code — including test prints and CLI prompts. The guard keeps reusable functions importable while still letting the file run as a script.",
     coreConcept: "Every Python file has a built-in __name__ variable. When you run the file directly, Python sets __name__ to '__main__'. When another file imports it, __name__ is the module's name. The guard `if __name__ == '__main__':` checks which case this is, so code inside only runs during direct execution.",
     workedExample: "def total_minutes(sessions): total = 0; for s in sessions: total += s['minutes']; return total then a guard block below creates test data, calls total_minutes, and prints the result. Importing the file gives you the function. Running it directly prints the summary.",
-    guidedExercise: "Add the module guard to a short script so the calculation code only runs when the file is executed directly.",
+    guidedExercise: "Add the module guard to a short script so the calculation code only runs when the file is executed directly. Because this sandbox runs the file the way an import would, __name__ is not '__main__' here: the guard's job is to keep the module silent on import while total_minutes stays importable.",
     missionConnection: "The CLI Study Tracker will need this pattern to separate reusable data functions from the interactive menu script.",
     reflectionPrompt: "What would happen if you imported a helper module that printed test output at the bottom? How does the guard prevent that confusion?",
     practiceStarter: "def total_minutes(sessions):\n    total = 0\n    for s in sessions:\n        total = total + s['minutes']\n    return total\n\n# Add the module guard. Inside it:\n#   sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\n#   result = total_minutes(sessions)\n#   print(f'{result} total minutes')\n",
     practiceExpected: "45 total minutes",
-    practiceCheck: "If the guard is missing or misspelled, the output might still be blank or might fire during import. Check that __name__ has double underscores on both sides and the comparison is to '__main__'.",
+    practiceCheck: "This sandbox executes the file the way an import would, so __name__ is not '__main__' and the guarded block will not print in your output — that is expected. The guard's job is to keep the module silent on import while total_minutes stays importable. If you leave the test data at module level, it runs on import. Check that __name__ has double underscores on both sides and the comparison is to '__main__'.",
     practiceReps: pythonModuleGuardPracticeReps,
     miniTitle: "Guard the Study Tracker logic",
     miniGoal: "Add an if __name__ guard to a module so the test code stays silent during import.",
@@ -746,15 +746,35 @@ export const level2Lessons: Lesson[] = [
     expectedEvidence: "Terminal output showing the summary plus a note that importing this file does not print the summary.",
     projectConnection: "This pattern is essential for the CLI Study Tracker to separate reusable logic (importable) from the interactive menu (direct-run only).",
     requiredCodeIncludes: ["__name__", "__main__", "if", "sessions"],
-    requiredOutputIncludes: ["minutes"],
+    requiredOutputIncludes: ["passed"],
     runnerLanguage: "python",
-    runnerStarterCode: "def total_minutes(sessions):\n    total = 0\n    for s in sessions:\n        total = total + s['minutes']\n    return total\n\n# Add the module guard. Inside:\n#   sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\n#   result = total_minutes(sessions)\n#   print(f'{result} total minutes')\n",
+    runnerStarterCode: "def total_minutes(sessions):\n    total = 0\n    for s in sessions:\n        total = total + s['minutes']\n    return total\n\nsessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\nresult = total_minutes(sessions)\nprint(f'{result} total minutes')\n\n# TODO: wrap the three lines above in if __name__ == '__main__':\n# (indent them under the guard) so importing this file stays silent.\n# This sandbox runs the file the way an import would, so __name__ is not\n# '__main__' here and the guarded print will not appear in your output. That\n# is expected: the check confirms total_minutes stays importable while the\n# module stays silent on import.\n",
     runnerTestCode: "assert callable(total_minutes), 'total_minutes must be a function defined at module level'\ntest_sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\nassert total_minutes(test_sessions) == 45, 'total_minutes should return 45 for the test data'\nprint('module guard passed')",
     hiddenTests: [
       {
         id: "module-guard-function-sums-correctly",
         name: "total_minutes sums correctly with varied data",
         code: "assert total_minutes([{'topic': 'x', 'minutes': 10}, {'topic': 'y', 'minutes': 20}]) == 30, 'total_minutes should sum two records'\nassert total_minutes([]) == 0, 'total_minutes should handle empty list'"
+      },
+      {
+        id: "module-guard-silent-on-import",
+        name: "Guarded code stays silent when the file is imported",
+        code: [
+          "import io",
+          "import contextlib",
+          "# The sandbox execs this file the way an import would: top-level code fires",
+          "# and prints, guarded code stays silent. After an import-style run the",
+          "# guarded section must have left nothing behind at module level.",
+          "assert callable(total_minutes), 'total_minutes must stay defined at module level'",
+          "assert 'sessions' not in globals(), 'sessions still ran on import - indent the test data inside if __name__ == \"__main__\":'",
+          "assert 'result' not in globals(), 'result still ran on import - indent it inside the guard'",
+          "buffer = io.StringIO()",
+          "with contextlib.redirect_stdout(buffer):",
+          "    total_minutes([{'topic': 'probe', 'minutes': 1}])",
+          "assert buffer.getvalue() == '', 'total_minutes must not print - only the guarded section prints'",
+          "print('module guard silence passed')"
+        ].join("\n"),
+        expectedOutputIncludes: ["module guard silence passed"]
       }
     ]
   })
@@ -800,7 +820,7 @@ level2Lessons[0].depth = {
       id: "g-list-1",
       instruction: "Add a fourth topic 'sql' to the topics list and print index 3.",
       conceptIds: ["py.list.literal"],
-      targetCodeFragment: 'topics = ["python", "git"]',
+      targetCodeFragment: 'topics = ["python", "git", "html"]',
       expectedObservation: "The output shows 'sql' when accessing index 3.",
       wrongTurnHint: "Add 'sql' inside the list brackets separated by a comma."
     }

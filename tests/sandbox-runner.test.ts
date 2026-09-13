@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createRequire } from "node:module";
 import { contentPack } from "@/content/seed";
+import type { LessonRunnerSpec } from "@/domain/types";
 import { runNativePythonProof } from "@/sandbox/native-python-proof-runner";
 import { preloadSandbox, runLessonSandbox } from "@/sandbox/runner";
 
@@ -129,5 +131,75 @@ describe("lesson sandbox runner", () => {
       expect(result.passed).toBe(false);
       expect(result.stderr).toContain("Unsupported Python feature in the native offline verifier");
     }).not.toThrow();
+  });
+
+  describe("SQL sandbox per-check isolation", () => {
+    beforeAll(() => {
+      const require = createRequire(import.meta.url);
+      const wasmPath = require.resolve("sql.js/dist/sql-wasm.wasm");
+      globalThis.__careerforgeImportRuntimeModuleForTests = async (specifier: string) => {
+        const loaded = await import(specifier);
+        if (specifier !== "sql.js") {
+          return loaded;
+        }
+
+        // In the Node test environment the runner's hardcoded browser asset URL
+        // (/sandbox-assets/sql.js/...) does not exist. Redirect sql.js to the
+        // wasm file shipped in node_modules so the runner exercises real SQL.
+        const initSqlJs = (loaded as { default: (config?: { locateFile?: (file: string) => string }) => Promise<unknown> }).default;
+        return {
+          ...loaded,
+          default: (config?: { locateFile?: (file: string) => string }) => initSqlJs({ ...config, locateFile: () => wasmPath })
+        };
+      };
+    });
+
+    afterAll(() => {
+      globalThis.__careerforgeImportRuntimeModuleForTests = undefined;
+    });
+
+    it("re-seeds a fresh database for every check so non-idempotent SQL does not leak state", async () => {
+      const spec: LessonRunnerSpec = {
+        language: "sql",
+        instructions: "Summarize study minutes per topic.",
+        starterCode: "SELECT topic, SUM(minutes) AS total FROM sessions GROUP BY topic;",
+        setupCode: [
+          "CREATE TABLE sessions (topic TEXT, minutes INTEGER);",
+          "INSERT INTO sessions VALUES ('python', 30), ('python', 15), ('sql', 20);"
+        ].join("\n"),
+        visibleTests: [
+          {
+            id: "visible-topic-totals",
+            name: "Returns totals per topic",
+            code: "EXPECT_ROWS",
+            expectedOutputIncludes: ["python | 45", "sql | 20"]
+          }
+        ],
+        hiddenTests: [
+          {
+            id: "hidden-topic-totals",
+            name: "Returns the same totals on a second check",
+            code: "EXPECT_ROWS",
+            expectedOutputIncludes: ["python | 45", "sql | 20"]
+          }
+        ],
+        expectedOutput: ["python | 45", "sql | 20"],
+        timeoutMs: 30000,
+        allowNetwork: false
+      };
+
+      // `CREATE TABLE tmp` is policy-legal but non-idempotent: without a fresh
+      // database per check, the second check fails with "table tmp already exists".
+      const code = [
+        "CREATE TABLE tmp (id INTEGER);",
+        "SELECT topic, SUM(minutes) FROM sessions GROUP BY topic;"
+      ].join("\n");
+
+      const result = await runLessonSandbox(spec, "lesson-sql-isolation", code, "2026-05-07T20:38:00.000Z");
+
+      expect(result.passed).toBe(true);
+      expect(result.testResults.length).toBeGreaterThan(0);
+      expect(result.testResults.every((testResult) => testResult.passed)).toBe(true);
+    });
   });
 });

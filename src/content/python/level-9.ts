@@ -162,7 +162,7 @@ const envConfigLesson = proofLesson({
   requiredCodeIncludes: ["os.environ.get", "API_KEY", "DB_PATH"],
   requiredOutputIncludes: ["config", "api", "passed"],
   runnerLanguage: "javascript",
-  runnerStarterCode: "const config = {\n  dotenv: true,\n  loadFromEnv: function(vars) {\n    // Concept: os.environ.get() reads a value with optional default.\n    return vars.reduce((cfg, {key, fallback}) => {\n      cfg[key] = process.env[key] || fallback || null;\n      return cfg;\n    }, {});\n  },\n  maskSecrets: function(cfg, secretKeys) {\n    const masked = {...cfg};\n    secretKeys.forEach(k => { if (masked[k]) masked[k] = '***'; });\n    return masked;\n  }\n};\n\nconst loaded = config.loadFromEnv([\n  {key: 'API_KEY'},\n  {key: 'DB_PATH', fallback: 'tracker.db'}\n]);\nconsole.log('config loaded');",
+  runnerStarterCode: "const config = {\n  dotenv: true,\n  // Simulated environment: real Python reads os.environ and browser or Node\n  // runtimes read their own env APIs, but this sandbox has no OS environment,\n  // so we simulate one with a plain object. Never paste a real API key into\n  // lesson code — use a non-secret placeholder like 'REPLACE_ME'.\n  simulatedEnv: { API_KEY: 'REPLACE_ME' },\n  loadFromEnv: function(vars) {\n    // Concept: os.environ.get() reads a value with optional default.\n    return vars.reduce((cfg, {key, fallback}) => {\n      cfg[key] = this.simulatedEnv[key] || fallback || null;\n      return cfg;\n    }, {});\n  },\n  maskSecrets: function(cfg, secretKeys) {\n    const masked = {...cfg};\n    secretKeys.forEach(k => { if (masked[k]) masked[k] = '***'; });\n    return masked;\n  }\n};\n\nconst loaded = config.loadFromEnv([\n  {key: 'API_KEY'},\n  {key: 'DB_PATH', fallback: 'tracker.db'}\n]);\nconsole.log('config loaded');",
   runnerTestCode: "const cfg = config.loadFromEnv([\n  {key: 'API_KEY', fallback: ''},\n  {key: 'DB_PATH', fallback: 'tracker.db'}\n]);\nif (typeof cfg.API_KEY !== 'string') throw new Error('API_KEY should be a string');\nif (cfg.DB_PATH !== 'tracker.db') throw new Error('DB_PATH should default to tracker.db');\nconst masked = config.maskSecrets(cfg, ['API_KEY']);\nif (masked.API_KEY !== '***') throw new Error('secret keys should be masked');\nconsole.log('config api passed');",
   hiddenTests: [
     {
@@ -467,8 +467,8 @@ const secretsManagementLesson = proofLesson({
   requiredCodeIncludes: ["Secrets", "from_env", "db_password", "api_key"],
   requiredOutputIncludes: ["secrets", "loaded", "passed"],
   runnerLanguage: "javascript",
-  runnerStarterCode: "class Secrets {\n  constructor(env) {\n    this.dbPassword = env.DB_PASSWORD || null;\n    this.apiKey = env.API_KEY || null;\n  }\n  \n  static fromEnv(env) {\n    const s = new Secrets(env);\n    if (!s.dbPassword) throw new Error('DB_PASSWORD is required');\n    if (!s.apiKey) throw new Error('API_KEY is required');\n    return s;\n  }\n  \n  mask() {\n    return {\n      dbPassword: this.dbPassword ? '***' : null,\n      apiKey: this.apiKey ? '***' : null\n    };\n  }\n}\n\nconst env = { DB_PASSWORD: 'supersecret', API_KEY: 'sk-abc123' };\nconst s = Secrets.fromEnv(env);\nconsole.log('secrets loaded');",
-  runnerTestCode: "const env = { DB_PASSWORD: 'supersecret', API_KEY: 'sk-abc123' };\nconst s = Secrets.fromEnv(env);\nif (!(s instanceof Secrets)) throw new Error('should return Secrets instance');\nconst masked = s.mask();\nif (masked.dbPassword !== '***') throw new Error('db password should be masked');\nif (masked.apiKey !== '***') throw new Error('api key should be masked');\ntry {\n  Secrets.fromEnv({});\n  throw new Error('should throw for missing secrets');\n} catch (e) {\n  if (!e.message.includes('required')) throw new Error('error should mention required');\n}\nconsole.log('secrets management passed');",
+  runnerStarterCode: "class Secrets {\n  constructor(env) {\n    this.dbPassword = env.DB_PASSWORD || null;\n    this.apiKey = env.API_KEY || null;\n  }\n  \n  static fromEnv(env) {\n    const s = new Secrets(env);\n    if (!s.dbPassword) throw new Error('DB_PASSWORD is required');\n    if (!s.apiKey) throw new Error('API_KEY is required');\n    return s;\n  }\n  \n  mask() {\n    return {\n      dbPassword: this.dbPassword ? '***' : null,\n      apiKey: this.apiKey ? '***' : null\n    };\n  }\n}\n\nconst env = { DB_PASSWORD: 'supersecret', API_KEY: 'test-key-not-real' };\nconst s = Secrets.fromEnv(env);\nconsole.log('secrets loaded');",
+  runnerTestCode: "const env = { DB_PASSWORD: 'supersecret', API_KEY: 'test-key-not-real' };\nconst s = Secrets.fromEnv(env);\nif (!(s instanceof Secrets)) throw new Error('should return Secrets instance');\nconst masked = s.mask();\nif (masked.dbPassword !== '***') throw new Error('db password should be masked');\nif (masked.apiKey !== '***') throw new Error('api key should be masked');\ntry {\n  Secrets.fromEnv({});\n  throw new Error('should throw for missing secrets');\n} catch (e) {\n  if (!e.message.includes('required')) throw new Error('error should mention required');\n}\nconsole.log('secrets management passed');",
   hiddenTests: [
     {
       id: "secrets-rejects-missing-key",
@@ -527,19 +527,19 @@ secretsManagementLesson.depth = {
   guidedEdits: [
     {
       id: "g-sec-1",
-      instruction: "Rename db_password to db_password and add an api_key field to the Secrets dataclass.",
+      instruction: "Add an api_key: str field to the Secrets dataclass alongside db_password.",
       conceptIds: ["py.secrets.env"],
-      targetCodeFragment: "class Secrets:",
-      expectedObservation: "The Secrets dataclass now holds both db_password and api_key fields.",
-      wrongTurnHint: "Use @dataclass decorator and add the new field with a type annotation: api_key: str."
+      targetCodeFragment: "@dataclass\nclass Secrets:\n    db_password: str\n    api_key: str",
+      expectedObservation: "The Secrets dataclass holds both db_password and api_key fields.",
+      wrongTurnHint: "Keep the @dataclass decorator and add the new field with a type annotation: api_key: str (no default, because required secrets must not have fallbacks)."
     },
     {
       id: "g-sec-2",
-      instruction: "Add a from_env classmethod that reads DB_PASSWORD and API_KEY from the environment.",
+      instruction: "Extend from_env to read API_KEY as well as DB_PASSWORD.",
       conceptIds: ["py.secrets.env"],
-      targetCodeFragment: "@dataclass\nclass Secrets:\n    db_password: str\n    api_key: str",
-      expectedObservation: "Secrets.from_env() reads both values from environment variables and returns a Secrets instance.",
-      wrongTurnHint: "Use os.environ['KEY'] for required secrets. Add a @classmethod that returns cls(db_password=os.environ['DB_PASSWORD'], api_key=os.environ['API_KEY'])."
+      targetCodeFragment: "return cls(\n            db_password=os.environ['DB_PASSWORD'],\n            api_key=os.environ['API_KEY']\n        )",
+      expectedObservation: "Secrets.from_env() reads DB_PASSWORD and API_KEY from the environment and returns a Secrets instance.",
+      wrongTurnHint: "Use os.environ['KEY'] for required secrets. Have from_env return cls(db_password=os.environ['DB_PASSWORD'], api_key=os.environ['API_KEY'])."
     }
   ],
   errorClinic: [

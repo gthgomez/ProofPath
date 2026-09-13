@@ -78,7 +78,10 @@ describe("lesson depth schemas", () => {
 
   it("can run validation on contentPack", () => {
     const errors = validateContent();
-    // Initially, there are no lessons with depth, so errors should be empty.
+    // Pin the depth floor: exactly 74 of 104 lessons carry depth blocks today
+    // (verified 2026-09-13). The floor must not regress as content changes;
+    // lowering it should require an explicit review decision.
+    expect(contentPack.lessons.filter((lesson) => lesson.depth).length).toBeGreaterThanOrEqual(74);
     expect(errors).toEqual([]);
   });
 });
