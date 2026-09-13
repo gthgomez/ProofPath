@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate content integrity
+        run: npm run validate:content
+
+      - name: Content audit report
+        run: npm run report:content
+
+      - name: Sandbox redaction scan
+        run: npm run scan:redaction
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Unit / integration tests
+        run: npm test
+
+      - name: Web export (build smoke)
+        run: npx expo export --platform web
