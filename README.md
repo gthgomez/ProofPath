@@ -135,3 +135,12 @@ ProofPath represents a serious engineering project rather than a simple content 
 2. **Defensive Sandbox Pipeline:** Code execution is structured defensively with AST-like checking and regex validation to provide direct compiler diagnostics back to mobile learners.
 3. **Robust Local-First Persistence:** Implements a serialization queue using React refs to coordinate SQLite writes on low-spec mobile storage arrays.
 4. **Pedagogical Stepper:** Integrates a state-machine driven wizard layout that tracks learner interaction across five stages without compromising state integrity.
+---
+
+## 10. License
+
+ProofPath is **proprietary**. This repository is public for viewing and
+development transparency, but public visibility does not grant permission to
+copy, modify, redistribute, sublicense, sell, commercially exploit, or create
+derivative works from the project's original source, design, content, or
+branding. See [LICENSE](LICENSE).
