@@ -383,7 +383,7 @@ const typeErrorLesson = proofLesson({
       tier: "diagnose"
     },
     {
-      starterCode: "# Run this working type-safe version and observe the correct output.\nminutes_str = \"30\"\ntotal = int(minutes_str) + 20\nprint(f\"total minutes: {total}\")",
+      starterCode: "# Run this working type-safe version and observe the correct output.\nminutes_str = \"30\"\ntotal = int(minutes_str) + 20\nprint(f\"The correct total is: {total} minutes\")",
       expectedOutput: "The correct total is: 50 minutes",
       checkYourAnswer: "int() converts the string to an integer before addition, so the calculation produces the correct numeric result without TypeError.",
       tier: "replicate"
@@ -457,7 +457,7 @@ typeErrorLesson.depth = {
     {
       id: "w-te-1",
       label: "Read the TypeError",
-      codeFragment: "TypeError: can only concatenate str (not 'int') to str",
+      codeFragment: "TypeError: can only concatenate str (not \"int\") to str",
       conceptIds: ["debug.typeerror"],
       explanation: "Python cannot add a string and an integer. The types are incompatible for +.",
       learnerShouldBeAbleToSay: "The types are mismatched — one needs to be converted"
@@ -486,7 +486,7 @@ typeErrorLesson.depth = {
       id: "e-te-1",
       conceptIds: ["debug.typeerror"],
       brokenExample: 'total = "30" + 20',
-      symptom: "TypeError: can only concatenate str (not 'int') to str",
+      symptom: "TypeError: can only concatenate str (not \"int\") to str",
       likelyCause: "The string '30' and the integer 20 cannot be added.",
       fixStrategy: "Convert the string: int('30') + 20"
     }
@@ -548,8 +548,8 @@ const valueErrorLesson = proofLesson({
       tier: "replicate"
     },
     {
-      starterCode: "# Bug: this function catches the wrong exception type.\ndef safe_parse(raw):\n    try:\n        return int(raw)\n    except TypeError:\n        return f\"invalid: {raw}\"\n\nprint(safe_parse(\"45\"))\nprint(safe_parse(\"oops\"))",
-      expectedOutput: "Parsed 45 as integer\nInvalid input: oops was rejected",
+      starterCode: "# Bug: this function catches the wrong exception type.\ndef safe_parse(raw):\n    try:\n        return int(raw)\n    except TypeError:\n        return f\"invalid: {raw}\"\n\nprint(f\"Parsed: {safe_parse('45')}\")\nprint(f\"Rejected: {safe_parse('oops')}\")",
+      expectedOutput: "Parsed: 45\nRejected: invalid: oops",
       checkYourAnswer: "int('oops') raises ValueError, not TypeError. The except TypeError clause does not catch it. Change it to except ValueError so the handler fires.",
       tier: "diagnose"
     },
@@ -737,8 +737,8 @@ const tryExceptLesson = proofLesson({
       tier: "diagnose"
     },
     {
-      starterCode: "# Write a robust parse_minutes function with try/except ValueError.\n# Valid input: return the integer.\n# Invalid input: return \"INVALID: <raw>\" in uppercase.\ndef parse_minutes(raw):\n    # Implement try/except here.\n    return 0\n\nprint(parse_minutes(\"30\"))\nprint(parse_minutes(\"bad\"))",
-      expectedOutput: "parse_minutes(30) returns 30\nparse_minutes(bad) returns INVALID: bad",
+      starterCode: "# Write a robust parse_minutes function with try/except ValueError.\n# Valid input: return the integer.\n# Invalid input: return \"INVALID: <raw>\" in uppercase.\ndef parse_minutes(raw):\n    # Implement try/except here.\n    return 0\n\nprint(f\"Valid: {parse_minutes('30')}\")\nprint(f\"Invalid: {parse_minutes('bad')}\")",
+      expectedOutput: "Valid: 30\nInvalid: INVALID: bad",
       checkYourAnswer: "Use try/except ValueError. Valid strings return int(raw). Invalid strings return f\"INVALID: {raw}\" in the except block.",
       tier: "synthesize"
     }
@@ -1755,7 +1755,7 @@ export const level4Quizzes: Quiz[] = [
     "Read a Traceback Checkpoint",
     "print(undefined_variable)",
     "reading tracebacks",
-    'NameError: name "undefined_variable" is not defined — the variable was never assigned',
+    "NameError: name 'undefined_variable' is not defined — the variable was never assigned",
     "TypeError: the wrong type of value was used",
     "SyntaxError: the code violates Python grammar rules",
     "NameError means Python cannot find a name. Read the last line of the traceback first to see which name is missing.",

@@ -7,6 +7,7 @@ import {
   PYTHON_DIRECT_RUN_NAME,
   PYTHON_IMPORT_RUN_NAME,
   SQL_HARNESS_PATTERN,
+  isTrustedSqlHarness,
   preloadSandbox,
   runLessonSandbox
 } from "@/sandbox/runner";
@@ -322,6 +323,78 @@ describe("lesson sandbox runner", () => {
       for (const code of rejected) {
         expect(SQL_HARNESS_PATTERN.test(code)).toBe(false);
       }
+    });
+
+    it("rejects multi-statement harness payloads that chain a destructive statement", () => {
+      // The legacy prefix pattern only inspects the first statement, so it still
+      // accepts these. `db.run` executes every statement, so the hardened gate
+      // must reject them.
+      const chainedPayloads = [
+        "INSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-04', 'sql', 45); DROP TABLE sessions;",
+        "SELECT 1; DELETE FROM sessions;",
+        "WITH seed AS (SELECT 1 AS n) DELETE FROM sessions;",
+        "CREATE TABLE tmp (id INTEGER); PRAGMA writable_schema = 1;",
+        "INSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-04', 'sql', 45); UPDATE sessions SET minutes = 0;"
+      ];
+
+      for (const payload of chainedPayloads) {
+        expect(SQL_HARNESS_PATTERN.test(payload)).toBe(true);
+        expect(isTrustedSqlHarness(payload)).toBe(false);
+      }
+
+      // The legitimate hidden harness must still be accepted, including a
+      // semicolon and a destructive-looking word inside a string literal.
+      expect(isTrustedSqlHarness("INSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-04', 'sql', 45);")).toBe(true);
+      expect(isTrustedSqlHarness("INSERT INTO notes (body) VALUES ('call; delete later');")).toBe(true);
+      expect(isTrustedSqlHarness("-- seed\nINSERT INTO sessions (topic) VALUES ('sql');")).toBe(true);
+    });
+
+    it("does not execute a multi-statement hidden harness that chains a DROP after a seed", async () => {
+      const spec: LessonRunnerSpec = {
+        language: "sql",
+        instructions: "List the seeded topics.",
+        starterCode: "SELECT topic FROM sessions;",
+        setupCode: [
+          "CREATE TABLE sessions (id INTEGER PRIMARY KEY, topic TEXT NOT NULL);",
+          "INSERT INTO sessions (topic) VALUES ('python'), ('git');"
+        ].join("\n"),
+        visibleTests: [
+          {
+            id: "visible-topics",
+            name: "Lists the seeded topics",
+            code: "-- visible check runs no harness SQL",
+            expectedOutputIncludes: ["python", "git"]
+          }
+        ],
+        hiddenTests: [
+          {
+            id: "hidden-multi-statement",
+            name: "Would seed then drop",
+            // Privileged hidden harness: if the gate only checked the first
+            // statement, `db.run` would execute the DROP and the learner query
+            // would fail for every check.
+            code: "INSERT INTO sessions (topic) VALUES ('sql'); DROP TABLE sessions;",
+            expectedOutputIncludes: ["python", "git"]
+          }
+        ],
+        expectedOutput: ["python", "git"],
+        timeoutMs: 30000,
+        allowNetwork: false
+      };
+
+      const result = await runLessonSandbox(
+        spec,
+        "lesson-sql-harness-multi-statement",
+        "SELECT topic FROM sessions;",
+        "2026-05-07T20:42:00.000Z"
+      );
+
+      // The harness is skipped, so the DROP never runs and the read-only learner
+      // query still sees the seeded table. Only a prefix-only gate would fail here.
+      expect(result.passed).toBe(true);
+      expect(result.stderr).not.toContain("no such table");
+      expect(result.stdout).toContain("python");
+      expect(result.stdout).toContain("git");
     });
   });
 

@@ -681,9 +681,9 @@ const typescriptContractPracticeReps: LessonPracticeBlock[] = [
 
 const sqlJoinPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "SELECT skills.name\nFROM skills\nLEFT JOIN evidence_skills es ON es.skill_id = skills.id\nWHERE es.evidence_id IS NULL;",
-    expectedOutput: "Only skills with no linked evidence rows should appear.",
-    checkYourAnswer: "Start from the table where missing rows matter. If you start from evidence, skills with no evidence cannot appear."
+    starterCode: "SELECT m.title\nFROM missions m\nLEFT JOIN evidence e ON e.mission_id = m.id\nWHERE e.id IS NULL;",
+    expectedOutput: "Only the mission with no linked evidence appears, and its title is 'no evidence'.",
+    checkYourAnswer: "Start from the table where missing rows matter. If you start from evidence, missions with no evidence cannot appear."
   },
   {
     starterCode: "SELECT m.title, COUNT(e.id) AS evidence_count\nFROM missions m\nLEFT JOIN evidence e ON e.mission_id = m.id\nGROUP BY m.id, m.title;",

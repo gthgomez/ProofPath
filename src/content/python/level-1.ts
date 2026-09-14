@@ -46,9 +46,9 @@ const assignmentPracticeReps: LessonPracticeBlock[] = [
     tier: "replicate"
   },
   {
-    starterCode: '# Fix the bug: minutes should hold the integer 30, not the string "30".\nminutes = "30"\nprint("The minutes value is")\nprint(minutes)',
-    expectedOutput: "The minutes value is\n30",
-    checkYourAnswer: "The bug is that minutes holds the string '30' instead of the integer 30. Remove the quotes so Python treats it as a number.",
+    starterCode: '# Fix the bug: minutes should hold the integer 30, not the string "30".\nminutes = "30"\nprint("The minutes type is")\nprint(type(minutes))\nprint("Five more minutes is")\nprint(minutes + 5)',
+    expectedOutput: "The minutes type is\n<class 'int'>\nFive more minutes is\n35",
+    checkYourAnswer: "The bug is that minutes holds the string '30'. A string and an integer can print identically, so check the type: type(minutes) reports <class 'str'> and minutes + 5 raises a TypeError because text cannot be added to a number. Remove the quotes so minutes is the integer 30 and both lines show the number.",
     tier: "diagnose"
   },
   {

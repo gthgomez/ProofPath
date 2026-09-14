@@ -7,41 +7,41 @@ import { proofLesson } from "./shared";
 
 const pythonEnvConfigPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "import os\n\n# Read API_KEY and DB_PATH from environment.\napi_key = os.environ.get('API_KEY', '')\ndb_path = os.environ.get('DB_PATH', 'tracker.db')\nprint(f'api_key: {\"***\" if api_key else \"missing\"}')\nprint(f'db_path: {db_path}')",
+    starterCode: "// Read API_KEY and DB_PATH from a simulated environment.\nconst env = { API_KEY: 'REPLACE_ME', DB_PATH: 'tracker.db' };\nconst apiKey = env.API_KEY || '';\nconst dbPath = env.DB_PATH || 'tracker.db';\nconsole.log('api_key: ' + (apiKey ? '***' : 'missing'));\nconsole.log('db_path: ' + dbPath);",
     expectedOutput: "api_key: *** (masked) and db_path: tracker.db",
     checkYourAnswer: "Repeat the env-read pattern with new variable names. Sensitive values should be masked in output, not printed in plain text.",
     tier: "replicate"
   },
   {
-    starterCode: "import os\n\n# Return the value or a clear error when a required env var is missing.\napi_key = os.environ.get('API_KEY')\nif not api_key:\n    print('missing API_KEY')",
+    starterCode: "// API_KEY is not set in this simulated environment.\nconst env = {};\nconst apiKey = env.API_KEY;\nif (!apiKey) {\n  console.log('missing API_KEY');\n}",
     expectedOutput: "missing API_KEY printed when the environment variable is not set.",
-    checkYourAnswer: "This failure rep proves missing env vars produce visible errors, not silent None values that crash later.",
+    checkYourAnswer: "This failure rep proves missing env vars produce visible errors, not silent undefined values that crash later.",
     tier: "diagnose"
   },
   {
-    starterCode: "config = {\n    'api_key': os.environ.get('API_KEY'),\n    'db_path': os.environ.get('DB_PATH', 'tracker.db'),\n}\n# Use config dict so the rest of the app does not call os.environ directly.\nprint(config)",
-    expectedOutput: "A config dictionary with loaded values, keeping os.environ calls at the boundary.",
-    checkYourAnswer: "Project-shaped config: environment reads happen once at startup, and the rest of the app uses the config dict.",
+    starterCode: "const env = { API_KEY: 'REPLACE_ME', DB_PATH: 'tracker.db' };\nconst config = {\n  apiKey: env.API_KEY ? '***' : null,\n  dbPath: env.DB_PATH || 'tracker.db'\n};\n// Environment reads happen once here; the rest of the app uses this config object.\nconsole.log(config);",
+    expectedOutput: "A config object with the key masked as '***' and dbPath set to tracker.db, keeping environment reads at the startup boundary.",
+    checkYourAnswer: "Project-shaped config: environment reads happen once at startup, and the rest of the app uses the config object.",
     tier: "synthesize"
   }
 ];
 
 const pythonCiWorkflowPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "ci_steps = [\n    {'name': 'Checkout code'},\n    {'name': 'Set up Python'},\n]\n# Add lint and test steps.\nprint(ci_steps)",
+    starterCode: "const ciSteps = [\n  { name: 'Checkout code' },\n  { name: 'Set up Python' },\n  { name: 'Run lint' },\n  { name: 'Run tests' }\n];\n// Add lint and test steps to complete the workflow.\nconsole.log(ciSteps);",
     expectedOutput: "The workflow includes checkout, Python setup, lint, and test steps.",
     checkYourAnswer: "Repeat the CI pattern with new lint and test step names. A CI workflow should declare all verification steps explicitly.",
     tier: "replicate"
   },
   {
-    starterCode: "ci_steps = [{'name': 'Deploy'}, {'name': 'Notify'}]\n# These run before lint and tests. Mark this as wrong.\nprint(ci_steps)",
+    starterCode: "const ciSteps = [\n  { name: 'Deploy' },\n  { name: 'Notify' }\n];\n// These run before lint and tests. Mark this as wrong.\nconsole.log(ciSteps);",
     expectedOutput: "This workflow is wrong because deploy runs before tests and lint, which could ship broken code.",
     checkYourAnswer: "This failure rep shows the wrong order. Tests and lint should gate deployment, not run after it.",
     tier: "diagnose"
   },
   {
-    starterCode: "ci_triggers = ['push', 'pull_request']\nci_jobs = ['lint', 'test', 'deploy']\nprint(ci_triggers)\nprint(ci_jobs)",
-    expectedOutput: "push and pull_request triggers, with lint, test, and deploy jobs.",
+    starterCode: "const ciTriggers = ['push', 'pull_request'];\nconst ciJobs = ['lint', 'test', 'deploy'];\nconsole.log(ciTriggers);\nconsole.log(ciJobs);",
+    expectedOutput: "push and pull_request triggers, with lint, test, and deploy jobs in that order.",
     checkYourAnswer: "Project-shaped CI: the workflow file should specify which events trigger it and what jobs run in what order.",
     tier: "synthesize"
   }
@@ -51,21 +51,21 @@ const pythonCiWorkflowPracticeReps: LessonPracticeBlock[] = [
 
 const pythonSecretsPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "import os\n\n# Read DB_PASSWORD and API_KEY from environment, never hardcode.\ndb_password = os.environ.get('DB_PASSWORD')\napi_key = os.environ.get('API_KEY')\nprint(f'db configured: {bool(db_password)}')\nprint(f'api configured: {bool(api_key)}')",
-    expectedOutput: "db configured: True and api configured: True when env vars are set.",
+    starterCode: "// Read DB_PASSWORD and API_KEY from a simulated environment, never hardcode.\nconst env = { DB_PASSWORD: 'REPLACE_ME', API_KEY: 'REPLACE_ME' };\nconst dbPassword = env.DB_PASSWORD || null;\nconst apiKey = env.API_KEY || null;\nconsole.log('db configured: ' + Boolean(dbPassword));\nconsole.log('api configured: ' + Boolean(apiKey));",
+    expectedOutput: "db configured: true and api configured: true when the simulated env vars are set.",
     checkYourAnswer: "Repeat the pattern with new secret names. Secrets should always come from the environment, not from hardcoded source code.",
     tier: "replicate"
   },
   {
-    starterCode: "import os\n\n# This prints the actual API key in logs\napi_key = os.environ.get('API_KEY', 'fallback')\nprint(f'Connecting with key {api_key}')",
+    starterCode: "const env = { API_KEY: 'REPLACE_ME' };\n// This prints the actual API key in logs.\nconst apiKey = env.API_KEY || 'fallback';\nconsole.log('Connecting with key ' + apiKey);",
     expectedOutput: "The printed output contains the API_KEY value in plain text, exposing the secret to anyone viewing logs or terminal output.",
     checkYourAnswer: "This failure rep shows the risk of printing secret values. Logged secrets can be exposed in CI logs, terminal history, and support tickets.",
     tier: "diagnose"
   },
   {
-    starterCode: "from dataclasses import dataclass\nimport os\n\n@dataclass\nclass Secrets:\n    db_password: str\n    api_key: str\n    \n    @classmethod\n    def from_env(cls):\n        return cls(\n            db_password=os.environ['DB_PASSWORD'],\n            api_key=os.environ['API_KEY']\n        )\n\n# Load secrets at startup boundary\nsecrets = Secrets.from_env()\nprint(f'Secrets loaded: {bool(secrets.db_password)}')",
-    expectedOutput: "Secrets loaded: True, proving the secrets boundary loads values at startup without exposing them in output.",
-    checkYourAnswer: "Project-shaped secrets: load all secrets at a single startup boundary into a typed dataclass. The rest of the app never calls os.environ directly.",
+    starterCode: "class Secrets {\n  constructor(dbPassword, apiKey) {\n    this.dbPassword = dbPassword;\n    this.apiKey = apiKey;\n  }\n\n  static fromEnv(env) {\n    if (!env.DB_PASSWORD) {\n      throw new Error('DB_PASSWORD is required');\n    }\n    if (!env.API_KEY) {\n      throw new Error('API_KEY is required');\n    }\n    return new Secrets(env.DB_PASSWORD, env.API_KEY);\n  }\n}\n\n// Load secrets at the startup boundary with placeholder values.\nconst secrets = Secrets.fromEnv({ DB_PASSWORD: 'REPLACE_ME', API_KEY: 'REPLACE_ME' });\nconsole.log('Secrets loaded: ' + Boolean(secrets.dbPassword));",
+    expectedOutput: "Secrets loaded: true, proving the secrets boundary loads values at startup without exposing them in output.",
+    checkYourAnswer: "Project-shaped secrets: load all secrets at a single startup boundary into a typed Secrets class. The rest of the app never reads the environment directly.",
     tier: "synthesize"
   }
 ];
@@ -74,20 +74,20 @@ const pythonSecretsPracticeReps: LessonPracticeBlock[] = [
 
 const pythonDeploymentPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "# Deployment strategies define how new code reaches production.\nstrategies = ['blue-green', 'canary', 'rolling']\nrollback_plan = 'revert to previous version'\nprint(strategies)\nprint(rollback_plan)",
+    starterCode: "// Deployment strategies define how new code reaches production.\nconst strategies = ['blue-green', 'canary', 'rolling'];\nconst rollbackPlan = 'revert to previous version';\nconsole.log(strategies);\nconsole.log(rollbackPlan);",
     expectedOutput: "blue-green, canary, rolling deployment strategies plus a rollback plan.",
     checkYourAnswer: "Repeat the pattern with your own deployment keywords. Every deployment should name a strategy and a rollback approach.",
     tier: "replicate"
   },
   {
-    starterCode: "# This deployment skips health checks and monitoring.\ndeploy = {'strategy': 'rolling', 'health_check': False, 'rollback': False}\nprint(f'Deploy strategy: {deploy[\"strategy\"]}')\nprint(f'Safe to deploy: {deploy[\"health_check\"] and deploy[\"rollback\"]}')",
-    expectedOutput: "Safe to deploy: False because health_check and rollback are not set up.",
+    starterCode: "// This deployment skips health checks and rollback.\nconst deploy = { strategy: 'rolling', healthCheck: false, rollback: false };\nconsole.log('Deploy strategy: ' + deploy.strategy);\nconsole.log('Safe to deploy: ' + (deploy.healthCheck && deploy.rollback));",
+    expectedOutput: "Safe to deploy: false because healthCheck and rollback are not set up.",
     checkYourAnswer: "This failure rep proves deployment readiness requires health checks and rollback plans. Skipping them means broken code can reach users undetected.",
     tier: "diagnose"
   },
   {
-    starterCode: "# Deployment runbook for the Study Tracker\nrunbook = {\n    'strategy': 'blue-green',\n    'health_check_endpoint': '/health',\n    'rollback_command': 'kubectl rollout undo deployment/study-tracker',\n    'monitor_window': '10 minutes'\n}\nprint(f'Strategy: {runbook[\"strategy\"]}')\nprint(f'Health check: {runbook[\"health_check_endpoint\"]}')\nprint(f'Rollback: {runbook[\"rollback_command\"]}')",
-    expectedOutput: "A complete deployment runbook with strategy, health check, rollback command, and monitor window.",
+    starterCode: "// Deployment runbook for the Study Tracker.\nconst runbook = {\n  strategy: 'blue-green',\n  healthCheckEndpoint: '/health',\n  rollbackCommand: 'kubectl rollout undo deployment/study-tracker',\n  monitorWindow: '10 minutes'\n};\nconsole.log('Strategy: ' + runbook.strategy);\nconsole.log('Health check: ' + runbook.healthCheckEndpoint);\nconsole.log('Rollback: ' + runbook.rollbackCommand);",
+    expectedOutput: "Strategy: blue-green, Health check: /health, and Rollback: kubectl rollout undo deployment/study-tracker.",
     checkYourAnswer: "Project-shaped deployment: a runbook documents the strategy, how to verify success, and how to rollback. Every deploy should be repeatable from these instructions.",
     tier: "synthesize"
   }
@@ -97,20 +97,20 @@ const pythonDeploymentPracticeReps: LessonPracticeBlock[] = [
 
 const pythonMonitoringPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "# Basic health check for the Study Tracker\nimport json\nhealth = {'status': 'ok', 'timestamp': '2026-06-21T10:00:00Z', 'version': '1.0.0'}\nprint(json.dumps(health))",
+    starterCode: "// Basic health check for the Study Tracker.\nconst health = { status: 'ok', timestamp: '2026-06-21T10:00:00Z', version: '1.0.0' };\nconsole.log(JSON.stringify(health));",
     expectedOutput: "A JSON health check response with status, timestamp, and version.",
     checkYourAnswer: "Repeat the pattern with extra fields like uptime or database_connected. A health check endpoint should return structured JSON for monitoring tools to parse.",
     tier: "replicate"
   },
   {
-    starterCode: "# This health check always returns 'ok' even when the database is disconnected\nhealth = {'status': 'ok', 'database': 'disconnected'}\nprint(f'Reported: {health[\"status\"]}')\nprint(f'Database: {health[\"database\"]}')",
+    starterCode: "// This health check always returns 'ok' even when the database is disconnected.\nconst health = { status: 'ok', database: 'disconnected' };\nconsole.log('Reported: ' + health.status);\nconsole.log('Database: ' + health.database);",
     expectedOutput: "Reported: ok but Database: disconnected — the status field is misleading because it does not reflect the actual database state.",
     checkYourAnswer: "This failure rep shows a dishonest health check. The status field should aggregate sub-check results, not always report 'ok'.",
     tier: "diagnose"
   },
   {
-    starterCode: "# Structured logging with JSON format\nimport logging\nimport json\n\nlogging.basicConfig(level=logging.INFO)\nlogger = logging.getLogger('study_tracker')\n\nlog_entry = {\n    'event': 'session_added',\n    'topic': 'python',\n    'minutes': 30,\n    'severity': 'info'\n}\nlogger.info(json.dumps(log_entry))\nprint('Monitoring configured')",
-    expectedOutput: "A JSON log entry with event, topic, minutes, and severity fields ready for monitoring ingestion.",
+    starterCode: "// Structured logging with JSON format.\nconst logEntry = {\n  event: 'session_added',\n  topic: 'python',\n  minutes: 30,\n  severity: 'info'\n};\nconsole.log(JSON.stringify(logEntry));\nconsole.log('Monitoring configured');",
+    expectedOutput: "A JSON log entry with event, topic, minutes, and severity fields, followed by Monitoring configured.",
     checkYourAnswer: "Project-shaped monitoring: structured JSON logs let monitoring tools parse and alert on specific fields. Log levels (info, warning, error) help filter signal from noise.",
     tier: "synthesize"
   }
@@ -148,7 +148,7 @@ const envConfigLesson = proofLesson({
   guidedExercise: "Write a config loader that reads API_KEY and DB_PATH from environment, masks the key in output, and raises a clear error if API_KEY is missing.",
   missionConnection: "This prepares professional-grade credential handling before the CI/CD and deployment lessons.",
   reflectionPrompt: "Which configuration values should be required (no default), and which should have safe fallback defaults?",
-  practiceStarter: "import os\n\napi_key = os.environ.get('API_KEY')\ndb_path = os.environ.get('DB_PATH', 'tracker.db')\n\nprint(f'Config: db_path={db_path}')\nif not api_key:\n    print('Error: API_KEY is not set')",
+  practiceStarter: "// Sandbox simulation of environment variables: JS has no OS-level environment here.\nconst env = { API_KEY: '', DB_PATH: 'tracker.db' };\nconst apiKey = env.API_KEY || null;\nconst dbPath = env.DB_PATH || 'tracker.db';\nconsole.log('Config: db_path=' + dbPath);\nif (!apiKey) {\n  console.log('Error: API_KEY is not set');\n}",
   practiceExpected: "Config output shows db_path and an error if API_KEY is missing.",
   practiceCheck: "If the code prints the actual API_KEY value in plain text, secrets are at risk. Mask or validate required keys before using them.",
   practiceReps: pythonEnvConfigPracticeReps,
@@ -328,8 +328,8 @@ const ciWorkflowLesson = proofLesson({
   guidedExercise: "Write a GitHub Actions workflow YAML that runs lint and test jobs, with test depending on lint passing first.",
   missionConnection: "This adds automated quality gates to the project, making it ready for professional team workflows.",
   reflectionPrompt: "What would happen if lint failed but tests passed? Should the deploy job still run?",
-  practiceStarter: "name: CI\n\non:\n  push:\n  pull_request:\n\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v3\n      - uses: actions/setup-python@v4\n        with:\n          python-version: '3.11'\n      - run: pip install ruff\n      - run: ruff check .\n\n  test:\n    needs: lint\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v3\n      - uses: actions/setup-python@v4\n        with:\n          python-version: '3.11'\n      - run: pip install pytest\n      - run: python -m pytest",
-  practiceExpected: "Workflow YAML with name, on triggers, and separate lint and test jobs.",
+  practiceStarter: "// Concept Lab sandbox: build a GitHub Actions workflow as a plain object.\nconst workflow = {\n  name: 'CI',\n  on: ['push', 'pull_request'],\n  jobs: {\n    lint: { steps: ['checkout', 'ruff check .'] },\n    test: { needs: 'lint', steps: ['checkout', 'pytest'] }\n  }\n};\nconsole.log(workflow);",
+  practiceExpected: "A workflow object with a name, on triggers, and separate lint and test jobs where test needs lint.",
   practiceCheck: "If test does not depend on lint, broken formatting can reach deployment before tests run. Use needs: lint to gate the test job.",
   practiceReps: pythonCiWorkflowPracticeReps,
   miniTitle: "Create a CI workflow file",
@@ -497,8 +497,8 @@ const secretsManagementLesson = proofLesson({
   guidedExercise: "Create a Secrets dataclass with from_env that loads DB_PASSWORD and API_KEY, validates they are present, and raises ValueError if any are missing.",
   missionConnection: "This adds professional secret handling to the deploy pipeline, protecting production credentials.",
   reflectionPrompt: "Should default values ever be provided for secrets like API keys and database passwords, or should they always be required?",
-  practiceStarter: "import os\n\n# Create a Secrets class with from_env that loads secrets.\nprint('Loading secrets at startup boundary...')\nprint('Secrets boundary configured')",
-  practiceExpected: "Secrets are loaded at startup from environment variables with clear error messages for missing required values.",
+  practiceStarter: "// Simulate a secrets boundary with placeholder values.\nconst env = { DB_PASSWORD: 'REPLACE_ME', API_KEY: 'REPLACE_ME' };\nconsole.log('Loading secrets at startup boundary...');\nconst secrets = { dbPassword: env.DB_PASSWORD, apiKey: env.API_KEY };\nconsole.log(secrets.dbPassword && secrets.apiKey ? 'Secrets boundary configured' : 'Error: required secret missing');",
+  practiceExpected: "Prints 'Loading secrets at startup boundary...' then confirms the boundary is configured when both placeholder secrets are present.",
   practiceCheck: "If the code provides default values for secrets (like 'default_password'), those defaults could accidentally be used in production. Required secrets should have no defaults.",
   practiceReps: pythonSecretsPracticeReps,
   miniTitle: "Create a typed secrets boundary",
@@ -679,8 +679,8 @@ const deploymentStrategiesLesson = proofLesson({
   guidedExercise: "Write a deployment runbook for the Study Tracker that names the strategy, health check endpoint, rollback command, and monitoring window.",
   missionConnection: "This prepares the ops workflow for deploying the Study Tracker to a real server.",
   reflectionPrompt: "When would you choose a canary deploy over blue-green? What additional monitoring does a canary need?",
-  practiceStarter: "# Deployment runbook for Study Tracker\nrunbook = {\n    'strategy': '',\n    'health_check_endpoint': '',\n    'rollback_command': '',\n    'monitor_window': ''\n}\nprint('Define the deployment runbook fields')",
-  practiceExpected: "A complete runbook with strategy, health check, rollback command, and monitor window.",
+  practiceStarter: "// Deployment runbook for the Study Tracker.\nconst runbook = {\n  strategy: '',\n  healthCheckEndpoint: '',\n  rollbackCommand: '',\n  monitorWindow: ''\n};\nconsole.log('Define the deployment runbook fields');\nconsole.log(runbook);",
+  practiceExpected: "Prints the empty runbook object and a reminder to define the strategy, health check, rollback command, and monitor window.",
   practiceCheck: "If the runbook is missing a health check or rollback plan, the deployment is unsafe. Every valid runbook must have all four fields populated.",
   practiceReps: pythonDeploymentPracticeReps,
   miniTitle: "Create a deployment runbook",
@@ -854,8 +854,8 @@ const monitoringBasicsLesson = proofLesson({
   guidedExercise: "Create a health check response schema, write a sample structured log entry, and define alert thresholds for database errors and high latency.",
   missionConnection: "This completes the ops workflow: deploy the Study Tracker and monitor it in production.",
   reflectionPrompt: "Which metrics are most important to alert on immediately vs track as trends over time?",
-  practiceStarter: "# Health check for the Study Tracker\nhealth = {\n    'status': '',\n    'version': '',\n    'database': '',\n    'timestamp': ''\n}\nprint('Define the health check response shape')",
-  practiceExpected: "A complete health check JSON with status, version, database, and timestamp fields.",
+  practiceStarter: "// Health check for the Study Tracker.\nconst health = {\n  status: '',\n  version: '',\n  database: '',\n  timestamp: ''\n};\nconsole.log('Define the health check response shape');\nconsole.log(health);",
+  practiceExpected: "Prints the empty health object and a reminder to define status, version, database, and timestamp.",
   practiceCheck: "If the health check always returns 'ok' even when dependencies are down, it is misleading. Each dependency should have its own check that contributes to the overall status.",
   practiceReps: pythonMonitoringPracticeReps,
   miniTitle: "Create a health check and monitoring config",
@@ -906,7 +906,7 @@ console.log('health monitor configured');`,
     sequence: 5,
     version: "1.0.0",
     lessonKind: "concept_only",
-    teaches: ["ops.monitoring.basics"],
+    teaches: ["ops.monitoring.basics", "py.time"],
     requires: [],
     visibleCodeConcepts: ["ops.monitoring.basics"],
     quizConcepts: ["ops.monitoring.basics"],
@@ -917,8 +917,8 @@ console.log('health monitor configured');`,
 
 monitoringBasicsLesson.depth = {
   primaryConceptId: "ops.monitoring.basics",
-  secondaryConceptIds: [],
-  maxNewConcepts: 1,
+  secondaryConceptIds: ["py.time"],
+  maxNewConcepts: 2,
   conceptCapsules: [
     {
       conceptId: "ops.monitoring.basics",
@@ -929,6 +929,16 @@ monitoringBasicsLesson.depth = {
       commonMistake: "Health check always returns 'ok' even when database or other dependencies are down, hiding problems from operators.",
       repairHint: "Check each dependency individually and aggregate their status. The top-level status should reflect the worst dependency state.",
       usedIn: ["learn", "practice"]
+    },
+    {
+      conceptId: "py.time",
+      definition: "The time module measures elapsed time with time.time() and pauses execution with time.sleep().",
+      mentalModel: "Think of time.time() as reading a stopwatch and time.sleep() as setting a kitchen timer: one tells you how much time has passed, the other makes the program wait before it continues.",
+      syntaxShape: "import time\nstart = time.time()\nelapsed = time.time() - start\ntime.sleep(0.5)",
+      tinyExample: "import time\nstart = time.time()\nrun_health_check()\nprint(f'elapsed: {time.time() - start:.2f}s')",
+      commonMistake: "Measuring elapsed time with a fixed time.sleep() instead of subtracting two time.time() readings, which reports the planned delay rather than the real duration.",
+      repairHint: "Read time.time() before and after the operation and subtract the two readings to get the actual elapsed seconds.",
+      usedIn: ["learn"]
     }
   ],
   codeWalkthrough: [
@@ -947,6 +957,22 @@ monitoringBasicsLesson.depth = {
       conceptIds: ["ops.monitoring.basics"],
       explanation: "Emits a structured JSON log entry that monitoring tools can parse. Each entry has an event name, severity, and context fields.",
       learnerShouldBeAbleToSay: "I use structured JSON logging so monitoring tools can filter and alert on specific events."
+    },
+    {
+      id: "w-mon-3",
+      label: "Measure latency with time.time()",
+      codeFragment: "import time\nstart = time.time()\nrun_health_check()\nelapsed = time.time() - start\nif elapsed > 0.5:\n    logger.warning(f'slow health check: {elapsed:.2f}s')",
+      conceptIds: ["py.time"],
+      explanation: "Reads the clock before and after the health check and subtracts the two readings to get the elapsed seconds. Monitoring compares that duration against the latency alert threshold.",
+      learnerShouldBeAbleToSay: "I measure how long a health check takes with time.time() so I can alert when a response is slower than the latency threshold."
+    },
+    {
+      id: "w-mon-4",
+      label: "Pace repeated probes with time.sleep()",
+      codeFragment: "import time\nfor attempt in range(3):\n    if check_database():\n        break\n    time.sleep(1)\nelse:\n    logger.error('database still down after 3 probes')",
+      conceptIds: ["py.time"],
+      explanation: "Pauses between repeated dependency probes so a struggling database is not hammered with rapid requests. The sleep is deliberate pacing, separate from measuring elapsed time.",
+      learnerShouldBeAbleToSay: "I use time.sleep() to wait between repeated health-check probes instead of retrying in a tight loop."
     }
   ],
   guidedEdits: [

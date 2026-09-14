@@ -48,9 +48,117 @@ export const PYTHON_IMPORT_RUN_NAME = "<module>";
 // DELETE, DROP, ALTER, VACUUM, PRAGMA, ATTACH, DETACH, REINDEX, ANALYZE, ...)
 // is rejected, and legacy checks with non-SQL placeholder tokens (for example
 // "EXPECT_ROWS:...") or comment-only notes are never executed as SQL.
-// The native WebView runner mirrors this exact pattern.
+//
+// This prefix pattern only inspects the FIRST statement. Because `db.run`
+// executes every `;`-separated statement, it must be combined with
+// `isTrustedSqlHarness` below, which also rejects destructive/admin keywords and
+// requires every statement to be seed-safe. The native WebView runner embeds the
+// same combined gate.
 export const SQL_HARNESS_PATTERN =
   /^\s*(?:(?:--[^\n]*\n?|\/\*[\s\S]*?\*\/)\s*)*(SELECT|WITH|INSERT|CREATE)\b/i;
+
+// Destructive/admin operations trusted harness SQL must never contain. Mirrors
+// `dangerousSetupCodePattern` in scripts/validate-content.ts so the runtime gate
+// and the build-time content validator agree on what "seed-safe" means.
+export const SQL_HARNESS_DANGEROUS_PATTERN =
+  /\b(DROP|ATTACH|DETACH|PRAGMA|load_extension|UPDATE|DELETE|ALTER|VACUUM|REINDEX|ANALYZE|REPLACE\s+INTO|CREATE\s+(?:(?:TEMP|TEMPORARY)\s+)?TRIGGER|CREATE\s+VIRTUAL\s+TABLE)\b/i;
+
+/**
+ * Blanks SQL comments and quoted regions so keyword checks inspect executable
+ * statements rather than words inside seed literals or comments. Mirrors
+ * `stripSqlLiteralsAndComments` in scripts/validate-content.ts.
+ */
+export function stripSqlLiteralsAndComments(code: string): string {
+  let sanitized = "";
+  let index = 0;
+
+  const blankChar = (char: string): string => (char === "\n" ? "\n" : " ");
+
+  while (index < code.length) {
+    const char = code[index];
+    const next = code[index + 1];
+
+    if (char === "-" && next === "-") {
+      sanitized += "  ";
+      index += 2;
+      while (index < code.length && code[index] !== "\n") {
+        sanitized += " ";
+        index += 1;
+      }
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      sanitized += "  ";
+      index += 2;
+      while (index < code.length) {
+        if (code[index] === "*" && code[index + 1] === "/") {
+          sanitized += "  ";
+          index += 2;
+          break;
+        }
+        sanitized += blankChar(code[index]);
+        index += 1;
+      }
+      continue;
+    }
+
+    const quote = char === "'" ? "'" : char === '"' ? '"' : char === "`" ? "`" : char === "[" ? "]" : null;
+    if (quote) {
+      const escapeDoubled = quote !== "]";
+      sanitized += " ";
+      index += 1;
+      while (index < code.length) {
+        if (code[index] === quote) {
+          if (escapeDoubled && code[index + 1] === quote) {
+            sanitized += "  ";
+            index += 2;
+            continue;
+          }
+          sanitized += " ";
+          index += 1;
+          break;
+        }
+        sanitized += blankChar(code[index]);
+        index += 1;
+      }
+      continue;
+    }
+
+    sanitized += char;
+    index += 1;
+  }
+
+  return sanitized;
+}
+
+/**
+ * Returns true only when a check's trusted harness `code` is seed-safe. The
+ * prefix pattern rejects comment-only notes and non-SQL placeholder tokens; this
+ * additionally rejects destructive/admin keywords anywhere in the executable
+ * text and requires every `;`-separated statement to start with SELECT/WITH/
+ * INSERT/CREATE. That closes the multi-statement bypass (`INSERT ...; DROP ...`)
+ * that `db.run` would otherwise execute in full.
+ */
+export function isTrustedSqlHarness(code: string): boolean {
+  if (!SQL_HARNESS_PATTERN.test(code)) {
+    return false;
+  }
+
+  const stripped = stripSqlLiteralsAndComments(code);
+  if (SQL_HARNESS_DANGEROUS_PATTERN.test(stripped)) {
+    return false;
+  }
+
+  for (const statement of stripped.split(";")) {
+    const trimmed = statement.trim();
+    if (trimmed.length > 0 && !/^(SELECT|WITH|INSERT|CREATE)\b/i.test(trimmed)) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 declare global {
   // Test environments that run code inside a VM may not allow dynamic import from new Function.
@@ -531,8 +639,9 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
       // the freshly seeded database before the learner query and is not subject
       // to the read-only policy that gates learner submissions. Hidden checks use
       // this to seed rows so a hardcoded/forged result cannot match. The harness
-      // is restricted to seed-safe statements (SQL_HARNESS_PATTERN).
-      if (test.code && SQL_HARNESS_PATTERN.test(test.code)) {
+      // is restricted to seed-safe statements (isTrustedSqlHarness), so a
+      // multi-statement payload cannot smuggle in a destructive statement.
+      if (test.code && isTrustedSqlHarness(test.code)) {
         db.run(test.code);
       }
 

@@ -81,6 +81,22 @@ describe("mini project tester", () => {
     expect(result.blockedOutputTerms).not.toContain("error:");
   });
 
+  it("does not suppress a forbidden term a required term merely contains", () => {
+    const miniProject = makeMiniProject({
+      requiredOutputIncludes: ["error count: 0"],
+      forbiddenOutputIncludes: ["error:"]
+    });
+
+    const result = runMiniProjectTest(miniProject, {
+      codeOrArtifact: "print('error count: 0')",
+      terminalOutput: "error count: 0\nValueError: unexpected failure"
+    });
+
+    expect(result.missingOutputRequirements).toEqual([]);
+    expect(result.blockedOutputTerms).toContain("error:");
+    expect(result.passed).toBe(false);
+  });
+
   it("still blocks an unrequested traceback on a normal lesson", () => {
     const miniProject = makeMiniProject({ requiredOutputIncludes: ["passed"] });
 
