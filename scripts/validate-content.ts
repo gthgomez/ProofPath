@@ -80,19 +80,83 @@ export const setupCodeAllowedLessonIds = new Set<string>([
 // check's harness `code` is likewise privileged/trusted, so both must stay
 // schema + seed. The pattern covers destructive/admin statements that could
 // mutate or exfiltrate lesson data: DROP/ATTACH/DETACH/PRAGMA/load_extension/
-// UPDATE/DELETE plus ALTER/VACUUM/REINDEX/ANALYZE and virtual-table/trigger
-// creation.
+// UPDATE/DELETE plus ALTER/VACUUM/REINDEX/ANALYZE, `REPLACE INTO`, and
+// (temporary) trigger / virtual-table creation. Input is stripped of comments
+// and quoted regions first so seed literals such as 'delete my notes' do not
+// false-positive.
 export const dangerousSetupCodePattern =
-  /\b(DROP|ATTACH|DETACH|PRAGMA|load_extension|UPDATE|DELETE|ALTER|VACUUM|REINDEX|ANALYZE|CREATE\s+VIRTUAL\s+TABLE|CREATE\s+TRIGGER)\b/i;
+  /\b(DROP|ATTACH|DETACH|PRAGMA|load_extension|UPDATE|DELETE|ALTER|VACUUM|REINDEX|ANALYZE|REPLACE\s+INTO|CREATE\s+(?:(?:TEMP|TEMPORARY)\s+)?TRIGGER|CREATE\s+VIRTUAL\s+TABLE)\b/i;
 
 /**
- * Strips leading whitespace and SQL comments so a trusted code blob can be
- * inspected from its first real statement. Comments are the only thing allowed
- * to precede schema/seed SQL in a runner check (the hidden harness starts with
- * `--` notes before its INSERT).
+ * Blanks SQL comments and quoted regions so trusted-SQL keyword checks inspect
+ * executable statements rather than words inside seed literals or comments.
+ * Mirrors the sandbox tokenizer: `--` line comments, C-style block comments,
+ * single-quoted strings (`''` escapes), double-quoted identifiers (`""`
+ * escapes), backtick identifiers, and `[...]` identifiers (closed at the first
+ * `]`, matching SQLite). Newlines are preserved so line structure survives.
  */
-export function stripLeadingSqlComments(code: string): string {
-  return code.replace(/^(?:\s+|--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)+/, "");
+export function stripSqlLiteralsAndComments(code: string): string {
+  let sanitized = "";
+  let index = 0;
+
+  const blankChar = (char: string): string => (char === "\n" ? "\n" : " ");
+
+  while (index < code.length) {
+    const char = code[index];
+    const next = code[index + 1];
+
+    if (char === "-" && next === "-") {
+      sanitized += "  ";
+      index += 2;
+      while (index < code.length && code[index] !== "\n") {
+        sanitized += " ";
+        index += 1;
+      }
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      sanitized += "  ";
+      index += 2;
+      while (index < code.length) {
+        if (code[index] === "*" && code[index + 1] === "/") {
+          sanitized += "  ";
+          index += 2;
+          break;
+        }
+        sanitized += blankChar(code[index]);
+        index += 1;
+      }
+      continue;
+    }
+
+    const quote = char === "'" ? "'" : char === '"' ? '"' : char === "`" ? "`" : char === "[" ? "]" : null;
+    if (quote) {
+      const escapeDoubled = quote !== "]";
+      sanitized += " ";
+      index += 1;
+      while (index < code.length) {
+        if (code[index] === quote) {
+          if (escapeDoubled && code[index + 1] === quote) {
+            sanitized += "  ";
+            index += 2;
+            continue;
+          }
+          sanitized += " ";
+          index += 1;
+          break;
+        }
+        sanitized += blankChar(code[index]);
+        index += 1;
+      }
+      continue;
+    }
+
+    sanitized += char;
+    index += 1;
+  }
+
+  return sanitized;
 }
 
 /**
@@ -102,7 +166,7 @@ export function stripLeadingSqlComments(code: string): string {
  * cannot drift from the validator.
  */
 export function findDangerousRunnerStatement(code: string): string | null {
-  const match = stripLeadingSqlComments(code).match(dangerousSetupCodePattern);
+  const match = stripSqlLiteralsAndComments(code).match(dangerousSetupCodePattern);
   return match ? match[0] : null;
 }
 
@@ -908,9 +972,9 @@ for (const lesson of contentPack.lessons) {
       if (!setupCodeAllowedLessonIds.has(lesson.id)) {
         errors.push(`Rule Group O: Lesson '${lesson.id}' defines privileged setupCode but is not on the setupCode allow-list`);
       }
-      const dangerous = setupCode.match(dangerousSetupCodePattern);
+      const dangerous = findDangerousRunnerStatement(setupCode);
       if (dangerous) {
-        errors.push(`Rule Group O: Lesson '${lesson.id}' setupCode contains non-schema/seed statement '${dangerous[0]}'`);
+        errors.push(`Rule Group O: Lesson '${lesson.id}' setupCode contains non-schema/seed statement '${dangerous}'`);
       }
     }
 

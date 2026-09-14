@@ -118,6 +118,27 @@ function stripPythonCommentsAndStrings(code: string): string {
   return sanitized;
 }
 
+/**
+ * Collapses Python explicit line continuations (`\` at the end of a physical
+ * line) into spaces so a statement split across lines is matched as one logical
+ * line. This must run after comments/strings are stripped, where a trailing
+ * backslash can only be a continuation, otherwise `import \<newline>socket`
+ * would slip past the line-oriented network rule (which the old bare-keyword
+ * pattern caught) and also defeats reflective imports via string operands.
+ */
+function collapsePythonLineContinuations(code: string): string {
+  return code.replace(/\\\r?\n/g, "  ");
+}
+
+/**
+ * Python-rule pre-processing: strip comments/strings, then join explicit line
+ * continuations. Every Python rule uses this so a keyword hidden in a comment
+ * or string is ignored, and a blocked keyword cannot be split across lines.
+ */
+function sanitizePythonCode(code: string): string {
+  return collapsePythonLineContinuations(stripPythonCommentsAndStrings(code));
+}
+
 // Matches real Python network module usage after comments/strings are stripped:
 // module names anywhere in an import list (e.g. `import os, socket`,
 // `from http import client`) and attribute access (`requests.get`, `http.client`).
@@ -125,14 +146,20 @@ const PYTHON_NETWORK_PATTERN =
   /\b(?:import|from)\s+[^\n]*\b(?:socket|urllib|requests|http)\b|\b(?:socket|urllib|requests)\s*\.|\bhttp\.client\b/i;
 
 const pythonRules: PatternRule[] = [
-  { rule: "python-js-bridge", pattern: /^\s*(from\s+js\s+import|import\s+js\b)/im, message: "The Pyodide JavaScript bridge is disabled in beginner Python lessons." },
-  { rule: "python-package-install", pattern: /\b(micropip|pyodide)\b/i, message: "Package installation/runtime control is disabled in beginner Python lessons." },
-  { rule: "python-process", pattern: /\b(subprocess|os\.system|shutil|pathlib)\b/i, message: "Process and filesystem helpers are disabled in beginner Python lessons." },
-  { rule: "python-network", pattern: PYTHON_NETWORK_PATTERN, message: "Python network modules are disabled in beginner sandboxes.", sanitize: stripPythonCommentsAndStrings },
-  { rule: "python-dynamic-import", pattern: /\b(importlib|import_module)\b/, message: "Dynamic Python imports are disabled in learner submissions.", sanitize: stripPythonCommentsAndStrings },
-  { rule: "python-dynamic-code", pattern: /\b(eval|exec|__import__)\s*\(/, message: "Dynamic Python execution is disabled in learner submissions." },
-  { rule: "python-file-io", pattern: /\bopen\s*\(/, message: "File I/O is disabled; use the in-memory inputs provided by the lesson." },
-  { rule: "python-infinite-loop", pattern: /while\s+True\s*:/, message: "Obvious infinite loops are blocked before execution." }
+  { rule: "python-js-bridge", pattern: /^\s*(from\s+js\s+import|import\s+js\b)/im, message: "The Pyodide JavaScript bridge is disabled in beginner Python lessons.", sanitize: sanitizePythonCode },
+  { rule: "python-package-install", pattern: /\b(micropip|pyodide)\b/i, message: "Package installation/runtime control is disabled in beginner Python lessons.", sanitize: sanitizePythonCode },
+  { rule: "python-process", pattern: /\b(subprocess|os\.system|shutil|pathlib)\b/i, message: "Process and filesystem helpers are disabled in beginner Python lessons.", sanitize: sanitizePythonCode },
+  { rule: "python-network", pattern: PYTHON_NETWORK_PATTERN, message: "Python network modules are disabled in beginner sandboxes.", sanitize: sanitizePythonCode },
+  { rule: "python-dynamic-import", pattern: /\b(importlib|import_module)\b/, message: "Dynamic Python imports are disabled in learner submissions.", sanitize: sanitizePythonCode },
+  // Bare names (not just `name(`) so rebinding first — `e = eval; e(...)` — is
+  // still caught. Sanitized so a keyword inside a comment/string is ignored.
+  { rule: "python-dynamic-code", pattern: /\b(eval|exec|compile|__import__)\b/, message: "Dynamic Python execution is disabled in learner submissions.", sanitize: sanitizePythonCode },
+  // Reflective access to the import machinery (`getattr(builtins, '__import__')`,
+  // `vars(builtins)['__import__']`) that the sanitized network rule can no longer
+  // see because the module name lives inside a string literal.
+  { rule: "python-builtins-access", pattern: /\b(builtins|__builtins__)\b/, message: "Reflective access to Python builtins is disabled in learner submissions.", sanitize: sanitizePythonCode },
+  { rule: "python-file-io", pattern: /\bopen\s*\(/, message: "File I/O is disabled; use the in-memory inputs provided by the lesson.", sanitize: sanitizePythonCode },
+  { rule: "python-infinite-loop", pattern: /while\s+True\s*:/, message: "Obvious infinite loops are blocked before execution.", sanitize: sanitizePythonCode }
 ];
 
 /**

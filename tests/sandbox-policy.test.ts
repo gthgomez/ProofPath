@@ -74,6 +74,35 @@ describe("sandbox policy keyword matching", () => {
     });
   });
 
+  describe("python policy resists obfuscation and ignores comments/strings", () => {
+    const blocked: Array<[string, string, string]> = [
+      ["backslash-continued import alias", "import \\\n    socket as s\ns.socket()", "python-network"],
+      ["backslash-continued from-import", "from \\\n    urllib import request", "python-network"],
+      ["reflective builtins import", "import builtins\ngetattr(builtins, '__import__')('socket').socket()", "python-builtins-access"],
+      ["builtins dict access", "builtins.__dict__['__import__']('socket')", "python-builtins-access"],
+      ["__builtins__ dict access", "__builtins__['__import__']('socket')", "python-builtins-access"],
+      ["rebound __import__", "x = __import__\nx('socket')", "python-dynamic-code"],
+      ["rebound eval", "e = eval\ne('1')", "python-dynamic-code"],
+      ["aliased importlib", "import importlib as il\nil.import_module('socket')", "python-dynamic-import"]
+    ];
+
+    it.each(blocked)("blocks %s", (_label, code, rule) => {
+      expect(rulesTriggered("python", code)).toContain(rule);
+    });
+
+    const allowedMentions = [
+      "print('never call eval() here')",
+      "note = 'call open( soon'\nprint(note)",
+      "note = '''import socket and importlib.import_module'''",
+      "# open('data.txt') is a comment\nprint('ok')",
+      "message = 'builtins is a module name'"
+    ];
+
+    it.each(allowedMentions)("ignores blocked keywords in comments/strings: %s", (code) => {
+      expect(rulesTriggered("python", code)).toEqual([]);
+    });
+  });
+
   describe("sql keywords ignore comments and string literals", () => {
     it("allows a mutation keyword inside a line comment", () => {
       expect(rulesTriggered("sql", "SELECT 1; -- replace this row later")).toEqual([]);

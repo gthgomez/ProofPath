@@ -5,7 +5,6 @@ import { conceptRegistry } from "@/content/concepts";
 import { contentPackSchema, roleTargetSchema } from "@/domain/schemas";
 import { validateSandboxSubmission } from "@/sandbox/policy";
 import {
-  dangerousSetupCodePattern,
   findDangerousRunnerStatement,
   findUnsafeRunnerSqlErrors,
   setupCodeAllowedLessonIds,
@@ -497,9 +496,9 @@ describe("structural invariants", () => {
         if (!setupCodeAllowedLessonIds.has(lesson.id)) {
           problems.push(`lesson ${lesson.id} defines privileged setupCode but is not on the validator allow-list`);
         }
-        const dangerous = setupCode.match(dangerousSetupCodePattern);
+        const dangerous = findDangerousRunnerStatement(setupCode);
         if (dangerous) {
-          problems.push(`lesson ${lesson.id} setupCode contains non-schema/seed statement '${dangerous[0]}'`);
+          problems.push(`lesson ${lesson.id} setupCode contains non-schema/seed statement '${dangerous}'`);
         }
       }
 
@@ -547,18 +546,26 @@ describe("structural invariants", () => {
       ["REINDEX;", "REINDEX"],
       ["ANALYZE;", "ANALYZE"],
       ["CREATE VIRTUAL TABLE fts USING fts5(topic);", "CREATE VIRTUAL TABLE"],
-      ["CREATE TRIGGER t AFTER INSERT ON sessions BEGIN SELECT 1; END;", "CREATE TRIGGER"]
+      ["CREATE TRIGGER t AFTER INSERT ON sessions BEGIN SELECT 1; END;", "CREATE TRIGGER"],
+      ["CREATE TEMP TRIGGER t AFTER INSERT ON sessions BEGIN SELECT 1; END;", "CREATE TEMP TRIGGER"],
+      ["CREATE TEMPORARY TRIGGER t AFTER INSERT ON sessions BEGIN SELECT 1; END;", "CREATE TEMPORARY TRIGGER"],
+      ["REPLACE INTO sessions VALUES (1);", "REPLACE INTO"],
+      ["INSERT INTO sessions VALUES (1); DROP TABLE sessions;", "DROP"]
     ];
 
     for (const [code, expectedOperator] of rejected) {
       expect(findDangerousRunnerStatement(code)).toBe(expectedOperator);
     }
 
-    // Schema + seed harnesses and legacy non-SQL markers must be allowed.
+    // Schema + seed harnesses and legacy non-SQL markers must be allowed, and
+    // keywords inside seed literals/comments must not false-positive.
     const allowed = [
       "INSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-04', 'sql', 45);",
       "-- Trusted harness SQL: seed an unseen topic\nINSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-04', 'sql', 45);",
       "CREATE TABLE IF NOT EXISTS seed (topic TEXT);\nINSERT INTO seed VALUES ('sql');",
+      "INSERT INTO sessions (topic) VALUES ('delete my notes');",
+      "-- UPDATE nothing here\nINSERT INTO sessions (topic) VALUES ('sql');",
+      "CREATE TABLE t (note TEXT DEFAULT 'drop me');",
       "SELECT 1;",
       "WITH seed AS (SELECT 1 AS n) SELECT n FROM seed;",
       "EXPECT_ROWS:no evidence",
