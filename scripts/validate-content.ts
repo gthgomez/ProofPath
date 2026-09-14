@@ -75,8 +75,62 @@ export const setupCodeAllowedLessonIds = new Set<string>([
   "lesson-sql-constraints"
 ]);
 
-// Operations setupCode may never contain: schema + seed only.
-export const dangerousSetupCodePattern = /\b(DROP|ATTACH|DETACH|PRAGMA|load_extension|UPDATE|DELETE)\b/i;
+// Operations trusted runner SQL may never contain: schema + seed only.
+// setupCode runs before the learner query, and (since Issue #11 follow-up) a
+// check's harness `code` is likewise privileged/trusted, so both must stay
+// schema + seed. The pattern covers destructive/admin statements that could
+// mutate or exfiltrate lesson data: DROP/ATTACH/DETACH/PRAGMA/load_extension/
+// UPDATE/DELETE plus ALTER/VACUUM/REINDEX/ANALYZE and virtual-table/trigger
+// creation.
+export const dangerousSetupCodePattern =
+  /\b(DROP|ATTACH|DETACH|PRAGMA|load_extension|UPDATE|DELETE|ALTER|VACUUM|REINDEX|ANALYZE|CREATE\s+VIRTUAL\s+TABLE|CREATE\s+TRIGGER)\b/i;
+
+/**
+ * Strips leading whitespace and SQL comments so a trusted code blob can be
+ * inspected from its first real statement. Comments are the only thing allowed
+ * to precede schema/seed SQL in a runner check (the hidden harness starts with
+ * `--` notes before its INSERT).
+ */
+export function stripLeadingSqlComments(code: string): string {
+  return code.replace(/^(?:\s+|--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)+/, "");
+}
+
+/**
+ * Returns the first dangerous operation found in trusted runner SQL (setupCode
+ * or a check's harness code), or null when the code is schema/seed-only. Rule
+ * Group O and tests/content-integrity.test.ts both use this so the invariant
+ * cannot drift from the validator.
+ */
+export function findDangerousRunnerStatement(code: string): string | null {
+  const match = stripLeadingSqlComments(code).match(dangerousSetupCodePattern);
+  return match ? match[0] : null;
+}
+
+/**
+ * Rule Group O's SQL check-harness guard, split out so it can be exercised with
+ * crafted input (see tests/content-integrity.test.ts) as well as the real pack.
+ * A trusted check `code` may only seed schema/rows; any dangerous operation is
+ * reported against the owning lesson so the validator fails the build.
+ */
+export function findUnsafeRunnerSqlErrors(
+  lessonId: string,
+  runnerSpec: { language: string; visibleTests: Array<{ id: string; code: string }>; hiddenTests: Array<{ id: string; code: string }> }
+): string[] {
+  if (runnerSpec.language !== "sql") {
+    return [];
+  }
+
+  const errors: string[] = [];
+  for (const test of [...runnerSpec.visibleTests, ...runnerSpec.hiddenTests]) {
+    if (!test.code || test.code.trim().length === 0) continue;
+    const dangerous = findDangerousRunnerStatement(test.code);
+    if (dangerous) {
+      errors.push(`Rule Group O: Lesson '${lessonId}' SQL check '${test.id}' code contains non-schema/seed statement '${dangerous}'`);
+    }
+  }
+
+  return errors;
+}
 
 export function validateContent(): string[] {
   const errors: string[] = [];
@@ -840,20 +894,29 @@ for (const lesson of contentPack.lessons) {
     }
   }
 
-  // --- RULE GROUP O: Runner setupCode Safety (Issue #11) ---
+  // --- RULE GROUP O: Runner setupCode + check harness Safety (Issue #11) ---
   // setupCode is privileged: src/sandbox/runner.ts runs it directly against
   // SQLite without the validateSandboxSubmission policy gate. It must therefore
   // stay on an explicit allow-list and contain only schema + seed statements.
+  // A SQL check's `code` is also privileged harness SQL that runs before the
+  // learner query, so it is held to the same schema + seed standard (the level-7
+  // INSERT harness and legacy EXPECT_ROWS markers must still pass).
   for (const lesson of contentPack.lessons) {
-    const setupCode = lesson.workshop.miniProject.runnerSpec.setupCode;
-    if (!setupCode || setupCode.trim().length === 0) continue;
-    if (!setupCodeAllowedLessonIds.has(lesson.id)) {
-      errors.push(`Rule Group O: Lesson '${lesson.id}' defines privileged setupCode but is not on the setupCode allow-list`);
+    const runnerSpec = lesson.workshop.miniProject.runnerSpec;
+    const setupCode = runnerSpec.setupCode;
+    if (setupCode && setupCode.trim().length > 0) {
+      if (!setupCodeAllowedLessonIds.has(lesson.id)) {
+        errors.push(`Rule Group O: Lesson '${lesson.id}' defines privileged setupCode but is not on the setupCode allow-list`);
+      }
+      const dangerous = setupCode.match(dangerousSetupCodePattern);
+      if (dangerous) {
+        errors.push(`Rule Group O: Lesson '${lesson.id}' setupCode contains non-schema/seed statement '${dangerous[0]}'`);
+      }
     }
-    const dangerous = setupCode.match(dangerousSetupCodePattern);
-    if (dangerous) {
-      errors.push(`Rule Group O: Lesson '${lesson.id}' setupCode contains non-schema/seed statement '${dangerous[0]}'`);
-    }
+
+    if (runnerSpec.language !== "sql") continue;
+
+    errors.push(...findUnsafeRunnerSqlErrors(lesson.id, runnerSpec));
   }
 
   // --- RULE GROUP P: Concept Registry Hygiene (Issue #7) ---

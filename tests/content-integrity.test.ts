@@ -6,6 +6,8 @@ import { contentPackSchema, roleTargetSchema } from "@/domain/schemas";
 import { validateSandboxSubmission } from "@/sandbox/policy";
 import {
   dangerousSetupCodePattern,
+  findDangerousRunnerStatement,
+  findUnsafeRunnerSqlErrors,
   setupCodeAllowedLessonIds,
   supportingConceptAllowList,
   validateContent
@@ -485,21 +487,38 @@ describe("structural invariants", () => {
     // reuses those exports so the invariant cannot drift from the validator.
     const problems: string[] = [];
     let setupCodeLessons = 0;
+    let sqlCheckHarnesses = 0;
 
     for (const lesson of contentPack.lessons) {
-      const setupCode = lesson.workshop.miniProject.runnerSpec.setupCode;
-      if (!setupCode || setupCode.trim().length === 0) continue;
-      setupCodeLessons++;
-      if (!setupCodeAllowedLessonIds.has(lesson.id)) {
-        problems.push(`lesson ${lesson.id} defines privileged setupCode but is not on the validator allow-list`);
+      const runnerSpec = lesson.workshop.miniProject.runnerSpec;
+      const setupCode = runnerSpec.setupCode;
+      if (setupCode && setupCode.trim().length > 0) {
+        setupCodeLessons++;
+        if (!setupCodeAllowedLessonIds.has(lesson.id)) {
+          problems.push(`lesson ${lesson.id} defines privileged setupCode but is not on the validator allow-list`);
+        }
+        const dangerous = setupCode.match(dangerousSetupCodePattern);
+        if (dangerous) {
+          problems.push(`lesson ${lesson.id} setupCode contains non-schema/seed statement '${dangerous[0]}'`);
+        }
       }
-      const dangerous = setupCode.match(dangerousSetupCodePattern);
-      if (dangerous) {
-        problems.push(`lesson ${lesson.id} setupCode contains non-schema/seed statement '${dangerous[0]}'`);
+
+      // A SQL check's `code` is privileged harness SQL too: it runs before the
+      // learner query, outside the sandbox policy gate. Mirror Rule Group O's
+      // schema-and-seed requirement so a dangerous harness cannot ship.
+      if (runnerSpec.language !== "sql") continue;
+      for (const test of [...runnerSpec.visibleTests, ...runnerSpec.hiddenTests]) {
+        if (!test.code || test.code.trim().length === 0) continue;
+        sqlCheckHarnesses++;
+        const dangerous = findDangerousRunnerStatement(test.code);
+        if (dangerous) {
+          problems.push(`lesson ${lesson.id} SQL check '${test.id}' code contains non-schema/seed statement '${dangerous}'`);
+        }
       }
     }
 
     expect(setupCodeLessons).toBeGreaterThan(0);
+    expect(sqlCheckHarnesses).toBeGreaterThan(0);
     expect(problems).toEqual([]);
 
     // The allow-list must stay tight: every vetted lesson actually ships setupCode,
@@ -509,6 +528,81 @@ describe("structural invariants", () => {
       return !lesson?.workshop.miniProject.runnerSpec.setupCode?.trim();
     });
     expect(allowlistedWithoutSetupCode).toEqual([]);
+  });
+
+  it("rejects dangerous trusted SQL harness code in runner checks (negative fixture)", () => {
+    // Negative fixture: Rule Group O must fail closed on privileged harness SQL.
+    // These crafted strings stand in for a malicious content pack, so the rule is
+    // proven to reject bad input rather than merely passing the real content.
+    const rejected: Array<[string, string]> = [
+      ["DROP TABLE sessions;", "DROP"],
+      ["  -- seed then destroy\nDROP TABLE sessions;", "DROP"],
+      ["UPDATE sessions SET minutes = 0;", "UPDATE"],
+      ["DELETE FROM sessions;", "DELETE"],
+      ["ALTER TABLE sessions ADD COLUMN hidden TEXT;", "ALTER"],
+      ["PRAGMA table_info(sessions);", "PRAGMA"],
+      ["ATTACH DATABASE 'evil.db' AS evil;", "ATTACH"],
+      ["DETACH DATABASE evil;", "DETACH"],
+      ["VACUUM;", "VACUUM"],
+      ["REINDEX;", "REINDEX"],
+      ["ANALYZE;", "ANALYZE"],
+      ["CREATE VIRTUAL TABLE fts USING fts5(topic);", "CREATE VIRTUAL TABLE"],
+      ["CREATE TRIGGER t AFTER INSERT ON sessions BEGIN SELECT 1; END;", "CREATE TRIGGER"]
+    ];
+
+    for (const [code, expectedOperator] of rejected) {
+      expect(findDangerousRunnerStatement(code)).toBe(expectedOperator);
+    }
+
+    // Schema + seed harnesses and legacy non-SQL markers must be allowed.
+    const allowed = [
+      "INSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-04', 'sql', 45);",
+      "-- Trusted harness SQL: seed an unseen topic\nINSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-04', 'sql', 45);",
+      "CREATE TABLE IF NOT EXISTS seed (topic TEXT);\nINSERT INTO seed VALUES ('sql');",
+      "SELECT 1;",
+      "WITH seed AS (SELECT 1 AS n) SELECT n FROM seed;",
+      "EXPECT_ROWS:no evidence",
+      "-- visible check runs no harness SQL",
+      ""
+    ];
+
+    for (const code of allowed) {
+      expect(findDangerousRunnerStatement(code)).toBeNull();
+    }
+
+    // Belt-and-braces: the real content must satisfy the same predicate.
+    for (const lesson of contentPack.lessons) {
+      const runnerSpec = lesson.workshop.miniProject.runnerSpec;
+      if (runnerSpec.language !== "sql") continue;
+      for (const test of [...runnerSpec.visibleTests, ...runnerSpec.hiddenTests]) {
+        expect(findDangerousRunnerStatement(test.code)).toBeNull();
+      }
+    }
+
+    // Prove the actual Rule Group O guard fails closed on a crafted lesson whose
+    // SQL check harness is destructive (a whole malicious pack cannot be
+    // injected because validateContent reads the shipped pack).
+    const craftedErrors = findUnsafeRunnerSqlErrors("lesson-crafted-evil", {
+      language: "sql",
+      visibleTests: [{ id: "visible", code: "SELECT 1;" }],
+      hiddenTests: [{ id: "hidden", code: "DROP TABLE sessions;" }]
+    });
+    expect(craftedErrors).toHaveLength(1);
+    expect(craftedErrors[0]).toContain("lesson-crafted-evil");
+    expect(craftedErrors[0]).toContain("hidden");
+    expect(craftedErrors[0]).toContain("DROP");
+
+    // Non-SQL specs and safe SQL harnesses produce no errors.
+    expect(findUnsafeRunnerSqlErrors("lesson-crafted-safe", {
+      language: "sql",
+      visibleTests: [{ id: "visible", code: "EXPECT_ROWS:no evidence" }],
+      hiddenTests: [{ id: "hidden", code: "-- seed\nINSERT INTO sessions (topic) VALUES ('sql');" }]
+    })).toEqual([]);
+    expect(findUnsafeRunnerSqlErrors("lesson-crafted-js", {
+      language: "javascript",
+      visibleTests: [{ id: "visible", code: "DROP TABLE sessions;" }],
+      hiddenTests: []
+    })).toEqual([]);
   });
 
   it("runs module-python lessons in the python sandbox except documented simulations", () => {

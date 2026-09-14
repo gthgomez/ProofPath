@@ -41,7 +41,10 @@ describe("sandbox policy keyword matching", () => {
       "socket.socket()",
       "urllib.request.urlopen('https://example.com')",
       "import http.client",
-      "http.client.HTTPSConnection('example.com')"
+      "http.client.HTTPSConnection('example.com')",
+      "import os, socket",
+      "import http as h\nh.client.HTTPSConnection('x')",
+      "from http import client\nclient.HTTPSConnection('x')"
     ])("blocks real network usage: %s", (code) => {
       expect(rulesTriggered("python", code)).toContain("python-network");
     });
@@ -52,6 +55,22 @@ describe("sandbox policy keyword matching", () => {
       expect(rulesTriggered("python", "eval('1 + 1')")).toContain("python-dynamic-code");
       expect(rulesTriggered("python", "open('data.txt')")).toContain("python-file-io");
       expect(rulesTriggered("python", "while True:\n    pass")).toContain("python-infinite-loop");
+    });
+  });
+
+  describe("python dynamic imports are blocked", () => {
+    it.each([
+      'import importlib\nimportlib.import_module("requests")',
+      'import importlib\nimportlib.import_module("subprocess")',
+      'importlib.import_module("requests")',
+      'from importlib import import_module\nimport_module("socket")'
+    ])("blocks importlib/import_module: %s", (code) => {
+      expect(rulesTriggered("python", code)).toContain("python-dynamic-import");
+    });
+
+    it("does not flag dynamic-import words inside comments or strings", () => {
+      expect(rulesTriggered("python", "note = 'call importlib.import_module soon'")).not.toContain("python-dynamic-import");
+      expect(rulesTriggered("python", "# importlib.import_module('requests')\nprint('ok')")).not.toContain("python-dynamic-import");
     });
   });
 
@@ -80,6 +99,15 @@ describe("sandbox policy keyword matching", () => {
       expect(rulesTriggered("sql", "SELECT 'it''s a delete' AS note;")).toEqual([]);
     });
 
+    it.each([
+      'SELECT "DROP" AS note;',
+      "SELECT `DROP` AS note;",
+      "SELECT [DROP] AS note;",
+      'SELECT "a\'b" AS note;'
+    ])("allows mutation keywords inside quoted identifiers: %s", (code) => {
+      expect(rulesTriggered("sql", code)).toEqual([]);
+    });
+
     it("allows attach and extension keywords inside comments and strings", () => {
       expect(rulesTriggered("sql", "-- attach database 'x' as y\nSELECT 'load_extension';")).toEqual([]);
     });
@@ -93,6 +121,9 @@ describe("sandbox policy keyword matching", () => {
       ["REPLACE INTO t VALUES (1)", "sql-mutation"],
       ["VACUUM", "sql-mutation"],
       ["PRAGMA table_info(t)", "sql-mutation"],
+      ['SELECT "a\'b" ; DROP TABLE victim', "sql-mutation"],
+      ["SELECT `a'b` ; DROP TABLE victim", "sql-mutation"],
+      ["SELECT [a'b] ; DROP TABLE victim", "sql-mutation"],
       ["ATTACH DATABASE 'x' AS y", "sql-attach"],
       ["DETACH DATABASE y", "sql-attach"],
       ["SELECT load_extension('evil')", "sql-extension"],

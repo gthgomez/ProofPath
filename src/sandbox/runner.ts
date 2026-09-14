@@ -37,15 +37,20 @@ const SQLJS_DIST_URL = "/sandbox-assets/sql.js/";
 // Python's `__name__` for a file run directly is "__main__"; imported modules use
 // their own name. The sandbox has no real module name for checks, so it uses a
 // neutral import-style sentinel that guarantees `__name__ != "__main__"`.
-const PYTHON_DIRECT_RUN_NAME = "__main__";
-const PYTHON_IMPORT_STYLE_NAME = "<module>";
+// The native WebView runner mirrors these exact values.
+export const PYTHON_DIRECT_RUN_NAME = "__main__";
+export const PYTHON_IMPORT_RUN_NAME = "<module>";
 
-// A test's `code` may carry trusted harness SQL that mutates the freshly seeded
-// database before the learner query runs. Legacy checks used non-SQL placeholder
-// tokens (for example "EXPECT_ROWS:...") and comment-only notes, so only code
-// whose first statement is real SQL is executed.
-const SQL_HARNESS_STATEMENT =
-  /^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/|\s)*(SELECT|WITH|INSERT|REPLACE|UPDATE|DELETE|CREATE|ALTER|DROP|PRAGMA|VACUUM|ATTACH|DETACH|EXPLAIN|ANALYZE|REINDEX)\b/i;
+// A test's `code` may carry trusted harness SQL that seeds the freshly created
+// database before the learner query runs. The harness is privileged (it is not
+// gated by validateSandboxSubmission), so it is restricted to seed-safe
+// statements only: SELECT, WITH, INSERT, and CREATE. Anything else (UPDATE,
+// DELETE, DROP, ALTER, VACUUM, PRAGMA, ATTACH, DETACH, REINDEX, ANALYZE, ...)
+// is rejected, and legacy checks with non-SQL placeholder tokens (for example
+// "EXPECT_ROWS:...") or comment-only notes are never executed as SQL.
+// The native WebView runner mirrors this exact pattern.
+export const SQL_HARNESS_PATTERN =
+  /^\s*(?:(?:--[^\n]*\n?|\/\*[\s\S]*?\*\/)\s*)*(SELECT|WITH|INSERT|CREATE)\b/i;
 
 declare global {
   // Test environments that run code inside a VM may not allow dynamic import from new Function.
@@ -243,6 +248,11 @@ self.onmessage = (event) => {
         visible,
         message: formatSandboxFailureMessage(error, language)
       });
+    } finally {
+      // Hidden check output must never reach learner-visible stdout.
+      if (!visible) {
+        stdout.length = stdoutStart;
+      }
     }
   }
 
@@ -329,6 +339,11 @@ async function runJavaScriptInProcess(spec: LessonRunnerSpec, runtimeCode: strin
       testResults.push(passResult(test, visible));
     } catch (error) {
       testResults.push(failResult(test, visible, error, spec.language));
+    } finally {
+      // Hidden check output must never reach learner-visible stdout.
+      if (!visible) {
+        captured.stdout.length = stdoutStart;
+      }
     }
   }
 
@@ -387,16 +402,16 @@ async function runPython(spec: LessonRunnerSpec, code: string, runMode: CodeRunM
   const testResults: CodeRunTestResult[] = [];
   const stdout: string[] = [];
   const stderr: string[] = [];
-  const moduleName = runMode === "run_file" ? PYTHON_DIRECT_RUN_NAME : PYTHON_IMPORT_STYLE_NAME;
+  const moduleName = runMode === "run_file" ? PYTHON_DIRECT_RUN_NAME : PYTHON_IMPORT_RUN_NAME;
 
   pyodide.setStdout({ batched: (text: string) => stdout.push(text) });
   pyodide.setStderr({ batched: (text: string) => stderr.push(text) });
 
   for (const [index, test] of [...spec.visibleTests, ...spec.hiddenTests].entries()) {
     const visible = index < spec.visibleTests.length;
+    const stdoutStart = stdout.length;
 
     try {
-      const stdoutStart = stdout.length;
       const wrappedCode = [
         `_careerforge_globals = {'__builtins__': __builtins__, '__name__': ${JSON.stringify(moduleName)}}`,
         `exec(${JSON.stringify(code)}, _careerforge_globals)`,
@@ -412,6 +427,12 @@ async function runPython(spec: LessonRunnerSpec, code: string, runMode: CodeRunM
     } catch (error) {
       stderr.push(error instanceof Error ? error.message : normalizeOutput(error));
       testResults.push(failResult(test, visible, error, spec.language));
+    } finally {
+      // Hidden checks must never contribute to learner-visible stdout: their
+      // harness can reveal the anti-forgery seed. Keep only visible output.
+      if (!visible) {
+        stdout.length = stdoutStart;
+      }
     }
   }
 
@@ -509,14 +530,20 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
       // A check's `code` is trusted harness SQL (like setupCode): it runs against
       // the freshly seeded database before the learner query and is not subject
       // to the read-only policy that gates learner submissions. Hidden checks use
-      // this to mutate the seed so a hardcoded/forged result cannot match.
-      if (test.code && SQL_HARNESS_STATEMENT.test(test.code)) {
+      // this to seed rows so a hardcoded/forged result cannot match. The harness
+      // is restricted to seed-safe statements (SQL_HARNESS_PATTERN).
+      if (test.code && SQL_HARNESS_PATTERN.test(test.code)) {
         db.run(test.code);
       }
 
       const result = db.exec(code);
       const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n");
-      stdout.push(output);
+      // Hidden checks must never contribute to learner-visible stdout: their
+      // output reveals the anti-forgery seed inserted by the harness. Evaluate
+      // the hidden expectation from `output`, but only publish visible output.
+      if (visible) {
+        stdout.push(output);
+      }
 
       if (!includesAll(output, test.expectedOutputIncludes)) {
         throw new Error("Output missing");
