@@ -18,20 +18,209 @@ interface PatternRule {
 
 const MAX_CODE_LENGTH = 20000;
 
-const commonRules: PatternRule[] = [
-  { rule: "network-fetch", pattern: /\bfetch\s*\(/i, message: "Network calls are disabled in beginner sandboxes." },
-  { rule: "dynamic-import", pattern: /\bimport\s*\(/i, message: "Dynamic imports are disabled in beginner sandboxes." }
-];
+/**
+ * Removes JavaScript comments and string/template literals so policy rules match
+ * executable code rather than words inside line/block comments or string data.
+ * Newlines are preserved so future line-oriented rules keep their meaning.
+ * Handles single-, double-, and backtick-quoted strings with backslash escapes.
+ * Template literal interpolations (`${...}`) are executable, so they are kept
+ * and recursively sanitized; a blocked name inside `${}` is still matched,
+ * which avoids turning the sanitizer itself into an evasion path.
+ */
+function stripJsCommentsAndStrings(code: string): string {
+  let sanitized = "";
+  let index = 0;
+
+  const blankChar = (char: string): string => (char === "\n" ? "\n" : " ");
+
+  // Whether a `/` here would start a regex literal rather than division. A
+  // regex can follow only after operators/punctuation that cannot end an
+  // expression (or a regex-preceding keyword); after a value (identifier,
+  // literal, `)`, `]`, `}`) a slash is division. Tracking this keeps the
+  // sanitizer from blanking executable code when it misreads a slash.
+  let regexAllowed = true;
+
+  const REGEX_PRECEDING_KEYWORDS = new Set([
+    "return", "typeof", "instanceof", "in", "of", "new", "delete", "void",
+    "case", "do", "else", "yield", "await", "throw"
+  ]);
+
+  const noteCodeChar = (char: string): void => {
+    if (/\s/.test(char)) return;
+    if (/[A-Za-z0-9_$]/.test(char)) {
+      const wordMatch = /([A-Za-z_$][A-Za-z0-9_$]*)$/.exec(sanitized);
+      regexAllowed = wordMatch ? REGEX_PRECEDING_KEYWORDS.has(wordMatch[1]) : false;
+      return;
+    }
+    regexAllowed = "([{,;:?=!&|^~<>".includes(char);
+  };
+
+  const scan = (insideInterpolation: boolean): void => {
+    let braceDepth = 0;
+
+    while (index < code.length) {
+      const char = code[index];
+      const next = code[index + 1];
+
+      if (insideInterpolation && char === "{") {
+        braceDepth += 1;
+        sanitized += char;
+        index += 1;
+        regexAllowed = true;
+        continue;
+      }
+
+      if (insideInterpolation && char === "}") {
+        if (braceDepth === 0) {
+          sanitized += char;
+          index += 1;
+          regexAllowed = false;
+          return;
+        }
+        braceDepth -= 1;
+        sanitized += char;
+        index += 1;
+        regexAllowed = false;
+        continue;
+      }
+
+      if (char === "/" && next === "/") {
+        while (index < code.length && code[index] !== "\n") {
+          sanitized += " ";
+          index += 1;
+        }
+        continue;
+      }
+
+      if (char === "/" && next === "*") {
+        sanitized += "  ";
+        index += 2;
+        while (index < code.length && !(code[index] === "*" && code[index + 1] === "/")) {
+          sanitized += blankChar(code[index]);
+          index += 1;
+        }
+        if (index < code.length) {
+          sanitized += "  ";
+          index += 2;
+        }
+        continue;
+      }
+
+      if (char === "/" && regexAllowed) {
+        // Regex literal (or a misdetected division): blank it as a unit so a
+        // `//` or a keyword inside can never be mistaken for a comment/code.
+        sanitized += " ";
+        index += 1;
+        let inClass = false;
+        while (index < code.length) {
+          const regexChar = code[index];
+          if (regexChar === "\\" && index + 1 < code.length) {
+            sanitized += blankChar(regexChar) + blankChar(code[index + 1]);
+            index += 2;
+            continue;
+          }
+          if (regexChar === "\n") {
+            break;
+          }
+          if (regexChar === "[") {
+            inClass = true;
+          } else if (regexChar === "]") {
+            inClass = false;
+          } else if (regexChar === "/" && !inClass) {
+            sanitized += " ";
+            index += 1;
+            break;
+          }
+          sanitized += blankChar(regexChar);
+          index += 1;
+        }
+        while (index < code.length && /[a-z]/i.test(code[index])) {
+          sanitized += " ";
+          index += 1;
+        }
+        regexAllowed = false;
+        continue;
+      }
+
+      if (char === "'" || char === '"') {
+        sanitized += " ";
+        index += 1;
+        while (index < code.length) {
+          if (code[index] === "\\" && index + 1 < code.length) {
+            sanitized += blankChar(code[index]) + blankChar(code[index + 1]);
+            index += 2;
+            continue;
+          }
+          if (code[index] === char) {
+            sanitized += " ";
+            index += 1;
+            break;
+          }
+          if (code[index] === "\n") {
+            // Unterminated single-line string; keep the newline so the rest of
+            // the file remains analyzable.
+            sanitized += "\n";
+            index += 1;
+            break;
+          }
+          sanitized += blankChar(code[index]);
+          index += 1;
+        }
+        regexAllowed = false;
+        continue;
+      }
+
+      if (char === "`") {
+        sanitized += " ";
+        index += 1;
+        while (index < code.length) {
+          if (code[index] === "\\" && index + 1 < code.length) {
+            sanitized += blankChar(code[index]) + blankChar(code[index + 1]);
+            index += 2;
+            continue;
+          }
+          if (code[index] === "`") {
+            sanitized += " ";
+            index += 1;
+            break;
+          }
+          if (code[index] === "$" && code[index + 1] === "{") {
+            sanitized += "${";
+            index += 2;
+            regexAllowed = true;
+            scan(true);
+            continue;
+          }
+          sanitized += blankChar(code[index]);
+          index += 1;
+        }
+        regexAllowed = false;
+        continue;
+      }
+
+      sanitized += char;
+      index += 1;
+      noteCodeChar(char);
+    }
+  };
+
+  scan(false);
+  return sanitized;
+}
 
 const javascriptRules: PatternRule[] = [
-  { rule: "eval", pattern: /\beval\s*\(/i, message: "eval is disabled in the sandbox." },
-  { rule: "function-constructor", pattern: /\bFunction\s*\(/, message: "The Function constructor is disabled in learner code." },
+  { rule: "network-fetch", pattern: /\bfetch\b/i, message: "Network calls are disabled in beginner sandboxes.", sanitize: stripJsCommentsAndStrings },
+  { rule: "dynamic-import", pattern: /\bimport\s*\(/i, message: "Dynamic imports are disabled in beginner sandboxes.", sanitize: stripJsCommentsAndStrings },
+  { rule: "eval", pattern: /\beval\b/i, message: "eval is disabled in the sandbox.", sanitize: stripJsCommentsAndStrings },
+  { rule: "function-constructor", pattern: /\bFunction\b/, message: "The Function constructor is disabled in learner code.", sanitize: stripJsCommentsAndStrings },
+  // Constructor escape is matched on the raw source: the bracket form encodes the
+  // property name as a string literal, which the sanitizer would otherwise blank.
   { rule: "constructor-escape", pattern: /\.constructor\b|\["constructor"\]|\['constructor'\]/, message: "Constructor escape patterns are disabled." },
-  { rule: "global-object", pattern: /\b(globalThis|window|document|process|require)\b/, message: "Global host objects are not available to learner code." },
-  { rule: "browser-storage", pattern: /\b(localStorage|sessionStorage|indexedDB)\b/i, message: "Browser storage is disabled in beginner sandboxes." },
-  { rule: "browser-network", pattern: /\b(XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b/i, message: "Browser network APIs are disabled in beginner sandboxes." },
-  { rule: "prototype-access", pattern: /\b(__proto__|prototype)\b/, message: "Prototype mutation/introspection is disabled." },
-  { rule: "infinite-loop", pattern: /while\s*\(\s*true\s*\)|for\s*\(\s*;\s*;\s*\)/i, message: "Obvious infinite loops are blocked before execution." }
+  { rule: "global-object", pattern: /\b(globalThis|self|window|document|process|require)\b/, message: "Global host objects are not available to learner code.", sanitize: stripJsCommentsAndStrings },
+  { rule: "browser-storage", pattern: /\b(localStorage|sessionStorage|indexedDB)\b/i, message: "Browser storage is disabled in beginner sandboxes.", sanitize: stripJsCommentsAndStrings },
+  { rule: "browser-network", pattern: /\b(XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b/i, message: "Browser network APIs are disabled in beginner sandboxes.", sanitize: stripJsCommentsAndStrings },
+  { rule: "prototype-access", pattern: /\b(__proto__|prototype)\b/, message: "Prototype mutation/introspection is disabled.", sanitize: stripJsCommentsAndStrings },
+  { rule: "infinite-loop", pattern: /while\s*\(\s*true\s*\)|for\s*\(\s*;\s*;\s*\)/i, message: "Obvious infinite loops are blocked before execution.", sanitize: stripJsCommentsAndStrings }
 ];
 
 /**
@@ -273,19 +462,19 @@ function stripSqlCommentsAndStrings(code: string): string {
 const sqlRules: PatternRule[] = [
   { rule: "sql-attach", pattern: /\b(ATTACH|DETACH)\b/i, message: "Attaching external databases is disabled.", sanitize: stripSqlCommentsAndStrings },
   { rule: "sql-extension", pattern: /\b(load_extension|CREATE\s+VIRTUAL\s+TABLE)\b/i, message: "SQLite extensions and virtual tables are disabled.", sanitize: stripSqlCommentsAndStrings },
-  { rule: "sql-mutation", pattern: /\b(DROP|DELETE|UPDATE|INSERT|ALTER|REPLACE|VACUUM|PRAGMA)\b/i, message: "Learner SQL sandboxes are read-only; write statements are disabled.", sanitize: stripSqlCommentsAndStrings }
+  { rule: "sql-mutation", pattern: /\b(DROP|DELETE|UPDATE|INSERT|ALTER|REPLACE\s+INTO|VACUUM|PRAGMA|REINDEX|ANALYZE)\b/i, message: "Data-modifying and destructive statements are disabled in learner SQL.", sanitize: stripSqlCommentsAndStrings }
 ];
 
 function rulesForLanguage(language: LessonRunnerSpec["language"]): PatternRule[] {
   if (language === "python") {
-    return [...commonRules, ...pythonRules];
+    return [...pythonRules];
   }
 
   if (language === "sql") {
     return [...sqlRules];
   }
 
-  return [...commonRules, ...javascriptRules];
+  return [...javascriptRules];
 }
 
 export function validateSandboxSubmission(spec: LessonRunnerSpec, code: string): SandboxPolicyViolation[] {

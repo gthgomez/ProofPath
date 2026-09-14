@@ -255,6 +255,7 @@ describe("structural invariants", () => {
           for (const edit of depth.guidedEdits) for (const id of edit.conceptIds) push(id);
           for (const clinic of depth.errorClinic) for (const id of clinic.conceptIds) push(id);
           for (const id of depth.codeLabBridge.usesConcepts) push(id);
+          for (const id of depth.codeLabBridge.verifierOnlyConcepts ?? []) push(id);
         });
         for (const id of depthIds) {
           if (!registeredConceptIds.has(id)) dangling.push(`lesson ${lesson.id} depth references unknown concept '${id}'`);

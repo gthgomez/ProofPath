@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
-import type { CodeRunAttempt } from "@/domain/types";
+import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec } from "@/domain/types";
 import {
   createNativeWebViewRunnerHtml,
   NATIVE_ANDROID_SANDBOX_BASE_URL,
@@ -43,7 +43,6 @@ describe("native WebView sandbox runner bridge", () => {
     // the import sentinel so Code Lab checks stay import-style.
     expect(html).toContain('request.runMode === "run_file" ? PYTHON_DIRECT_RUN_NAME : PYTHON_IMPORT_RUN_NAME');
     expect(html).toContain('pyodide.globals.set("__name__", moduleName);');
-    expect(html).toContain("__name__");
 
     // Ordering, not just presence: the sentinel is selected before it is bound to
     // Pyodide's globals, and both happen before the per-check loop. Reversing any
@@ -238,5 +237,237 @@ describe("native WebView sandbox runner bridge", () => {
   it("ignores malformed or unknown messages", () => {
     expect(parseNativeWebViewRunnerMessage("{")).toBeNull();
     expect(parseNativeWebViewRunnerResult(JSON.stringify({ type: "sandbox-ready", assets: SANDBOX_ASSET_PATHS }))).toBeNull();
+  });
+});
+
+// The tests above assert on the generated HTML text. The harness below executes
+// the same embedded script with stubbed host globals so the runtime logic (fresh
+// per-check databases, harness ordering, __name__ binding) is observed rather
+// than merely grepped for.
+type EmbeddedAttempt = {
+  id: string;
+  lessonId: string;
+  language: string;
+  runMode: string;
+  stdout: string;
+  stderr: string;
+  passed: boolean;
+  score: number;
+  testResults: Array<{ id: string; visible: boolean; passed: boolean; message: string }>;
+  hiddenCheckSummary: { total: number; passed: number; failed: number };
+};
+
+interface EmbeddedRunnerOptions {
+  request: {
+    lessonId: string;
+    spec: LessonRunnerSpec;
+    code: string;
+    now: string;
+    runMode: CodeRunMode;
+  };
+  initSqlJs?: () => Promise<{ Database: new () => unknown }>;
+  loadPyodide?: () => Promise<unknown>;
+}
+
+function runEmbeddedNativeRunner(options: EmbeddedRunnerOptions): Promise<EmbeddedAttempt> {
+  const html = createNativeWebViewRunnerHtml();
+  const script = /<script>([\s\S]*)<\/script>/.exec(html)?.[1];
+  if (!script) {
+    throw new Error("embedded runner script not found");
+  }
+
+  let resolveResult!: (attempt: EmbeddedAttempt) => void;
+  const resultPromise = new Promise<EmbeddedAttempt>((resolve) => {
+    resolveResult = resolve;
+  });
+
+  const windowStub: Record<string, any> = {
+    ReactNativeWebView: {
+      postMessage: (payload: string) => {
+        const message = JSON.parse(payload) as { type?: string; attempt?: EmbeddedAttempt };
+        if (message.type === "sandbox-result" && message.attempt) {
+          resolveResult(message.attempt);
+        }
+      }
+    },
+    addEventListener: () => {},
+    initSqlJs: options.initSqlJs,
+    loadPyodide: options.loadPyodide
+  };
+  const documentStub = {
+    addEventListener: () => {},
+    querySelector: () => null,
+    createElement: () => ({}),
+    head: { appendChild: () => {} }
+  };
+
+  new Function("window", "document", script)(windowStub, documentStub);
+  windowStub.CareerForgeSandbox.run({ type: "run", request: options.request });
+  return resultPromise;
+}
+
+class FakeSqlDatabase {
+  rows: unknown[][] = [["python", "50"], ["git", "15"]];
+  runCalls: string[] = [];
+  execCalls: string[] = [];
+  closed = false;
+
+  run(sql: string): void {
+    this.runCalls.push(sql);
+    if (/INSERT\s+INTO\s+sessions/i.test(sql) && sql.includes("'sql'")) {
+      this.rows = [["python", "50"], ["git", "15"], ["sql", "45"]];
+    }
+  }
+
+  exec(sql: string): Array<{ columns: string[]; values: unknown[][] }> {
+    this.execCalls.push(sql);
+    return [{ columns: ["topic", "total"], values: this.rows }];
+  }
+
+  close(): void {
+    this.closed = true;
+  }
+}
+
+function createFakeSqlRuntime(): {
+  databases: FakeSqlDatabase[];
+  initSqlJs: () => Promise<{ Database: new () => unknown }>;
+} {
+  const databases: FakeSqlDatabase[] = [];
+  class TrackedDatabase extends FakeSqlDatabase {
+    constructor() {
+      super();
+      databases.push(this);
+    }
+  }
+
+  return { databases, initSqlJs: async () => ({ Database: TrackedDatabase }) };
+}
+
+describe("native WebView runner behavior (embedded script executed with stubs)", () => {
+  it("creates and closes a fresh database per check, running the gated harness before the query", async () => {
+    const setupCode = "CREATE TABLE sessions (topic TEXT, minutes INTEGER);";
+    const hiddenHarness = "INSERT INTO sessions (topic, minutes) VALUES ('sql', 45);";
+    const learnerQuery = "SELECT topic, SUM(minutes) FROM sessions GROUP BY topic ORDER BY topic;";
+    const { databases, initSqlJs } = createFakeSqlRuntime();
+
+    const attempt = await runEmbeddedNativeRunner({
+      request: {
+        lessonId: "lesson-native-sql",
+        code: learnerQuery,
+        now: "2026-05-08T22:10:00.000Z",
+        runMode: "run_checks",
+        spec: {
+          language: "sql",
+          instructions: "Summarize study minutes per topic.",
+          starterCode: learnerQuery,
+          setupCode,
+          visibleTests: [
+            {
+              id: "visible",
+              name: "Visible",
+              code: "-- visible check runs no harness SQL",
+              expectedOutputIncludes: ["python | 50"]
+            }
+          ],
+          hiddenTests: [
+            {
+              id: "hidden",
+              name: "Hidden",
+              code: hiddenHarness,
+              expectedOutputIncludes: ["python | 50", "sql | 45"]
+            }
+          ],
+          expectedOutput: ["python | 50"],
+          timeoutMs: 30000,
+          allowNetwork: false
+        }
+      },
+      initSqlJs
+    });
+
+    // One fresh database per check, each closed.
+    expect(databases).toHaveLength(2);
+    expect(databases.every((database) => database.closed)).toBe(true);
+
+    // The visible check's comment-only harness is skipped; the hidden check runs
+    // its seed after setup. Both run their single learner query once.
+    expect(databases[0]?.runCalls).toEqual([setupCode]);
+    expect(databases[1]?.runCalls).toEqual([setupCode, hiddenHarness]);
+    for (const database of databases) {
+      expect(database.execCalls).toEqual([learnerQuery]);
+    }
+
+    // The hidden check only passes because its harness ran before the learner
+    // query: the seeded sql row satisfies expectedOutputIncludes but must not be
+    // published to learner-visible stdout.
+    expect(attempt.passed).toBe(true);
+    expect(attempt.stdout).toContain("python | 50");
+    expect(attempt.stdout).not.toContain("sql | 45");
+    expect(attempt.testResults.map((result) => result.id)).toEqual(["visible"]);
+    expect(attempt.hiddenCheckSummary).toEqual({ total: 0, passed: 0, failed: 0 });
+  });
+
+  it("binds the import sentinel before checks and the direct sentinel for run_file", async () => {
+    const createFakePyodide = () => {
+      const events: string[] = [];
+      const pyodide = {
+        setStdout: () => {},
+        setStderr: () => {},
+        globals: {
+          set: (key: string, value: unknown) => {
+            events.push(`globals.set:${key}=${String(value)}`);
+          }
+        },
+        runPythonAsync: async (code: string) => {
+          events.push(`runPythonAsync:${code}`);
+        }
+      };
+      return { events, pyodide };
+    };
+
+    const spec: LessonRunnerSpec = {
+      language: "python",
+      instructions: "Probe the bound __name__.",
+      starterCode: "print(__name__)",
+      visibleTests: [{ id: "visible", name: "Visible", code: "print('ok')", expectedOutputIncludes: [] }],
+      hiddenTests: [],
+      expectedOutput: [],
+      timeoutMs: 30000,
+      allowNetwork: false
+    };
+
+    const checks = createFakePyodide();
+    const checkAttempt = await runEmbeddedNativeRunner({
+      request: {
+        lessonId: "lesson-native-python",
+        code: "print('probe')",
+        now: "2026-05-08T22:11:00.000Z",
+        runMode: "run_checks",
+        spec
+      },
+      loadPyodide: async () => checks.pyodide
+    });
+
+    expect(checks.events[0]).toBe(`globals.set:__name__=${PYTHON_IMPORT_RUN_NAME}`);
+    expect(checks.events).not.toContain(`globals.set:__name__=${PYTHON_DIRECT_RUN_NAME}`);
+    const firstRun = checks.events.findIndex((event) => event.startsWith("runPythonAsync:"));
+    expect(firstRun).toBeGreaterThan(0);
+    expect(checks.events.indexOf(`globals.set:__name__=${PYTHON_IMPORT_RUN_NAME}`)).toBeLessThan(firstRun);
+    expect(checkAttempt.passed).toBe(true);
+
+    const direct = createFakePyodide();
+    await runEmbeddedNativeRunner({
+      request: {
+        lessonId: "lesson-native-python",
+        code: "print('probe')",
+        now: "2026-05-08T22:12:00.000Z",
+        runMode: "run_file",
+        spec
+      },
+      loadPyodide: async () => direct.pyodide
+    });
+
+    expect(direct.events[0]).toBe(`globals.set:__name__=${PYTHON_DIRECT_RUN_NAME}`);
   });
 });

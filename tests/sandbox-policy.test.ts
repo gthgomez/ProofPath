@@ -27,7 +27,7 @@ describe("sandbox policy keyword matching", () => {
       "summary = 'socket programming basics'",
       "notes = ['urllib is a standard library module']"
     ])("allows bare module names in data literals: %s", (code) => {
-      expect(rulesTriggered("python", code)).not.toContain("python-network");
+      expect(rulesTriggered("python", code)).toEqual([]);
     });
 
     it.each([
@@ -47,6 +47,12 @@ describe("sandbox policy keyword matching", () => {
       "from http import client\nclient.HTTPSConnection('x')"
     ])("blocks real network usage: %s", (code) => {
       expect(rulesTriggered("python", code)).toContain("python-network");
+    });
+
+    it("does not apply the JavaScript fetch/dynamic-import rules to Python", () => {
+      // `from typing import (` is valid Python; the JS-only patterns no longer run here.
+      expect(rulesTriggered("python", "from typing import (\n    Any,\n    Optional,\n)")).toEqual([]);
+      expect(rulesTriggered("python", "fetch = 1")).toEqual([]);
     });
 
     it("does not weaken the other python rules", () => {
@@ -69,8 +75,8 @@ describe("sandbox policy keyword matching", () => {
     });
 
     it("does not flag dynamic-import words inside comments or strings", () => {
-      expect(rulesTriggered("python", "note = 'call importlib.import_module soon'")).not.toContain("python-dynamic-import");
-      expect(rulesTriggered("python", "# importlib.import_module('requests')\nprint('ok')")).not.toContain("python-dynamic-import");
+      expect(rulesTriggered("python", "note = 'call importlib.import_module soon'")).toEqual([]);
+      expect(rulesTriggered("python", "# importlib.import_module('requests')\nprint('ok')")).toEqual([]);
     });
   });
 
@@ -83,7 +89,9 @@ describe("sandbox policy keyword matching", () => {
       ["__builtins__ dict access", "__builtins__['__import__']('socket')", "python-builtins-access"],
       ["rebound __import__", "x = __import__\nx('socket')", "python-dynamic-code"],
       ["rebound eval", "e = eval\ne('1')", "python-dynamic-code"],
-      ["aliased importlib", "import importlib as il\nil.import_module('socket')", "python-dynamic-import"]
+      ["aliased importlib", "import importlib as il\nil.import_module('socket')", "python-dynamic-import"],
+      ["blocked import after a triple-quoted string", 'note = """safe"""\nimport socket', "python-network"],
+      ["blocked eval after an escaped-quote string", "note = 'it\\'s safe'\neval('1')", "python-dynamic-code"]
     ];
 
     it.each(blocked)("blocks %s", (_label, code, rule) => {
@@ -95,7 +103,15 @@ describe("sandbox policy keyword matching", () => {
       "note = 'call open( soon'\nprint(note)",
       "note = '''import socket and importlib.import_module'''",
       "# open('data.txt') is a comment\nprint('ok')",
-      "message = 'builtins is a module name'"
+      "message = 'builtins is a module name'",
+      // Triple-quoted (double and single) strings hide their contents.
+      'note = """eval and exec and open"""',
+      "note = '''it\\'s not eval time'''",
+      // Escaped quotes inside single- and double-quoted strings.
+      "note = 'it\\'s not eval time'",
+      'note = "call \\"eval\\" maybe"',
+      // Newlines inside a triple-quoted string must not leak the following line.
+      'note = """line1 eval\nline2 open"""'
     ];
 
     it.each(allowedMentions)("ignores blocked keywords in comments/strings: %s", (code) => {
@@ -141,6 +157,24 @@ describe("sandbox policy keyword matching", () => {
       expect(rulesTriggered("sql", "-- attach database 'x' as y\nSELECT 'load_extension';")).toEqual([]);
     });
 
+    it("allows the REPLACE scalar function (not the REPLACE INTO statement)", () => {
+      expect(rulesTriggered("sql", "SELECT REPLACE(name, 'a', 'b') AS fixed FROM t;")).toEqual([]);
+      expect(rulesTriggered("sql", "SELECT REPLACE(note, 'draft', 'final') FROM evidence;")).toEqual([]);
+    });
+
+    it("allows learner CREATE TABLE statements (the SQL constraints lesson ships one)", () => {
+      expect(rulesTriggered("sql", "CREATE TABLE missions (id TEXT PRIMARY KEY, title TEXT NOT NULL);")).toEqual([]);
+    });
+
+    it.each([
+      ["REPLACE INTO t VALUES (1)", "sql-mutation"],
+      ["INSERT OR REPLACE INTO t VALUES (1)", "sql-mutation"],
+      ["REINDEX t", "sql-mutation"],
+      ["ANALYZE", "sql-mutation"]
+    ])("still blocks the REPLACE INTO form and maintenance statements: %s", (code, rule) => {
+      expect(rulesTriggered("sql", code)).toContain(rule);
+    });
+
     it.each([
       ["INSERT INTO t VALUES (1)", "sql-mutation"],
       ["DROP TABLE t", "sql-mutation"],
@@ -163,6 +197,53 @@ describe("sandbox policy keyword matching", () => {
 
     it("still blocks a write statement whose value contains a string keyword", () => {
       expect(rulesTriggered("sql", "UPDATE t SET note = 'drop the mic'")).toContain("sql-mutation");
+    });
+  });
+
+  describe("javascript policy matches bare names and ignores comments/strings", () => {
+    it.each([
+      ["fetch('https://example.com')", "network-fetch"],
+      ["import('module')", "dynamic-import"],
+      ["const f = fetch; f('https://example.com')", "network-fetch"],
+      ["const e = eval; e('1')", "eval"],
+      ["const F = Function; F('return 1')", "function-constructor"],
+      ["self['fetch']('https://example.com')", "global-object"],
+      ["self['eval']('1')", "global-object"],
+      ["globalThis['Function']('return 1')", "global-object"],
+      ["window.fetch('https://example.com')", "global-object"]
+    ])("blocks an aliased or bracket-quoted global call: %s", (code, rule) => {
+      expect(rulesTriggered("javascript", code)).toContain(rule);
+    });
+
+    it.each([
+      "// fetch the user list",
+      "/* eval and Function are mentioned here */",
+      "const label = 'do not eval this'",
+      'const label = "call Function later"',
+      "const label = `do not eval this`",
+      "function build() {\n  return 1;\n}",
+      "const prefetch = 1;\nconst evaluate = 2;",
+      // Representative lesson JS (lesson-ai-test-loop): lowercase function declaration,
+      // a comment, and a string must all pass.
+      "function formatUser(user) {\n  return user.name;\n}\n\n// Fix formatUser, then keep this note honest.\nconst aiJudgmentNote = 'AI suggested a null check; I verified the fallback behavior.';"
+    ])("ignores blocked names in comments, strings, and near-misses: %s", (code) => {
+      expect(rulesTriggered("javascript", code)).toEqual([]);
+    });
+
+    it("still sees executable code inside a template literal interpolation", () => {
+      expect(rulesTriggered("javascript", "const s = `${eval('1')}`;")).toContain("eval");
+    });
+
+    it("does not let a regex literal hide executable code", () => {
+      // A `//` inside a regex must not be read as a line comment that blinds the
+      // sanitizer to a later blocked name, and division must stay division.
+      expect(rulesTriggered("javascript", "const re = /\\//; fetch('https://example.com');")).toContain("network-fetch");
+      expect(rulesTriggered("javascript", "const x = 'a' / 2; fetch('https://example.com');")).toContain("network-fetch");
+      expect(rulesTriggered("javascript", "const x = a / b; fetch('https://example.com');")).toContain("network-fetch");
+    });
+
+    it("ignores blocked names inside a regex literal", () => {
+      expect(rulesTriggered("javascript", "const re = /fetch/i;")).toEqual([]);
     });
   });
 });

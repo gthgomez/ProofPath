@@ -1239,12 +1239,12 @@ level2Lessons[5].depth = {
 };
 
 level2Lessons[6].depth = {
-  primaryConceptId: "py.string",
+  primaryConceptId: "py.string.methods",
   secondaryConceptIds: ["py.variable.assignment"],
   maxNewConcepts: 1,
   conceptCapsules: [
     {
-      conceptId: "py.string",
+      conceptId: "py.string.methods",
       definition: "Using built-in string methods (like strip(), lower(), replace()) to clean and normalize text.",
       mentalModel: "Think of string cleaning like washing vegetables before cooking: you remove dirt (spaces) and peel (normalize case) before slicing.",
       syntaxShape: "string.method()",
