@@ -199,8 +199,8 @@ const pythonStringCleanupPracticeReps: LessonPracticeBlock[] = [
 const pythonModuleGuardPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "def count_sessions(sessions):\n    return len(sessions)\n\n# Add the module guard. Inside:\n#   data = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\n#   print(f\"{count_sessions(data)} session(s)\")\n",
-    expectedOutput: "2 session(s) counted",
-    checkYourAnswer: "Copy the guard pattern: if __name__ == '__main__': with the test code indented below. Both double-underscore pairs on name and main are essential.",
+    expectedOutput: "2 session(s) counted when the file runs directly; no print when it is imported",
+    checkYourAnswer: "Copy the guard pattern: if __name__ == '__main__': with the test code indented below, then use Run file to see the direct-run print and Run checks to confirm import-time silence. Both double-underscore pairs on name and main are essential.",
     tier: "replicate"
   },
   {
@@ -715,7 +715,7 @@ export const level2Lessons: Lesson[] = [
     slug: "python-module-guard",
     title: "The Module Guard Lets Files Be Reusable AND Runnable",
     summary: "Learn the module guard pattern that lets Python files act as reusable modules AND standalone scripts.",
-    bodyMarkdown: "When Python runs a script, the built-in variable __name__ is set to '__main__'. When another file imports that script, __name__ is the module name, not '__main__'. The guard `if __name__ == '__main__':` checks which case this is, so code inside only runs during direct execution. This means the Study Tracker file can define reusable functions at the top, and wrap the interactive CLI code behind the guard. When you write `from study_tracker import parse_row`, the import silently loads the function without triggering test prints or the menu prompt.",
+    bodyMarkdown: "When Python runs a script, the built-in variable __name__ is set to '__main__'. When another file imports that script, __name__ is the module name, not '__main__'. The guard `if __name__ == '__main__':` checks which case this is, so code inside only runs during direct execution. This means the Study Tracker file can define reusable functions at the top, and wrap the interactive CLI code behind the guard. When you write `from study_tracker import parse_row`, the import silently loads the function without triggering test prints or the menu prompt. In Code Lab, Run file executes the script as the program entry point (`__name__` is '__main__'), so the guarded block runs; Run checks executes the file the way an import would (`__name__` is not '__main__'), so the guarded block stays silent while the reusable function remains importable.",
     estimatedMinutes: 10,
     difficulty: "applied",
     skillIds: ["skill-python-basics"],
@@ -726,17 +726,17 @@ export const level2Lessons: Lesson[] = [
     tools: ["Python 3", "terminal", "module guard pattern"],
     synopsis: "You are learning to protect your module's test and CLI code from running during import, which is the standard way professional Python projects organize reusable code.",
     prerequisites: ["Know that a function is a reusable block of code.", "Know that import loads another module's symbols."],
-    testingFocus: "You will test that the guarded code runs only when the file is executed directly, and that importing the module does not trigger the guarded output.",
+    testingFocus: "You will test that the guarded code runs only when the file is executed directly (Run file sets __name__ to '__main__'), and that import-style execution (Run checks) does not trigger the guarded output.",
     objective: "Explain and apply the if __name__ == '__main__' pattern to make Python files dual-purpose as modules and scripts.",
     whyItMatters: "Without the module guard, importing a file runs all its code — including test prints and CLI prompts. The guard keeps reusable functions importable while still letting the file run as a script.",
     coreConcept: "Every Python file has a built-in __name__ variable. When you run the file directly, Python sets __name__ to '__main__'. When another file imports it, __name__ is the module's name. The guard `if __name__ == '__main__':` checks which case this is, so code inside only runs during direct execution.",
     workedExample: "def total_minutes(sessions): total = 0; for s in sessions: total += s['minutes']; return total then a guard block below creates test data, calls total_minutes, and prints the result. Importing the file gives you the function. Running it directly prints the summary.",
-    guidedExercise: "Add the module guard to a short script so the calculation code only runs when the file is executed directly. Because this sandbox runs the file the way an import would, __name__ is not '__main__' here: the guard's job is to keep the module silent on import while total_minutes stays importable.",
+    guidedExercise: "Add the module guard to a short script so the calculation code only runs when the file is executed directly. Use Run file to see direct execution (__name__ is '__main__', so the guard runs and prints), then Run checks to see import-style execution (__name__ is not '__main__', so the guard stays silent while total_minutes stays importable).",
     missionConnection: "The CLI Study Tracker will need this pattern to separate reusable data functions from the interactive menu script.",
     reflectionPrompt: "What would happen if you imported a helper module that printed test output at the bottom? How does the guard prevent that confusion?",
     practiceStarter: "def total_minutes(sessions):\n    total = 0\n    for s in sessions:\n        total = total + s['minutes']\n    return total\n\n# Add the module guard. Inside it:\n#   sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\n#   result = total_minutes(sessions)\n#   print(f'{result} total minutes')\n",
     practiceExpected: "45 total minutes",
-    practiceCheck: "This sandbox executes the file the way an import would, so __name__ is not '__main__' and the guarded block will not print in your output — that is expected. The guard's job is to keep the module silent on import while total_minutes stays importable. If you leave the test data at module level, it runs on import. Check that __name__ has double underscores on both sides and the comparison is to '__main__'.",
+    practiceCheck: "Run checks executes the file the way an import would, so __name__ is not '__main__' and the guarded block stays silent in the check output — that is expected. Run file executes it as the program entry point, so __name__ is '__main__' and the guarded print appears. The guard's job is to keep the module silent on import while total_minutes stays importable. If you leave the test data at module level, it runs on import. Check that __name__ has double underscores on both sides and the comparison is to '__main__'.",
     practiceReps: pythonModuleGuardPracticeReps,
     miniTitle: "Guard the Study Tracker logic",
     miniGoal: "Add an if __name__ guard to a module so the test code stays silent during import.",
@@ -748,7 +748,7 @@ export const level2Lessons: Lesson[] = [
     requiredCodeIncludes: ["__name__", "__main__", "if", "sessions"],
     requiredOutputIncludes: ["passed"],
     runnerLanguage: "python",
-    runnerStarterCode: "def total_minutes(sessions):\n    total = 0\n    for s in sessions:\n        total = total + s['minutes']\n    return total\n\nsessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\nresult = total_minutes(sessions)\nprint(f'{result} total minutes')\n\n# TODO: wrap the three lines above in if __name__ == '__main__':\n# (indent them under the guard) so importing this file stays silent.\n# This sandbox runs the file the way an import would, so __name__ is not\n# '__main__' here and the guarded print will not appear in your output. That\n# is expected: the check confirms total_minutes stays importable while the\n# module stays silent on import.\n",
+    runnerStarterCode: "def total_minutes(sessions):\n    total = 0\n    for s in sessions:\n        total = total + s['minutes']\n    return total\n\nsessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\nresult = total_minutes(sessions)\nprint(f'{result} total minutes')\n\n# TODO: wrap the three test-data lines above in if __name__ == '__main__':\n# (indent them under the guard) so importing this file stays silent.\n# Run file executes the script as '__main__', so the guarded print shows there.\n# Run checks executes the file the way an import would (__name__ is not\n# '__main__'), so the guarded print stays silent and the check confirms\n# total_minutes stays importable.\n",
     runnerTestCode: "assert callable(total_minutes), 'total_minutes must be a function defined at module level'\ntest_sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\nassert total_minutes(test_sessions) == 45, 'total_minutes should return 45 for the test data'\nprint('module guard passed')",
     hiddenTests: [
       {

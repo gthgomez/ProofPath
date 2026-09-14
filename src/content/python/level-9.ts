@@ -162,7 +162,34 @@ const envConfigLesson = proofLesson({
   requiredCodeIncludes: ["os.environ.get", "API_KEY", "DB_PATH"],
   requiredOutputIncludes: ["config", "api", "passed"],
   runnerLanguage: "javascript",
-  runnerStarterCode: "const config = {\n  dotenv: true,\n  // Simulated environment: real Python reads os.environ and browser or Node\n  // runtimes read their own env APIs, but this sandbox has no OS environment,\n  // so we simulate one with a plain object. Never paste a real API key into\n  // lesson code — use a non-secret placeholder like 'REPLACE_ME'.\n  simulatedEnv: { API_KEY: 'REPLACE_ME' },\n  loadFromEnv: function(vars) {\n    // Concept: os.environ.get() reads a value with optional default.\n    return vars.reduce((cfg, {key, fallback}) => {\n      cfg[key] = this.simulatedEnv[key] || fallback || null;\n      return cfg;\n    }, {});\n  },\n  maskSecrets: function(cfg, secretKeys) {\n    const masked = {...cfg};\n    secretKeys.forEach(k => { if (masked[k]) masked[k] = '***'; });\n    return masked;\n  }\n};\n\nconst loaded = config.loadFromEnv([\n  {key: 'API_KEY'},\n  {key: 'DB_PATH', fallback: 'tracker.db'}\n]);\nconsole.log('config loaded');",
+  runnerStarterCode: `// Concept Lab sandbox: this environment has no OS-level variables, so we
+// simulate one with a plain object below. This is a sandbox simulation only --
+// it never reads or writes real credentials. Use a non-secret placeholder such
+// as 'REPLACE_ME' for any example value.
+const config = {
+  dotenv: true,
+  simulatedEnv: { API_KEY: 'REPLACE_ME' },
+  loadFromEnv: function(vars) {
+    // TODO: return one entry per {key, fallback} pair in vars.
+    //   Read this.simulatedEnv[key]. When it is missing or empty, use the
+    //   provided fallback, or null when no fallback was given.
+    return {};
+  },
+  maskSecrets: function(cfg, secretKeys) {
+    // TODO: return a copy of cfg where every key listed in secretKeys is
+    //   replaced with '***' when it has a value. Leave other keys unchanged
+    //   and do not mutate the original cfg object.
+    return {};
+  }
+};
+
+// TODO: load API_KEY (fallback '') and DB_PATH (fallback 'tracker.db') into
+//   loaded, then print 'config loaded' so the config boundary is visible.
+const loaded = config.loadFromEnv([
+  {key: 'API_KEY', fallback: ''},
+  {key: 'DB_PATH', fallback: 'tracker.db'}
+]);
+console.log('config loaded');`,
   runnerTestCode: "const cfg = config.loadFromEnv([\n  {key: 'API_KEY', fallback: ''},\n  {key: 'DB_PATH', fallback: 'tracker.db'}\n]);\nif (typeof cfg.API_KEY !== 'string') throw new Error('API_KEY should be a string');\nif (cfg.DB_PATH !== 'tracker.db') throw new Error('DB_PATH should default to tracker.db');\nconst masked = config.maskSecrets(cfg, ['API_KEY']);\nif (masked.API_KEY !== '***') throw new Error('secret keys should be masked');\nconsole.log('config api passed');",
   hiddenTests: [
     {
@@ -258,7 +285,7 @@ envConfigLesson.depth = {
   codeLabBridge: {
     story: "The tracker needs an API key to fetch sessions. Hardcoding it in the source would expose the credential. Loading it from the environment keeps the code safe to share.",
     usesConcepts: ["py.config.env"],
-    learnerOwns: [],
+    learnerOwns: ["loadFromEnv", "maskSecrets"],
     checkerOwns: ["env-config-missing-key-detection"],
     runExpectation: "prints config api passed"
   },
@@ -315,7 +342,24 @@ const ciWorkflowLesson = proofLesson({
   requiredCodeIncludes: ["name:", "on:", "push", "pull_request", "jobs:", "lint", "test"],
   requiredOutputIncludes: ["ci", "workflow", "passed"],
   runnerLanguage: "javascript",
-  runnerStarterCode: "function createWorkflow() {\n  return {\n    name: 'CI',\n    on: ['push', 'pull_request'],\n    jobs: {\n      lint: {\n        'runs-on': 'ubuntu-latest',\n        steps: [\n          { uses: 'actions/checkout@v3' },\n          { uses: 'actions/setup-python@v4', with: { 'python-version': '3.11' } },\n          { run: 'pip install ruff' },\n          { run: 'ruff check .' }\n        ]\n      },\n      test: {\n        needs: 'lint',\n        'runs-on': 'ubuntu-latest',\n        steps: [\n          { uses: 'actions/checkout@v3' },\n          { uses: 'actions/setup-python@v4', with: { 'python-version': '3.11' } },\n          { run: 'pip install pytest' },\n          { run: 'python -m pytest' }\n        ]\n      }\n    }\n  };\n}\n\nconst wf = createWorkflow();\nconsole.log('ci workflow created');",
+  runnerStarterCode: `// Concept Lab sandbox: this builds a GitHub Actions workflow object only.
+// It is a sandbox simulation -- it never contacts GitHub or runs a CI job.
+function createWorkflow() {
+  return {
+    name: '',            // TODO: use 'CI'
+    on: [],              // TODO: add 'push' and 'pull_request'
+    jobs: {
+      // TODO: add a lint job with at least two steps: a checkout step and a
+      //   run step that checks formatting (for example 'ruff check .').
+      // TODO: add a test job with needs: 'lint' and at least two steps:
+      //   a checkout step and a run step that runs the tests.
+    }
+  };
+}
+
+// Build one workflow so "Run file" shows the skeleton runs.
+createWorkflow();
+console.log('ci workflow created');`,
   runnerTestCode: "const wf = createWorkflow();\nif (wf.name !== 'CI') throw new Error('name should be CI');\nif (!wf.on.includes('push')) throw new Error('should trigger on push');\nif (!wf.on.includes('pull_request')) throw new Error('should trigger on pull_request');\nif (!wf.jobs.lint) throw new Error('should have lint job');\nif (!wf.jobs.test) throw new Error('should have test job');\nif (wf.jobs.test.needs !== 'lint') throw new Error('test should depend on lint');\nconsole.log('ci workflow passed');",
   hiddenTests: [
     {
@@ -410,7 +454,7 @@ ciWorkflowLesson.depth = {
   codeLabBridge: {
     story: "With test and lint commands ready locally, a CI workflow automates them on every push so nothing is forgotten.",
     usesConcepts: ["ops.ci.github_actions.basic"],
-    learnerOwns: [],
+    learnerOwns: ["createWorkflow", "jobs.lint", "jobs.test"],
     checkerOwns: ["ci-workflow-has-steps-in-each-job"],
     runExpectation: "prints ci workflow passed"
   },
@@ -467,13 +511,42 @@ const secretsManagementLesson = proofLesson({
   requiredCodeIncludes: ["Secrets", "from_env", "db_password", "api_key"],
   requiredOutputIncludes: ["secrets", "loaded", "passed"],
   runnerLanguage: "javascript",
-  runnerStarterCode: "class Secrets {\n  constructor(env) {\n    this.dbPassword = env.DB_PASSWORD || null;\n    this.apiKey = env.API_KEY || null;\n  }\n  \n  static fromEnv(env) {\n    const s = new Secrets(env);\n    if (!s.dbPassword) throw new Error('DB_PASSWORD is required');\n    if (!s.apiKey) throw new Error('API_KEY is required');\n    return s;\n  }\n  \n  mask() {\n    return {\n      dbPassword: this.dbPassword ? '***' : null,\n      apiKey: this.apiKey ? '***' : null\n    };\n  }\n}\n\nconst env = { DB_PASSWORD: 'supersecret', API_KEY: 'test-key-not-real' };\nconst s = Secrets.fromEnv(env);\nconsole.log('secrets loaded');",
-  runnerTestCode: "const env = { DB_PASSWORD: 'supersecret', API_KEY: 'test-key-not-real' };\nconst s = Secrets.fromEnv(env);\nif (!(s instanceof Secrets)) throw new Error('should return Secrets instance');\nconst masked = s.mask();\nif (masked.dbPassword !== '***') throw new Error('db password should be masked');\nif (masked.apiKey !== '***') throw new Error('api key should be masked');\ntry {\n  Secrets.fromEnv({});\n  throw new Error('should throw for missing secrets');\n} catch (e) {\n  if (!e.message.includes('required')) throw new Error('error should mention required');\n}\nconsole.log('secrets management passed');",
+  runnerStarterCode: `// Concept Lab sandbox: secrets are simulated with a plain object instead of a
+// real OS environment. This is a sandbox simulation only -- never put real
+// credentials in lesson code. Use non-secret placeholders such as 'REPLACE_ME'.
+class Secrets {
+  constructor(env) {
+    // TODO: copy env.DB_PASSWORD into this.dbPassword and env.API_KEY into
+    //   this.apiKey. Do not invent default values for missing secrets.
+    this.dbPassword = null;
+    this.apiKey = null;
+  }
+
+  static fromEnv(env) {
+    // TODO: build a Secrets instance from env and fail loudly when a required
+    //   secret is absent. Throw Error('DB_PASSWORD is required') when
+    //   DB_PASSWORD is missing, and Error('API_KEY is required') when API_KEY
+    //   is missing.
+    return new Secrets(env);
+  }
+
+  mask() {
+    // TODO: return { dbPassword: '***', apiKey: '***' } for loaded values and
+    //   null for missing values so secrets never appear in output.
+    return { dbPassword: null, apiKey: null };
+  }
+}
+
+// Call the boundary with placeholder values so "Run file" proves the sandbox
+// simulation runs without real credentials.
+Secrets.fromEnv({ DB_PASSWORD: 'REPLACE_ME', API_KEY: 'REPLACE_ME' });
+console.log('secrets loaded');`,
+  runnerTestCode: "const env = { DB_PASSWORD: 'REPLACE_ME', API_KEY: 'REPLACE_ME' };\nconst s = Secrets.fromEnv(env);\nif (!(s instanceof Secrets)) throw new Error('should return Secrets instance');\nconst masked = s.mask();\nif (masked.dbPassword !== '***') throw new Error('db password should be masked');\nif (masked.apiKey !== '***') throw new Error('api key should be masked');\ntry {\n  Secrets.fromEnv({});\n  throw new Error('should throw for missing secrets');\n} catch (e) {\n  if (!e.message.includes('required')) throw new Error('error should mention required');\n}\nconsole.log('secrets management passed');",
   hiddenTests: [
     {
       id: "secrets-rejects-missing-key",
       name: "Secrets rejects when API_KEY is missing",
-      code: "try {\n  Secrets.fromEnv({ DB_PASSWORD: 'pw123' });\n  throw new Error('should have thrown');\n} catch (e) {\n  if (!e.message.includes('API_KEY')) throw new Error('should mention missing API_KEY');\n  console.log('missing key rejected');\n}"
+      code: "try {\n  Secrets.fromEnv({ DB_PASSWORD: 'REPLACE_ME' });\n  throw new Error('should have thrown');\n} catch (e) {\n  if (!e.message.includes('API_KEY')) throw new Error('should mention missing API_KEY');\n  console.log('missing key rejected');\n}"
     }
   ],
   curriculum: {
@@ -563,7 +636,7 @@ secretsManagementLesson.depth = {
   codeLabBridge: {
     story: "The tracker needs database credentials and API keys to run. Hardcoding them would expose secrets. A typed Secrets boundary loads everything at startup from the environment.",
     usesConcepts: ["py.secrets.env"],
-    learnerOwns: [],
+    learnerOwns: ["Secrets", "Secrets.fromEnv", "Secrets.mask"],
     checkerOwns: ["secrets-rejects-missing-key"],
     runExpectation: "prints secrets management passed"
   },
@@ -620,19 +693,28 @@ const deploymentStrategiesLesson = proofLesson({
   requiredCodeIncludes: ["strategy", "health_check", "rollback"],
   requiredOutputIncludes: ["deploy", "strategy", "passed"],
   runnerLanguage: "javascript",
-  runnerStarterCode: `function createRunbook(strategy, healthEndpoint, rollbackCmd, monitorWindow) {
+  runnerStarterCode: `// Concept Lab sandbox: orchestration needs a cloud environment, so this lesson
+// only builds the runbook object. It is a sandbox simulation -- it never
+// deploys or rolls back anything for real.
+function createRunbook(strategy, healthEndpoint, rollbackCmd, monitorWindow) {
   return {
-    strategy: strategy || '',
-    healthCheckEndpoint: healthEndpoint || '',
-    rollbackCommand: rollbackCmd || '',
-    monitorWindow: monitorWindow || '',
+    // TODO: copy each argument into its matching field, defaulting a missing
+    //   argument to '' : strategy, healthCheckEndpoint, rollbackCommand,
+    //   monitorWindow.
+    strategy: '',
+    healthCheckEndpoint: '',
+    rollbackCommand: '',
+    monitorWindow: '',
     isReady: function() {
-      return !!(this.strategy && this.healthCheckEndpoint && this.rollbackCommand && this.monitorWindow);
+      // TODO: return true only when all four fields are populated, so an
+      //   incomplete runbook cannot claim to be ready.
+      return false;
     }
   };
 }
 
-const rb = createRunbook('blue-green', '/health', 'kubectl rollout undo', '10m');
+// Build one runbook so "Run file" shows the skeleton runs.
+createRunbook('blue-green', '/health', 'kubectl rollout undo', '10m');
 console.log('deploy runbook created');`,
   runnerTestCode: "const rb = createRunbook('blue-green', '/health', 'kubectl rollout undo', '10m');\nif (rb.strategy !== 'blue-green') throw new Error('strategy should be blue-green');\nif (rb.healthCheckEndpoint !== '/health') throw new Error('should have health check');\nif (!rb.rollbackCommand) throw new Error('should have rollback command');\nif (!rb.isReady()) throw new Error('complete runbook should be ready');\nconst empty = createRunbook();\nif (empty.isReady()) throw new Error('empty runbook should not be ready');\nconsole.log('deploy strategy passed');",
   hiddenTests: [
@@ -729,7 +811,7 @@ deploymentStrategiesLesson.depth = {
   codeLabBridge: {
     story: "With CI passing and secrets configured, the Study Tracker needs a safe deployment strategy. A runbook documents exactly how to deploy, verify, and rollback.",
     usesConcepts: ["ops.deploy.strategies"],
-    learnerOwns: [],
+    learnerOwns: ["createRunbook", "isReady"],
     checkerOwns: ["deploy-requires-rollback"],
     runExpectation: "prints deploy strategy passed"
   },
@@ -786,25 +868,30 @@ const monitoringBasicsLesson = proofLesson({
   requiredCodeIncludes: ["health", "status", "version", "timestamp"],
   requiredOutputIncludes: ["health", "monitor", "passed"],
   runnerLanguage: "javascript",
-  runnerStarterCode: `function healthCheck(version, dbConnected) {
+  runnerStarterCode: `// Concept Lab sandbox: health checks and logs are modelled with plain objects.
+// It is a sandbox simulation -- it never contacts a server, a database, or a
+// monitoring service.
+function healthCheck(version, dbConnected) {
   return {
-    status: dbConnected ? 'ok' : 'degraded',
-    version: version || 'unknown',
-    database: dbConnected ? 'connected' : 'disconnected',
-    timestamp: new Date().toISOString()
+    // TODO: status should be 'ok' when dbConnected is true and 'degraded'
+    //   when false. database should be 'connected' or 'disconnected'. version
+    //   should echo the argument and default to 'unknown' when it is missing.
+    //   timestamp should be new Date().toISOString().
+    status: '',
+    version: '',
+    database: '',
+    timestamp: ''
   };
 }
 
 function structuredLog(event, severity, data) {
-  return JSON.stringify({
-    event: event || 'unknown',
-    severity: severity || 'info',
-    timestamp: new Date().toISOString(),
-    ...data
-  });
+  // TODO: return JSON.stringify of an object with event, severity, a
+  //   timestamp from new Date().toISOString(), and every field from data.
+  return '';
 }
 
-const hc = healthCheck('1.0.0', true);
+// Evaluate one health check so "Run file" shows the skeleton runs.
+healthCheck('1.0.0', true);
 console.log('health monitor configured');`,
   runnerTestCode: "const hc = healthCheck('1.0.0', true);\nif (hc.status !== 'ok') throw new Error('should be ok when db connected');\nif (hc.version !== '1.0.0') throw new Error('version should be 1.0.0');\nif (hc.database !== 'connected') throw new Error('db should be connected');\n\nconst degraded = healthCheck('1.0.0', false);\nif (degraded.status !== 'degraded') throw new Error('should be degraded when db disconnected');\n\nconst log = JSON.parse(structuredLog('session_added', 'info', {topic: 'python', minutes: 30}));\nif (log.event !== 'session_added') throw new Error('log should contain event name');\nif (log.severity !== 'info') throw new Error('log should have severity');\nif (log.topic !== 'python') throw new Error('log should include context');\n\nconsole.log('health monitor passed');",
   hiddenTests: [
@@ -901,7 +988,7 @@ monitoringBasicsLesson.depth = {
   codeLabBridge: {
     story: "After deploying the Study Tracker with a safe strategy, monitoring tells you it is healthy. Health checks, structured logs, and alerts keep the deployment observable.",
     usesConcepts: ["ops.monitoring.basics"],
-    learnerOwns: [],
+    learnerOwns: ["healthCheck", "structuredLog"],
     checkerOwns: ["monitor-degraded-status"],
     runExpectation: "prints health monitor passed"
   },

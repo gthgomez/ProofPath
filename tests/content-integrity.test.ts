@@ -4,7 +4,12 @@ import { contentPack } from "@/content/seed";
 import { conceptRegistry } from "@/content/concepts";
 import { contentPackSchema, roleTargetSchema } from "@/domain/schemas";
 import { validateSandboxSubmission } from "@/sandbox/policy";
-import { validateContent } from "../scripts/validate-content";
+import {
+  dangerousSetupCodePattern,
+  setupCodeAllowedLessonIds,
+  supportingConceptAllowList,
+  validateContent
+} from "../scripts/validate-content";
 
 describe("content pack", () => {
   it("matches the schema", () => {
@@ -196,8 +201,7 @@ describe("structural invariants", () => {
   const registeredConceptIds = new Set(conceptRegistry.map((concept) => concept.id));
 
   // Module-python lessons that intentionally run in a non-Python sandbox (or are
-  // concept-only simulations). Shared by the sandbox-language test and the
-  // privileged setupCode test below.
+  // concept-only simulations). Used by the sandbox-language test below.
   const documentedSimulations = new Set([
     "lesson-python-portfolio-proof",
     "lesson-python-sqlite-persistence",
@@ -260,11 +264,13 @@ describe("structural invariants", () => {
 
     expect(dangling).toEqual([]);
 
-    // Rule Group L (scripts/validate-content.ts:716) enforces conceptIds only on
-    // quizzes whose lesson carries a depth block. Depth-less quizzes -- for
-    // example the non-Python inline quizzes assembled in seed.ts -- are a
-    // documented exception, so they are intentionally left unmapped rather than
-    // inventing concept ids for them.
+    // Rule Group L scope (Issue #8, CLAUDE.md Content Integrity Rule 5):
+    // conceptIds are required for exactly the quizzes of depth-bearing lessons.
+    // scripts/validate-content.ts enforces this inside its `if (!lesson.depth)
+    // continue` loop, so depth-less quizzes -- notably the 36 inline non-Python
+    // (TypeScript/SQL/Git/AI/ML) questions assembled in seed.ts -- are
+    // intentionally out of scope rather than force-mapped to an invented
+    // taxonomy. Keep this assertion in lockstep with that validator gate.
     const missingConceptMappings: string[] = [];
     const lessonById = new Map(contentPack.lessons.map((lesson) => [lesson.id, lesson]));
     for (const quiz of contentPack.quizzes) {
@@ -277,6 +283,101 @@ describe("structural invariants", () => {
     }
 
     expect(missingConceptMappings).toEqual([]);
+  });
+
+  it("keeps the concept registry free of orphans and contradictory usesButDoesNotTeach declarations", () => {
+    // Mirrors Rule Group P in scripts/validate-content.ts (Issue #7).
+    const supportingConceptIds = new Set(supportingConceptAllowList);
+
+    // A registry entry is superseded/deprecated when another entry lists it in
+    // `aliases` (for example py.open.read -> py.file.input), so it is exempt.
+    const aliasTargets = new Set<string>();
+    for (const concept of conceptRegistry) {
+      for (const alias of concept.aliases ?? []) aliasTargets.add(alias);
+    }
+
+    const taughtByActiveLesson = new Set<string>();
+    const metadataReferenced = new Set<string>();
+    for (const lesson of contentPack.lessons) {
+      const curriculum = lesson.curriculum;
+      const depth = lesson.depth;
+      if (curriculum?.deprecated) continue;
+      if (curriculum) {
+        for (const id of curriculum.teaches) taughtByActiveLesson.add(id);
+        for (const id of curriculum.requires) metadataReferenced.add(id);
+        for (const id of curriculum.reinforces ?? []) metadataReferenced.add(id);
+        for (const id of curriculum.usesButDoesNotTeach ?? []) metadataReferenced.add(id);
+        for (const id of curriculum.visibleCodeConcepts ?? []) metadataReferenced.add(id);
+        for (const id of curriculum.quizConcepts ?? []) metadataReferenced.add(id);
+      }
+      if (depth) {
+        metadataReferenced.add(depth.primaryConceptId);
+        for (const id of depth.secondaryConceptIds) metadataReferenced.add(id);
+        for (const capsule of depth.conceptCapsules) metadataReferenced.add(capsule.conceptId);
+        for (const note of depth.codeWalkthrough) for (const id of note.conceptIds) metadataReferenced.add(id);
+        for (const edit of depth.guidedEdits) for (const id of edit.conceptIds) metadataReferenced.add(id);
+        for (const clinic of depth.errorClinic) for (const id of clinic.conceptIds) metadataReferenced.add(id);
+        for (const id of depth.codeLabBridge.usesConcepts) metadataReferenced.add(id);
+        for (const id of depth.codeLabBridge.verifierOnlyConcepts ?? []) metadataReferenced.add(id);
+      }
+    }
+    for (const quiz of contentPack.quizzes) {
+      for (const question of quiz.questions) {
+        for (const id of question.conceptIds ?? []) metadataReferenced.add(id);
+      }
+    }
+
+    const orphans = conceptRegistry
+      .filter((concept) => !aliasTargets.has(concept.id))
+      .filter((concept) => !taughtByActiveLesson.has(concept.id))
+      .filter((concept) => !metadataReferenced.has(concept.id))
+      .filter((concept) => !supportingConceptIds.has(concept.id))
+      .map((concept) => concept.id);
+    expect(orphans).toEqual([]);
+
+    // The allow-list must stay meaningful: every entry is a real registry concept.
+    const unknownAllowedConcepts = supportingConceptAllowList.filter((id) => !registeredConceptIds.has(id));
+    expect(unknownAllowedConcepts).toEqual([]);
+
+    // usesButDoesNotTeach must not claim a concept is untaught when an earlier
+    // lesson at the same curriculum level already taught it.
+    const orderedLessonsByTrack = new Map<string, string[]>();
+    for (const track of contentPack.tracks) {
+      const ordered: string[] = [];
+      const modules = contentPack.modules
+        .filter((moduleItem) => moduleItem.trackId === track.id)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      for (const moduleItem of modules) {
+        for (const lessonId of moduleItem.lessonIds) ordered.push(lessonId);
+      }
+      orderedLessonsByTrack.set(track.id, ordered);
+    }
+    const lessonById = new Map(contentPack.lessons.map((lesson) => [lesson.id, lesson]));
+    const conflicts: string[] = [];
+    for (const lesson of contentPack.lessons) {
+      const curriculum = lesson.curriculum;
+      if (curriculum?.deprecated || !curriculum?.usesButDoesNotTeach?.length) continue;
+      const moduleItem = contentPack.modules.find((candidate) => candidate.id === lesson.moduleId);
+      if (!moduleItem) continue;
+      const ordered = orderedLessonsByTrack.get(moduleItem.trackId) ?? [];
+      const lessonIndex = ordered.indexOf(lesson.id);
+      if (lessonIndex < 0) continue;
+      const taughtEarlierAtSameLevel = new Set<string>();
+      for (let i = 0; i < lessonIndex; i++) {
+        const earlier = lessonById.get(ordered[i]);
+        if (!earlier?.curriculum || earlier.curriculum.deprecated) continue;
+        if (earlier.curriculum.level !== curriculum.level) continue;
+        for (const id of earlier.curriculum.teaches) taughtEarlierAtSameLevel.add(id);
+      }
+      for (const id of curriculum.usesButDoesNotTeach) {
+        if (taughtEarlierAtSameLevel.has(id)) {
+          conflicts.push(
+            `${lesson.id} lists ${id} in usesButDoesNotTeach but an earlier level-${curriculum.level} lesson already taught it`
+          );
+        }
+      }
+    }
+    expect(conflicts).toEqual([]);
   });
 
   it("keeps track and module containment bidirectional", () => {
@@ -379,28 +480,20 @@ describe("structural invariants", () => {
 
   it("keeps privileged runner setupCode to vetted schema-and-seed lessons", () => {
     // setupCode runs WITHOUT the sandbox policy checks that gate learner code
-    // (see src/content/python/level-7.ts and src/sandbox/runner.ts), so it must
-    // stay limited to lesson schema plus seed statements. Lessons allowed to
-    // carry setupCode are the documented module-python simulations above plus the
-    // SQL lessons, whose runner legitimately seeds a read-only database so the
-    // learner only writes SELECT queries.
-    const setupCodeAllowedLessonIds = new Set([
-      ...documentedSimulations,
-      "lesson-sql-joins",
-      "lesson-sql-constraints"
-    ]);
-    const dangerousSetupStatement = /\b(DROP|ATTACH|DETACH|PRAGMA|load_extension|UPDATE|DELETE)\b/i;
+    // (see src/sandbox/runner.ts). Rule Group O in scripts/validate-content.ts
+    // owns both the allow-list and the dangerous-operation pattern; this test
+    // reuses those exports so the invariant cannot drift from the validator.
     const problems: string[] = [];
     let setupCodeLessons = 0;
 
     for (const lesson of contentPack.lessons) {
       const setupCode = lesson.workshop.miniProject.runnerSpec.setupCode;
-      if (!setupCode) continue;
+      if (!setupCode || setupCode.trim().length === 0) continue;
       setupCodeLessons++;
       if (!setupCodeAllowedLessonIds.has(lesson.id)) {
-        problems.push(`lesson ${lesson.id} defines privileged setupCode but is not a vetted setup lesson`);
+        problems.push(`lesson ${lesson.id} defines privileged setupCode but is not on the validator allow-list`);
       }
-      const dangerous = setupCode.match(dangerousSetupStatement);
+      const dangerous = setupCode.match(dangerousSetupCodePattern);
       if (dangerous) {
         problems.push(`lesson ${lesson.id} setupCode contains non-schema/seed statement '${dangerous[0]}'`);
       }
@@ -408,6 +501,14 @@ describe("structural invariants", () => {
 
     expect(setupCodeLessons).toBeGreaterThan(0);
     expect(problems).toEqual([]);
+
+    // The allow-list must stay tight: every vetted lesson actually ships setupCode,
+    // so stale permissions are caught rather than silently accumulating.
+    const allowlistedWithoutSetupCode = [...setupCodeAllowedLessonIds].filter((lessonId) => {
+      const lesson = contentPack.lessons.find((candidate) => candidate.id === lessonId);
+      return !lesson?.workshop.miniProject.runnerSpec.setupCode?.trim();
+    });
+    expect(allowlistedWithoutSetupCode).toEqual([]);
   });
 
   it("runs module-python lessons in the python sandbox except documented simulations", () => {

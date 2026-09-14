@@ -649,13 +649,6 @@ export const conceptRegistry: ConceptDefinition[] = [
     introducedLevel: 6
   },
   {
-    id: "py.pyproject.toml",
-    label: "pyproject.toml",
-    category: "project",
-    description: "Maintain metadata details.",
-    introducedLevel: 6
-  },
-  {
     id: "git.repo.local",
     label: "Local Git repository",
     category: "git",

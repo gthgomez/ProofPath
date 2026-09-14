@@ -69,6 +69,10 @@ const readTracebackLesson = proofLesson({
   projectConnection: "The Study Tracker parser will raise ValueError for bad CSV rows. Reading that traceback starts the fix.",
   requiredCodeIncludes: ["undefined_variable", "try", "except", "NameError"],
   requiredOutputIncludes: ["NameError"],
+  // This lesson deliberately asks the learner to read and print a readable
+  // NameError line. Keep the meaningful guards only: the generic
+  // "error:"/"traceback" terms would otherwise block the intended output.
+  forbiddenOutputIncludes: ["exception", "syntaxerror", "failed"],
   runnerLanguage: "python",
   runnerStarterCode: "# Step 1: run this file as-is and read the traceback. It WILL crash with a NameError.\n# Step 2: keep the buggy line, but run it inside try/except NameError so the crash\n# is handled, and PRINT the error type and message to stdout, for example:\n#   NameError: name 'undefined_variable' is not defined\nprint(undefined_variable)",
   runnerTestCode: [
@@ -95,15 +99,6 @@ const readTracebackLesson = proofLesson({
     proofOutputs: ["terminal_stdout"]
   }
 });
-
-// This lesson deliberately asks the learner to read and print a readable
-// NameError line, so the generic "error:"/"traceback" forbidden terms would
-// block the intended, correct output. Keep the meaningful guards only.
-readTracebackLesson.workshop.miniProject.tester.forbiddenOutputIncludes = [
-  "exception",
-  "syntaxerror",
-  "failed"
-];
 
 readTracebackLesson.depth = {
   primaryConceptId: "debug.traceback",

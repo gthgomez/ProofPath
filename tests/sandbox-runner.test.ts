@@ -158,6 +158,39 @@ describe("lesson sandbox runner", () => {
       globalThis.__careerforgeImportRuntimeModuleForTests = undefined;
     });
 
+    // Mirrors the SQLite persistence lesson: a read-only learner aggregate over
+    // seeded sessions, plus a hidden check that first inserts an unseen topic.
+    const harnessSpec: LessonRunnerSpec = {
+      language: "sql",
+      instructions: "Summarize study minutes per topic.",
+      starterCode: "SELECT topic, SUM(minutes) FROM sessions GROUP BY topic ORDER BY topic;",
+      setupCode: [
+        "CREATE TABLE sessions (id INTEGER PRIMARY KEY, date TEXT NOT NULL, topic TEXT NOT NULL, minutes INTEGER NOT NULL CHECK (minutes > 0));",
+        "INSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-01', 'python', 30);",
+        "INSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-02', 'python', 20);",
+        "INSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-03', 'git', 15);"
+      ].join("\n"),
+      visibleTests: [
+        {
+          id: "visible-topic-totals",
+          name: "Returns per-topic totals",
+          code: "-- visible check runs no harness SQL",
+          expectedOutputIncludes: ["python", "50", "git", "15"]
+        }
+      ],
+      hiddenTests: [
+        {
+          id: "hidden-unseen-topic",
+          name: "Computes totals for a newly seeded topic",
+          code: "-- Hidden checks may seed an extra topic before the learner query runs.\nINSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-04', 'sql', 45);",
+          expectedOutputIncludes: ["python", "50", "git", "15", "sql", "45"]
+        }
+      ],
+      expectedOutput: ["python", "50", "git", "15"],
+      timeoutMs: 30000,
+      allowNetwork: false
+    };
+
     it("re-seeds a fresh database for every check so non-idempotent SQL does not leak state", async () => {
       const spec: LessonRunnerSpec = {
         language: "sql",
@@ -201,5 +234,71 @@ describe("lesson sandbox runner", () => {
       expect(result.testResults.length).toBeGreaterThan(0);
       expect(result.testResults.every((testResult) => testResult.passed)).toBe(true);
     });
+
+    it("passes a computed per-topic aggregate when a hidden check seeds an unseen topic", async () => {
+      const result = await runLessonSandbox(
+        harnessSpec,
+        "lesson-sql-harness-correct",
+        "SELECT topic, SUM(minutes) FROM sessions GROUP BY topic ORDER BY topic;",
+        "2026-05-07T20:39:00.000Z"
+      );
+
+      expect(result.passed).toBe(true);
+      expect(result.score).toBe(100);
+      expect(result.stdout).toContain("sql | 45");
+    });
+
+    it("fails a forged constant UNION that never reads the seeded sessions table", async () => {
+      const result = await runLessonSandbox(
+        harnessSpec,
+        "lesson-sql-harness-forged",
+        "SELECT 'python', 50 UNION ALL SELECT 'git', 15;",
+        "2026-05-07T20:40:00.000Z"
+      );
+
+      // The visible check passes, so the 50 score and "Output missing" error
+      // come from the hidden check that inserted the unseen sql topic.
+      expect(result.passed).toBe(false);
+      expect(result.score).toBe(50);
+      expect(result.stderr).toContain("Output missing");
+    });
   });
+
+  describe("Python __name__ run-mode fidelity", () => {
+    beforeAll(() => {
+      globalThis.__careerforgeImportRuntimeModuleForTests = (specifier: string) => import(specifier);
+    });
+
+    afterAll(() => {
+      globalThis.__careerforgeImportRuntimeModuleForTests = undefined;
+    });
+
+    const lesson = contentPack.lessons.find((candidate) => candidate.id === "lesson-python-module-guard")!;
+    const spec: LessonRunnerSpec = {
+      ...lesson.workshop.miniProject.runnerSpec,
+      timeoutMs: 30000
+    };
+    const guardedCode = [
+      "def total_minutes(sessions):",
+      "    total = 0",
+      "    for s in sessions:",
+      "        total = total + s['minutes']",
+      "    return total",
+      "",
+      "if __name__ == '__main__':",
+      "    sessions = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]",
+      "    result = total_minutes(sessions)",
+      "    print(f'{result} total minutes')"
+    ].join("\n");
+
+    it("prints guarded output under run_file and stays silent under run_checks", async () => {
+      const directRun = await runLessonSandbox(spec, lesson.id, guardedCode, "2026-05-08T22:20:00.000Z", "run_file");
+      expect(directRun.passed).toBe(true);
+      expect(directRun.stdout).toContain("45 total minutes");
+
+      const importStyle = await runLessonSandbox(spec, lesson.id, guardedCode, "2026-05-08T22:21:00.000Z", "run_checks");
+      expect(importStyle.passed).toBe(true);
+      expect(importStyle.stdout).not.toContain("45 total minutes");
+    });
+  }, 60000);
 });

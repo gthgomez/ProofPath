@@ -34,6 +34,19 @@ let sqlPromise: Promise<SqlJsModule> | null = null;
 const PYODIDE_INDEX_URL = "/sandbox-assets/pyodide/";
 const SQLJS_DIST_URL = "/sandbox-assets/sql.js/";
 
+// Python's `__name__` for a file run directly is "__main__"; imported modules use
+// their own name. The sandbox has no real module name for checks, so it uses a
+// neutral import-style sentinel that guarantees `__name__ != "__main__"`.
+const PYTHON_DIRECT_RUN_NAME = "__main__";
+const PYTHON_IMPORT_STYLE_NAME = "<module>";
+
+// A test's `code` may carry trusted harness SQL that mutates the freshly seeded
+// database before the learner query runs. Legacy checks used non-SQL placeholder
+// tokens (for example "EXPECT_ROWS:...") and comment-only notes, so only code
+// whose first statement is real SQL is executed.
+const SQL_HARNESS_STATEMENT =
+  /^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/|\s)*(SELECT|WITH|INSERT|REPLACE|UPDATE|DELETE|CREATE|ALTER|DROP|PRAGMA|VACUUM|ATTACH|DETACH|EXPLAIN|ANALYZE|REINDEX)\b/i;
+
 declare global {
   // Test environments that run code inside a VM may not allow dynamic import from new Function.
   // Production bundles should leave this unset and use the bundler-safe import path below.
@@ -369,11 +382,12 @@ async function getPyodide(): Promise<any> {
   return pyodidePromise;
 }
 
-async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
+async function runPython(spec: LessonRunnerSpec, code: string, runMode: CodeRunMode): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
   const pyodide = await getPyodide();
   const testResults: CodeRunTestResult[] = [];
   const stdout: string[] = [];
   const stderr: string[] = [];
+  const moduleName = runMode === "run_file" ? PYTHON_DIRECT_RUN_NAME : PYTHON_IMPORT_STYLE_NAME;
 
   pyodide.setStdout({ batched: (text: string) => stdout.push(text) });
   pyodide.setStderr({ batched: (text: string) => stderr.push(text) });
@@ -384,7 +398,7 @@ async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<Cod
     try {
       const stdoutStart = stdout.length;
       const wrappedCode = [
-        "_careerforge_globals = {'__builtins__': __builtins__}",
+        `_careerforge_globals = {'__builtins__': __builtins__, '__name__': ${JSON.stringify(moduleName)}}`,
         `exec(${JSON.stringify(code)}, _careerforge_globals)`,
         `exec(${JSON.stringify(test.code)}, _careerforge_globals)`
       ].join("\n");
@@ -416,6 +430,9 @@ async function runPythonFile(code: string): Promise<Pick<CodeRunAttempt, "stdout
   pyodide.setStdout({ batched: (text: string) => stdout.push(text) });
   pyodide.setStderr({ batched: (text: string) => stderr.push(text) });
   try {
+    // Direct execution is the "run the file" scenario: `__name__` is "__main__",
+    // so `if __name__ == "__main__":` blocks run, matching `python file.py`.
+    pyodide.globals.set("__name__", PYTHON_DIRECT_RUN_NAME);
     await pyodide.runPythonAsync(code);
   } catch (error) {
     stderr.push(error instanceof Error ? error.message : String(error));
@@ -487,6 +504,14 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
     try {
       if (spec.setupCode) {
         db.run(spec.setupCode);
+      }
+
+      // A check's `code` is trusted harness SQL (like setupCode): it runs against
+      // the freshly seeded database before the learner query and is not subject
+      // to the read-only policy that gates learner submissions. Hidden checks use
+      // this to mutate the seed so a hardcoded/forged result cannot match.
+      if (test.code && SQL_HARNESS_STATEMENT.test(test.code)) {
+        db.run(test.code);
       }
 
       const result = db.exec(code);
@@ -606,7 +631,7 @@ export async function runLessonSandbox(
     }
 
     if (spec.language === "python") {
-      return runPython(spec, code);
+      return runPython(spec, code, runMode);
     }
 
     if (spec.language === "sql") {

@@ -582,7 +582,7 @@ const sqlitePersistenceLesson = proofLesson({
   skillIds: ["skill-python-integration", "skill-sql-joins", "skill-testing-debugging"],
   quizId: "quiz-python-sqlite-persistence",
   desktopTask: "Write a read-only SQL aggregate query over a pre-seeded sessions table that totals study minutes per topic.",
-  evidencePrompt: "Record the aggregate SELECT, the query output showing python | 50 and git | 15, and a note explaining why GROUP BY is required.",
+  evidencePrompt: "Record the aggregate SELECT, the computed per-topic totals from the seeded sessions table, and a note explaining why GROUP BY is required and why hardcoded rows would not survive the hidden re-check.",
   language: "SQLite for Python utilities",
   tools: ["SQLite", "schema", "aggregate query"],
   synopsis: "You are learning how a Python utility can persist session data with SQLite. Persist means save data so it is still available after the program exits.",
@@ -590,7 +590,7 @@ const sqlitePersistenceLesson = proofLesson({
     "Know the session fields date, topic, and minutes.",
     "Know that SQL tables store rows and queries calculate answers."
   ],
-  testingFocus: "You will test that the read-only aggregate query returns one total row per topic from the pre-seeded sessions table instead of one row per session.",
+  testingFocus: "You will test that the read-only aggregate query computes one total row per topic from the sessions table instead of one row per session, and that it still works when a hidden check seeds an extra topic.",
   objective: "Store study sessions in a SQLite table.",
   whyItMatters: "A professional local utility should not lose data every time it exits. SQLite gives the tracker durable structured storage.",
   coreConcept: "A schema is the shape of a database table. A good first schema stores date, topic, and minutes with types and a simple primary key. A repository function can hide SQL details from service code while queries answer real product questions.",
@@ -607,19 +607,19 @@ const sqlitePersistenceLesson = proofLesson({
   miniSteps: ["Inspect the pre-seeded rows: python 30, python 20, and git 15", "Write one SELECT with SUM(minutes) and GROUP BY topic", "Add ORDER BY topic and confirm the totals are git 15 and python 50"],
   miniDeliverables: ["The read-only SELECT statement", "Query output showing python | 50 and git | 15", "A one-line note explaining why GROUP BY is required"],
   verifierCommand: "Code Lab check: SELECT topic, SUM(minutes) FROM sessions GROUP BY topic ORDER BY topic;",
-  expectedEvidence: "Query output showing the per-topic totals python | 50 and git | 15 from the seeded sessions table, plus a note that GROUP BY is required to aggregate one row per topic.",
+  expectedEvidence: "Query output showing the per-topic totals python | 50 and git | 15 from the seeded sessions table, plus a note that GROUP BY is required to aggregate one row per topic and that the totals must be computed from the table rather than hardcoded.",
   projectConnection: "This turns the tracker into a local persistent utility.",
   requiredCodeIncludes: ["SELECT", "sessions", "SUM", "GROUP BY"],
   requiredOutputIncludes: ["python", "50", "git", "15"],
   runnerLanguage: "sql",
   runnerStarterCode: "-- The sessions table already exists and is seeded for you by the lesson\n-- setup (python 30 + python 20, git 15).\n-- TODO: swap the placeholder query for one SELECT that reports total\n-- minutes per topic using SUM and GROUP BY.\nSELECT 1;",
-  runnerTestCode: "-- The SQL runner builds a freshly seeded database for each check,\n-- re-runs the learner query against it, and checks the query output;\n-- no separate harness SQL runs.",
+  runnerTestCode: "-- The SQL runner builds a freshly seeded database for each check, runs this\n-- check's trusted harness SQL (none for the visible check), then re-runs the\n-- learner query and checks its output.",
   hiddenTests: [
     {
       id: "sqlite-session-totals-recheck",
-      name: "SQLite depth re-checks per-topic totals",
-      code: "-- Read-only re-check: the SQL runner ignores this code and re-runs the\n-- learner query against a freshly seeded database, so the output must still\n-- show the per-topic totals.",
-      expectedOutputIncludes: ["python", "50", "git", "15"]
+      name: "SQLite depth re-checks totals for a newly seeded topic",
+      code: "-- Trusted harness SQL: add a topic the learner has not seen so a hardcoded\n-- UNION cannot pass. The learner query must compute totals from the table.\nINSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-04', 'sql', 45);",
+      expectedOutputIncludes: ["python", "50", "git", "15", "sql", "45"]
     }
   ],
   curriculum: {
@@ -637,15 +637,17 @@ const sqlitePersistenceLesson = proofLesson({
 });
 
 // The SQL runner (src/sandbox/runner.ts runSql) builds a freshly seeded database
-// for every check: it creates a new SQL.Database, runs setupCode to seed it, then
-// re-runs the learner query. The sandbox policy blocks mutation statements in
-// learner submissions (src/sandbox/policy.ts), so setupCode holds the schema and
-// seed rows and the learner writes only the read-only aggregation query.
+// for every check: it creates a new SQL.Database, runs setupCode to seed it, runs
+// the check's trusted harness SQL when present, then re-runs the learner query.
+// The sandbox policy blocks mutation statements in learner submissions
+// (src/sandbox/policy.ts), so setupCode holds the schema and seed rows, hidden
+// checks may seed extra rows, and the learner writes only the read-only
+// aggregation query. A hardcoded UNION cannot know the hidden extra topic.
 //
-// setupCode is privileged/trusted content executed once per check WITHOUT the
-// sandbox policy checks that gate learner submissions. Keep it limited to the
-// lesson database schema plus seed statements, and never put learner-facing or
-// dangerous SQL in it.
+// setupCode and hidden-check harness SQL are privileged/trusted content executed
+// once per check WITHOUT the sandbox policy checks that gate learner
+// submissions. Keep them limited to the lesson database schema plus seed
+// statements, and never put learner-facing or dangerous SQL in them.
 sqlitePersistenceLesson.workshop.miniProject.runnerSpec.setupCode = "CREATE TABLE sessions (\n  id INTEGER PRIMARY KEY,\n  date TEXT NOT NULL,\n  topic TEXT NOT NULL,\n  minutes INTEGER NOT NULL CHECK (minutes > 0)\n);\nINSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-01', 'python', 30);\nINSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-02', 'python', 20);\nINSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-03', 'git', 15);";
 
 sqlitePersistenceLesson.depth = {

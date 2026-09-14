@@ -11,6 +11,73 @@ function assertKnownIds(label: string, ids: string[], knownIds: Set<string>, err
   }
 }
 
+// Supporting/passive concepts that are intentionally registered but are not
+// taught by any active lesson nor referenced by active curriculum metadata
+// (Issue #7). These are legacy scaffolding, review-only concepts, or concepts
+// exercised only by the non-Python lessons, whose inline quizzes sit outside
+// Rule Group L's depth-bearing scope (Issue #8). A registered concept that is
+// neither taught, referenced, nor listed here is an orphan.
+export const supportingConceptAllowList: readonly string[] = [
+  // Level 0-1: filesystem and early-Python supporting concepts
+  "tool.files.folder",
+  "py.comment",
+  "py.arithmetic.add",
+  "py.arithmetic.multiply",
+  "py.integer_vs_string",
+  "py.str_conversion.basic",
+  // Level 2: collection/subscript supporting concepts
+  "py.boolean.expression",
+  "py.dict.get_set",
+  "py.key_error.basic",
+  "py.record.consistent_keys",
+  // Level 3: scope supporting concepts
+  "py.scope.local",
+  "py.scope.global_read_risk",
+  // Level 4: debugging/testing supporting concepts
+  "debug.invalid_input",
+  "testing.expected_actual",
+  "testing.happy_path",
+  "testing.failure_path",
+  "testing.regression",
+  // Level 5: file/CLI supporting concepts
+  "tool.files.relative_path",
+  "py.path.string",
+  "debug.file_not_found",
+  "py.with_statement",
+  "py.csv.reader",
+  "py.sys.argv",
+  // Level 6: project/packaging supporting concepts
+  "py.module.local",
+  "py.package.init",
+  // Git/GitHub track: these non-Python lessons carry no curriculum metadata
+  // block, so they cannot teach or reference registry concepts yet.
+  "git.repo.local",
+  "git.stage.add",
+  "git.commit.local",
+  "github.repo.url",
+  "git.branch.create",
+  "git.branch.switch",
+  "git.branch.merge",
+  "github.pull_request.create",
+  "github.pull_request.review",
+  "github.pull_request.merge"
+];
+
+// Lessons permitted to carry privileged `runnerSpec.setupCode` (Issue #11).
+// setupCode runs directly against SQLite in src/sandbox/runner.ts without the
+// validateSandboxSubmission policy gate, so it may only create schema and seed
+// rows. This list is intentionally tight: it mirrors the lessons that actually
+// ship setupCode today (the SQLite persistence lesson and the pre-existing SQL
+// lessons).
+export const setupCodeAllowedLessonIds = new Set<string>([
+  "lesson-python-sqlite-persistence",
+  "lesson-sql-joins",
+  "lesson-sql-constraints"
+]);
+
+// Operations setupCode may never contain: schema + seed only.
+export const dangerousSetupCodePattern = /\b(DROP|ATTACH|DETACH|PRAGMA|load_extension|UPDATE|DELETE)\b/i;
+
 export function validateContent(): string[] {
   const errors: string[] = [];
 
@@ -714,6 +781,11 @@ for (const lesson of contentPack.lessons) {
   }
 
   // Rule L: Checkpoint question conceptIds mapping
+  // Scope (Issue #8): enforced for depth-bearing lessons only. This loop already
+  // skips lessons without a `depth` block above, so the 36 inline non-Python
+  // quizzes assembled in seed.ts are intentionally out of scope: they have no
+  // depth metadata and no authored concept taxonomy. See CLAUDE.md Content
+  // Integrity Rule 5.
   const quiz = contentPack.quizzes.find((q) => q.id === lesson.quizId);
   if (quiz) {
     for (const question of quiz.questions) {
@@ -765,6 +837,117 @@ for (const lesson of contentPack.lessons) {
     }
     if (!tiers.has("synthesize")) {
       errors.push(`Rule Group N: Lesson '${lesson.id}' lacks a synthesize-tier practice rep`);
+    }
+  }
+
+  // --- RULE GROUP O: Runner setupCode Safety (Issue #11) ---
+  // setupCode is privileged: src/sandbox/runner.ts runs it directly against
+  // SQLite without the validateSandboxSubmission policy gate. It must therefore
+  // stay on an explicit allow-list and contain only schema + seed statements.
+  for (const lesson of contentPack.lessons) {
+    const setupCode = lesson.workshop.miniProject.runnerSpec.setupCode;
+    if (!setupCode || setupCode.trim().length === 0) continue;
+    if (!setupCodeAllowedLessonIds.has(lesson.id)) {
+      errors.push(`Rule Group O: Lesson '${lesson.id}' defines privileged setupCode but is not on the setupCode allow-list`);
+    }
+    const dangerous = setupCode.match(dangerousSetupCodePattern);
+    if (dangerous) {
+      errors.push(`Rule Group O: Lesson '${lesson.id}' setupCode contains non-schema/seed statement '${dangerous[0]}'`);
+    }
+  }
+
+  // --- RULE GROUP P: Concept Registry Hygiene (Issue #7) ---
+  // (P1) Every non-deprecated concept must be taught by an active lesson,
+  // referenced by active curriculum metadata, or allow-listed as a supporting
+  // concept. Anything else is a truly orphaned registry entry.
+  const conceptAliasTargets = new Set<string>();
+  for (const concept of conceptRegistry) {
+    for (const alias of concept.aliases ?? []) conceptAliasTargets.add(alias);
+  }
+
+  const taughtByActiveLesson = new Set<string>();
+  const metadataReferencedConceptIds = new Set<string>();
+
+  for (const lesson of contentPack.lessons) {
+    const curriculum = lesson.curriculum;
+    const depth = lesson.depth;
+    if (curriculum?.deprecated) continue;
+    if (curriculum) {
+      for (const conceptId of curriculum.teaches) taughtByActiveLesson.add(conceptId);
+      for (const conceptId of curriculum.requires) metadataReferencedConceptIds.add(conceptId);
+      for (const conceptId of curriculum.reinforces ?? []) metadataReferencedConceptIds.add(conceptId);
+      for (const conceptId of curriculum.usesButDoesNotTeach ?? []) metadataReferencedConceptIds.add(conceptId);
+      for (const conceptId of curriculum.visibleCodeConcepts ?? []) metadataReferencedConceptIds.add(conceptId);
+      for (const conceptId of curriculum.quizConcepts ?? []) metadataReferencedConceptIds.add(conceptId);
+    }
+    if (depth) {
+      metadataReferencedConceptIds.add(depth.primaryConceptId);
+      for (const conceptId of depth.secondaryConceptIds) metadataReferencedConceptIds.add(conceptId);
+      for (const capsule of depth.conceptCapsules) metadataReferencedConceptIds.add(capsule.conceptId);
+      for (const note of depth.codeWalkthrough) for (const conceptId of note.conceptIds) metadataReferencedConceptIds.add(conceptId);
+      for (const edit of depth.guidedEdits) for (const conceptId of edit.conceptIds) metadataReferencedConceptIds.add(conceptId);
+      for (const clinic of depth.errorClinic) for (const conceptId of clinic.conceptIds) metadataReferencedConceptIds.add(conceptId);
+      for (const conceptId of depth.codeLabBridge.usesConcepts) metadataReferencedConceptIds.add(conceptId);
+      for (const conceptId of depth.codeLabBridge.verifierOnlyConcepts ?? []) metadataReferencedConceptIds.add(conceptId);
+    }
+  }
+  for (const quiz of contentPack.quizzes) {
+    for (const question of quiz.questions) {
+      for (const conceptId of question.conceptIds ?? []) metadataReferencedConceptIds.add(conceptId);
+    }
+  }
+
+  const supportingConceptIds = new Set(supportingConceptAllowList);
+  for (const concept of conceptRegistry) {
+    // Concepts superseded by another entry's `aliases` are intentionally kept
+    // for backward compatibility and are not orphan candidates.
+    if (conceptAliasTargets.has(concept.id)) continue;
+    if (taughtByActiveLesson.has(concept.id)) continue;
+    if (metadataReferencedConceptIds.has(concept.id)) continue;
+    if (supportingConceptIds.has(concept.id)) continue;
+    errors.push(
+      `Rule Group P: Concept '${concept.id}' is orphaned (not taught by an active lesson, not referenced by active curriculum metadata, and not allow-listed)`
+    );
+  }
+
+  // (P2) usesButDoesNotTeach must not list a concept that an earlier lesson at
+  // the same curriculum level already taught. Cross-level reuse of prior
+  // concepts is an intentional pattern here (Rule Group E premature-module
+  // declarations, capstone review lessons), but a same-level declaration
+  // contradicts that level's own teaching order.
+  const orderedLessonsByTrack: Record<string, string[]> = {};
+  for (const track of contentPack.tracks) {
+    const ordered: string[] = [];
+    const modules = contentPack.modules
+      .filter((moduleItem) => moduleItem.trackId === track.id)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    for (const moduleItem of modules) {
+      for (const lessonId of moduleItem.lessonIds) ordered.push(lessonId);
+    }
+    orderedLessonsByTrack[track.id] = ordered;
+  }
+  const lessonByIdForHygiene = new Map(contentPack.lessons.map((lesson) => [lesson.id, lesson]));
+  for (const lesson of contentPack.lessons) {
+    const curriculum = lesson.curriculum;
+    if (curriculum?.deprecated || !curriculum?.usesButDoesNotTeach?.length) continue;
+    const moduleItem = contentPack.modules.find((candidate) => candidate.id === lesson.moduleId);
+    if (!moduleItem) continue;
+    const ordered = orderedLessonsByTrack[moduleItem.trackId] ?? [];
+    const lessonIndex = ordered.indexOf(lesson.id);
+    if (lessonIndex < 0) continue;
+    const taughtEarlierAtSameLevel = new Set<string>();
+    for (let i = 0; i < lessonIndex; i++) {
+      const earlier = lessonByIdForHygiene.get(ordered[i]);
+      if (!earlier?.curriculum || earlier.curriculum.deprecated) continue;
+      if (earlier.curriculum.level !== curriculum.level) continue;
+      for (const conceptId of earlier.curriculum.teaches) taughtEarlierAtSameLevel.add(conceptId);
+    }
+    for (const conceptId of curriculum.usesButDoesNotTeach) {
+      if (taughtEarlierAtSameLevel.has(conceptId)) {
+        errors.push(
+          `Rule Group P: Lesson '${lesson.id}' lists '${conceptId}' in usesButDoesNotTeach but an earlier level-${curriculum.level} lesson already taught it`
+        );
+      }
     }
   }
 

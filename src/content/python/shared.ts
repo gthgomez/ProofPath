@@ -258,6 +258,8 @@ export interface ProofLessonInput {
   projectConnection: string;
   requiredCodeIncludes: string[];
   requiredOutputIncludes: string[];
+  /** Optional override for the tester's forbidden output terms. Falls back to the shared default list when omitted. */
+  forbiddenOutputIncludes?: string[];
   runnerLanguage?: RunnerLanguage;
   runnerStarterCode: string;
   runnerTestCode: string;
@@ -319,6 +321,7 @@ export function proofLesson(input: ProofLessonInput): Lesson {
           outputLabel: "Paste check output",
           requiredCodeIncludes: input.requiredCodeIncludes,
           requiredOutputIncludes: input.requiredOutputIncludes,
+          forbiddenOutputIncludes: input.forbiddenOutputIncludes,
           successMessage: `${input.title} check passed.`,
           failureMessage: "The tester needs the required fields plus clean check output."
         },

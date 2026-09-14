@@ -1865,7 +1865,10 @@ const virtualEnvLesson = proofLesson({
     lessonKind: "concept_only",
     teaches: ["py.env.virtual"],
     requires: ["py.metadata.dependencies"],
-    usesButDoesNotTeach: ["py.import", "py.metadata.pyproject"],
+    // py.metadata.pyproject is taught earlier in this same level
+    // (lesson-python-pyproject-metadata), so it is prior knowledge here, not a
+    // "used but not taught" concept. Only genuinely premature imports remain.
+    usesButDoesNotTeach: ["py.import"],
     visibleCodeConcepts: ["py.env.virtual"],
     quizConcepts: ["py.env.virtual"],
     proofOutputs: ["reflection"]
