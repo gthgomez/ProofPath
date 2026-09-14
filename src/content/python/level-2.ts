@@ -171,15 +171,15 @@ const pythonFoundationCapstonePracticeReps: LessonPracticeBlock[] = [
 
 const pythonStringCleanupPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "raw_topic = \"  PYTHON  \"\nclean_topic = \"\"\nprint(clean_topic)",
-    expectedOutput: "python cleaned topic",
-    checkYourAnswer: "Use strip before lower so edge spaces disappear and capitalization becomes consistent. The cleaned value should not keep the original spacing.",
+    starterCode: "raw_topic = \"  PYTHON  \"\nclean_topic = \"\"\nprint(\"cleaned topic:\", clean_topic)",
+    expectedOutput: "cleaned topic: python",
+    checkYourAnswer: "Use strip before lower so edge spaces disappear and capitalization becomes consistent. Assign the cleaned result to clean_topic so the output is 'cleaned topic: python' instead of an empty value.",
     tier: "replicate"
   },
   {
-    starterCode: "clean_topic = \"python basics\"\nslug = \"\"\nprint(slug)",
-    expectedOutput: "python-basics slug output",
-    checkYourAnswer: "Create the slug after cleaning the topic. If spaces remain in slug, replace spaces with hyphens on the cleaned value.",
+    starterCode: "clean_topic = \"python basics\"\nslug = \"\"\nprint(\"topic slug:\", slug)",
+    expectedOutput: "topic slug: python-basics",
+    checkYourAnswer: "Create the slug after cleaning the topic. Assign clean_topic.replace(\" \", \"-\") to slug so spaces become hyphens and the output is 'topic slug: python-basics'.",
     tier: "replicate"
   },
   {
@@ -189,18 +189,18 @@ const pythonStringCleanupPracticeReps: LessonPracticeBlock[] = [
     tier: "synthesize"
   },
   {
-    starterCode: "raw_topic = \"  Python  \"\n# Bug: this code keeps the edge spaces.\nclean_topic = raw_topic.lower()\nprint(clean_topic)",
-    expectedOutput: "python cleaned topic",
-    checkYourAnswer: "The code calls lower() before strip(), so edge spaces remain. Swap the order: strip first, or chain as raw_topic.strip().lower().",
+    starterCode: "raw_topic = \"  Python  \"\n# Bug: this code keeps the edge spaces.\nclean_topic = raw_topic.lower()\nprint(\"cleaned topic:\", clean_topic)",
+    expectedOutput: "cleaned topic: python",
+    checkYourAnswer: "The code calls lower() before strip(), so the output keeps the edge spaces ('cleaned topic:   python  '). Swap the order: strip first, or chain as raw_topic.strip().lower(), so the output is 'cleaned topic: python'.",
     tier: "diagnose"
   }
 ];
 
 const pythonModuleGuardPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "def count_sessions(sessions):\n    return len(sessions)\n\n# Add the module guard. Inside:\n#   data = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\n#   print(f\"{count_sessions(data)} session(s)\")\n",
-    expectedOutput: "2 session(s) counted when the file runs directly; no print when it is imported",
-    checkYourAnswer: "Copy the guard pattern: if __name__ == '__main__': with the test code indented below, then use Run file to see the direct-run print and Run checks to confirm import-time silence. Both double-underscore pairs on name and main are essential.",
+    starterCode: "def count_sessions(sessions):\n    return len(sessions)\n\n# Add the module guard. Inside:\n#   data = [{'topic': 'python', 'minutes': 30}, {'topic': 'git', 'minutes': 15}]\n#   print(f\"{count_sessions(data)} session(s) counted\")\n",
+    expectedOutput: "2 session(s) counted",
+    checkYourAnswer: "Copy the guard pattern: if __name__ == '__main__': with the test code indented below, then use Run file to see '2 session(s) counted' on direct execution and Run checks to confirm import-time silence. Both double-underscore pairs on name and main are essential.",
     tier: "replicate"
   },
   {
@@ -715,7 +715,7 @@ export const level2Lessons: Lesson[] = [
     slug: "python-module-guard",
     title: "The Module Guard Lets Files Be Reusable AND Runnable",
     summary: "Learn the module guard pattern that lets Python files act as reusable modules AND standalone scripts.",
-    bodyMarkdown: "When Python runs a script, the built-in variable __name__ is set to '__main__'. When another file imports that script, __name__ is the module name, not '__main__'. The guard `if __name__ == '__main__':` checks which case this is, so code inside only runs during direct execution. This means the Study Tracker file can define reusable functions at the top, and wrap the interactive CLI code behind the guard. When you write `from study_tracker import parse_row`, the import silently loads the function without triggering test prints or the menu prompt. In Code Lab, Run file executes the script as the program entry point (`__name__` is '__main__'), so the guarded block runs; Run checks executes the file the way an import would (`__name__` is not '__main__'), so the guarded block stays silent while the reusable function remains importable.",
+    bodyMarkdown: "When Python runs a script, the built-in variable __name__ is set to '__main__'. When another file imports that script, __name__ is the module name, not '__main__'. The guard `if __name__ == '__main__':` checks which case this is, so code inside only runs during direct execution. This means the Study Tracker file can define reusable functions at the top, and wrap the interactive CLI code behind the guard. When you write `from study_tracker import parse_row`, the import silently loads the function without triggering test prints or the menu prompt. In Code Lab, Run file executes the script as the program entry point (`__name__` is '__main__'), so the guarded block runs; Run checks executes the file the way an import would (`__name__` is not '__main__'), so the guarded block stays silent while the reusable function remains importable. One caveat to be honest about: the automated check can only observe import-time silence — it runs your file the way an import would and confirms no test data or print reached module level. It cannot read your source, so deleting the test data would also satisfy that check. Run file is what proves the guard itself works, so keep the test data and wrap it in `if __name__ == '__main__':`; that way direct execution still prints while import stays silent.",
     estimatedMinutes: 10,
     difficulty: "applied",
     skillIds: ["skill-python-basics"],

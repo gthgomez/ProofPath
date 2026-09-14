@@ -1,6 +1,12 @@
 import { normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
 import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec } from "@/domain/types";
-import { PYTHON_DIRECT_RUN_NAME, PYTHON_IMPORT_RUN_NAME, SQL_HARNESS_PATTERN } from "./runner";
+import {
+  PYTHON_DIRECT_RUN_NAME,
+  PYTHON_IMPORT_RUN_NAME,
+  SQL_HARNESS_DANGEROUS_PATTERN,
+  SQL_HARNESS_PATTERN,
+  isTrustedSqlHarness
+} from "./runner";
 
 export interface NativeWebViewRunnerRequest {
   lessonId: string;
@@ -20,10 +26,11 @@ export const NATIVE_ANDROID_SANDBOX_BASE_URL = "file:///android_asset/";
 /**
  * The trusted-harness gate mirrored by the embedded WebView script. The web
  * runner (`src/sandbox/runner.ts`) and the native script both derive this from
- * the shared `SQL_HARNESS_PATTERN` so the two cannot drift.
+ * the shared `SQL_HARNESS_PATTERN` / `SQL_HARNESS_DANGEROUS_PATTERN` and the
+ * same statement-level check so the two cannot drift.
  */
 export function nativeWebViewTrustedSqlHarness(code: string): boolean {
-  return SQL_HARNESS_PATTERN.test(code);
+  return isTrustedSqlHarness(code);
 }
 
 export interface NativeWebViewRunnerReadyMessage {
@@ -53,6 +60,81 @@ export function createNativeWebViewRunnerHtml(): string {
     const PYTHON_DIRECT_RUN_NAME = ${JSON.stringify(PYTHON_DIRECT_RUN_NAME)};
     const PYTHON_IMPORT_RUN_NAME = ${JSON.stringify(PYTHON_IMPORT_RUN_NAME)};
     const SQL_HARNESS_PATTERN = new RegExp(${JSON.stringify(SQL_HARNESS_PATTERN.source)}, "i");
+    const SQL_HARNESS_DANGEROUS_PATTERN = new RegExp(${JSON.stringify(SQL_HARNESS_DANGEROUS_PATTERN.source)}, "i");
+    /* trusted-sql-harness-gate:start */
+    // Mirrors src/sandbox/runner.ts isTrustedSqlHarness so the web and native
+    // runners cannot drift on which trusted harness SQL executes.
+    function stripSqlLiteralsAndComments(code) {
+      let sanitized = "";
+      let index = 0;
+      const blankChar = (char) => (char === "\\n" ? "\\n" : " ");
+      while (index < code.length) {
+        const char = code[index];
+        const next = code[index + 1];
+        if (char === "-" && next === "-") {
+          sanitized += "  ";
+          index += 2;
+          while (index < code.length && code[index] !== "\\n") {
+            sanitized += " ";
+            index += 1;
+          }
+          continue;
+        }
+        if (char === "/" && next === "*") {
+          sanitized += "  ";
+          index += 2;
+          while (index < code.length) {
+            if (code[index] === "*" && code[index + 1] === "/") {
+              sanitized += "  ";
+              index += 2;
+              break;
+            }
+            sanitized += blankChar(code[index]);
+            index += 1;
+          }
+          continue;
+        }
+        const quote = char === "'" ? "'" : char === '"' ? '"' : char === "\`" ? "\`" : char === "[" ? "]" : null;
+        if (quote) {
+          const escapeDoubled = quote !== "]";
+          sanitized += " ";
+          index += 1;
+          while (index < code.length) {
+            if (code[index] === quote) {
+              if (escapeDoubled && code[index + 1] === quote) {
+                sanitized += "  ";
+                index += 2;
+                continue;
+              }
+              sanitized += " ";
+              index += 1;
+              break;
+            }
+            sanitized += blankChar(code[index]);
+            index += 1;
+          }
+          continue;
+        }
+        sanitized += char;
+        index += 1;
+      }
+      return sanitized;
+    }
+
+    function isTrustedSqlHarness(code) {
+      if (!SQL_HARNESS_PATTERN.test(code)) return false;
+      const stripped = stripSqlLiteralsAndComments(code);
+      if (SQL_HARNESS_DANGEROUS_PATTERN.test(stripped)) return false;
+      const statements = stripped.split(";");
+      for (let i = 0; i < statements.length; i += 1) {
+        const statement = statements[i].trim();
+        if (statement.length > 0 && !/^(SELECT|WITH|INSERT|CREATE)\\b/i.test(statement)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    /* trusted-sql-harness-gate:end */
     function post(payload) {
       window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
     }
@@ -128,7 +210,12 @@ export function createNativeWebViewRunnerHtml(): string {
     function buildAttempt(request, startedAt, stdout, stderr, testResults) {
       const passedTests = testResults.filter((result) => result.passed).length;
       const score = testResults.length === 0 ? 0 : Math.round((passedTests / testResults.length) * 100);
-      const passed = request.runMode === "run_file" ? true : testResults.length > 0 && testResults.every((result) => result.passed);
+      // Mirror the web runner: a run_file attempt is only passed when it produced
+      // no error output (a raised exception lands in stderr). Checks still require
+      // every result to pass.
+      const passed = request.runMode === "run_file"
+        ? stderr.join("\\n").trim().length === 0
+        : testResults.length > 0 && testResults.every((result) => result.passed);
       const redacted = redactCheckResults(testResults);
       const learnerSafeHiddenSummary = { total: 0, passed: 0, failed: 0 };
 
@@ -381,8 +468,8 @@ export function createNativeWebViewRunnerHtml(): string {
 
           // A check's code is trusted harness SQL (like setupCode): it runs
           // against the freshly seeded database before the learner query and is
-          // gated to seed-safe statements by the shared SQL_HARNESS_PATTERN.
-          if (test.code && SQL_HARNESS_PATTERN.test(test.code)) {
+          // gated to seed-safe statements by the shared isTrustedSqlHarness gate.
+          if (test.code && isTrustedSqlHarness(test.code)) {
             db.run(test.code);
           }
 

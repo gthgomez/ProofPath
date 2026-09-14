@@ -32,28 +32,51 @@ function includesNeedle(haystack: string, needle: string): boolean {
 }
 
 /**
- * Reduce a term to lowercase alphanumerics so containment comparisons ignore
- * case and punctuation. This lets a generic guard like "error:" be recognized
- * as part of a required term like "NameError" (the "Error:" in "NameError:" is
- * the requested output, not an unrequested error).
+ * Reduce a term to lowercase alphanumerics so comparisons ignore case and
+ * punctuation.
  */
 function comparableTerm(term: string): string {
   return term.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 /**
- * A forbidden term must not block output when it is a substring of one of the
- * lesson's required output terms. If the lesson requires `NameError`, the
- * generic `error:` guard must not veto that required output. Genuinely
- * forbidden content (for example an unrequested traceback on a normal lesson)
- * is still blocked because no required term covers it.
+ * Split a required term into lowercased camelCase words, grouped per
+ * alphanumeric identifier. "NameError" becomes [["name", "error"]] and
+ * "error count: 0" becomes [["error"], ["count"], ["0"]].
+ */
+function requiredTermIdentifiers(term: string): string[][] {
+  return term
+    .split(/[^A-Za-z0-9]+/)
+    .filter((identifier) => identifier.length > 0)
+    .map((identifier) => identifier
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .toLowerCase()
+      .split(" ")
+      .filter((word) => word.length > 0));
+}
+
+/**
+ * A forbidden term is covered only when a required output term actually names
+ * it, never when the required term merely contains it as a substring.
+ *
+ * An exact normalized match always counts (a lesson may require a term it would
+ * otherwise forbid). A term may also cover a generic guard when the guard is a
+ * later camelCase word of an identifier the required term names, so an
+ * exception type such as "NameError" covers the generic "error:" guard. A
+ * phrase such as "error count: 0" must not cover "error:" because "error" is
+ * its own word rather than the tail of an exception name.
  */
 function isCoveredByRequiredOutput(blockedText: string, requiredOutputIncludes: string[]): boolean {
   const blocked = comparableTerm(blockedText);
   if (blocked.length === 0) {
     return false;
   }
-  return requiredOutputIncludes.some((requiredText) => comparableTerm(requiredText).includes(blocked));
+  return requiredOutputIncludes.some((requiredText) => {
+    if (comparableTerm(requiredText) === blocked) {
+      return true;
+    }
+    return requiredTermIdentifiers(requiredText).some((words) => words.indexOf(blocked) > 0);
+  });
 }
 
 export function runMiniProjectTest(miniProject: LessonMiniProject, submission: MiniProjectSubmission): MiniProjectTestResult {

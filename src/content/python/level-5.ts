@@ -163,17 +163,17 @@ const pythonImportLesson = proofLesson({
   requiredOutputIncludes: ["topic", "minutes", "passed"],
   runnerLanguage: "python",
   runnerStarterCode: "# TODO: import the json module at the very top of this file.\nsession = {\"topic\": \"python\", \"minutes\": 30}\n# TODO: serialize the session dict with json.dumps(session)\n# TODO: print the JSON string so the check can read it",
-  runnerTestCode: "import json\ntry:\n    json.loads('{}')\n    result = json.dumps({\"topic\": \"python\", \"minutes\": 30})\n    assert 'topic' in result\n    assert 'python' in result\n    assert '30' in result\n    print('import json passed')\nexcept NameError:\n    print('json module not imported - add import json')",
+  runnerTestCode: "import json\nassert json.loads(json_text) == {\"topic\": \"python\", \"minutes\": 30}\nprint('import json passed')",
   hiddenTests: [
     {
       id: "import-json-parse",
-      name: "JSON parse works",
-      code: "import json\nparsed = json.loads('{\"topic\": \"git\", \"minutes\": 15}')\nassert parsed['topic'] == 'git'\nassert parsed['minutes'] == 15"
+      name: "Learner JSON parses back to the session",
+      code: "import json\nparsed = json.loads(json_text)\nassert parsed['topic'] == 'python'\nassert parsed['minutes'] == 30"
     },
     {
       id: "import-alternate-json",
-      name: "JSON dump with alternate data",
-      code: "import json\noutput = json.dumps({\"topic\": \"sql\", \"minutes\": 20})\nassert '\"topic\"' in output\nassert '\"sql\"' in output\nassert '20' in output"
+      name: "Learner JSON output matches the session",
+      code: "import json\nassert json.loads(json_text) == session\nassert '\"topic\"' in json_text\nassert '\"minutes\"' in json_text\nassert \"'topic'\" not in json_text"
     }
   ],
   curriculum: {
@@ -501,6 +501,11 @@ const parserTestsLesson = proofLesson({
       id: "rejects-column-count",
       name: "Rejects malformed column counts",
       code: "result = parse_row('bad-row')\nassert result['error'] == 'expected 3 columns'"
+    },
+    {
+      id: "valid-row-test-detects-regression",
+      name: "Valid-row test fails when the parser is broken",
+      code: "assert callable(test_parse_valid_row)\n_original_parse_row = parse_row\ndef _broken_parse_row(row):\n    return {'date': 'x', 'topic': 'x', 'minutes': 0}\nparse_row = _broken_parse_row\ntry:\n    test_parse_valid_row()\nexcept Exception:\n    pass\nelse:\n    raise AssertionError('test_parse_valid_row did not detect a broken parser')\nfinally:\n    parse_row = _original_parse_row"
     }
   ],
   curriculum: {
@@ -584,7 +589,7 @@ parserTestsLesson.depth = {
     story: "Testing is not just checking if the code runs. Repeatable tests prove your code handles edge cases correctly.",
     usesConcepts: ["py.test.assertions", "py.test.failures"],
     learnerOwns: ["parse_row", "test_parse_valid_row", "test_rejects_bad_minutes"],
-    checkerOwns: ["rejects-column-count"],
+    checkerOwns: ["rejects-column-count", "valid-row-test-detects-regression"],
     runExpectation: "prints 2 passed"
   },
   understandingProofPrompt: "What is the difference between a test crashing with a TypeError vs a test failing an assertion? Which is better for a user-facing tool?",
@@ -1405,7 +1410,7 @@ rejectedRowReportLesson.depth = {
     story: "A professional tool is helpful when inputs are messy. Building a rejected-row report preserves data audit trails.",
     usesConcepts: ["py.report.rejections", "py.report.row_numbers"],
     learnerOwns: ["parse_rows", "build_rejected_report"],
-    checkerOwns: ["rejected-report-has-empty-state"],
+    checkerOwns: ["rejected-report-empty-state"],
     runExpectation: "prints row 2 row 3 rejected report passed"
   },
   understandingProofPrompt: "Why do we include the raw bad row string in the rejection report, instead of only listing the line number?",

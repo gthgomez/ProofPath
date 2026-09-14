@@ -196,6 +196,183 @@ export function findUnsafeRunnerSqlErrors(
   return errors;
 }
 
+/**
+ * Rule Group O's full privileged-SQL guard, split out so it can be exercised
+ * with crafted packs (see tests/content-integrity.test.ts) as well as the real
+ * pack. `setupCode` runs directly against SQLite without the sandbox policy
+ * gate, so it must be allow-listed and schema/seed-only; a SQL check's `code` is
+ * likewise privileged harness SQL and must satisfy the same schema/seed rule.
+ */
+export function findUnsafeSetupCodeErrors(
+  lessons: ReadonlyArray<{
+    id: string;
+    workshop: {
+      miniProject: {
+        runnerSpec: {
+          language: string;
+          setupCode?: string;
+          visibleTests: Array<{ id: string; code: string }>;
+          hiddenTests: Array<{ id: string; code: string }>;
+        };
+      };
+    };
+  }>,
+  allowList: ReadonlySet<string>
+): string[] {
+  const errors: string[] = [];
+
+  for (const lesson of lessons) {
+    const runnerSpec = lesson.workshop.miniProject.runnerSpec;
+    const setupCode = runnerSpec.setupCode;
+    if (setupCode && setupCode.trim().length > 0) {
+      if (!allowList.has(lesson.id)) {
+        errors.push(`Rule Group O: Lesson '${lesson.id}' defines privileged setupCode but is not on the setupCode allow-list`);
+      }
+      const dangerous = findDangerousRunnerStatement(setupCode);
+      if (dangerous) {
+        errors.push(`Rule Group O: Lesson '${lesson.id}' setupCode contains non-schema/seed statement '${dangerous}'`);
+      }
+    }
+
+    if (runnerSpec.language !== "sql") continue;
+
+    errors.push(...findUnsafeRunnerSqlErrors(lesson.id, runnerSpec));
+  }
+
+  return errors;
+}
+
+/**
+ * Rule Group P1's active-curriculum concept footprint. Exported so tests can
+ * assert the supportingConceptAllowList has no stale entries without copying the
+ * traversal. References to a concept's `aliases` are normalized to the canonical
+ * id (e.g. `py.open.read` counts as `py.file.input`), and a quiz attached to a
+ * deprecated lesson is inactive metadata and is skipped (Issue #2).
+ */
+export function collectActiveConceptUsage(
+  pack: typeof contentPack,
+  registry: typeof conceptRegistry
+): { taughtByActiveLesson: Set<string>; metadataReferencedConceptIds: Set<string> } {
+  const canonicalByAlias = new Map<string, string>();
+  for (const concept of registry) {
+    for (const alias of concept.aliases ?? []) canonicalByAlias.set(alias, concept.id);
+  }
+  const canonical = (conceptId: string): string => canonicalByAlias.get(conceptId) ?? conceptId;
+
+  const taughtByActiveLesson = new Set<string>();
+  const metadataReferencedConceptIds = new Set<string>();
+
+  for (const lesson of pack.lessons) {
+    const curriculum = lesson.curriculum;
+    const depth = lesson.depth;
+    if (curriculum?.deprecated) continue;
+    if (curriculum) {
+      for (const conceptId of curriculum.teaches) taughtByActiveLesson.add(canonical(conceptId));
+      for (const conceptId of curriculum.requires) metadataReferencedConceptIds.add(canonical(conceptId));
+      for (const conceptId of curriculum.reinforces ?? []) metadataReferencedConceptIds.add(canonical(conceptId));
+      for (const conceptId of curriculum.usesButDoesNotTeach ?? []) metadataReferencedConceptIds.add(canonical(conceptId));
+      for (const conceptId of curriculum.visibleCodeConcepts ?? []) metadataReferencedConceptIds.add(canonical(conceptId));
+      for (const conceptId of curriculum.quizConcepts ?? []) metadataReferencedConceptIds.add(canonical(conceptId));
+    }
+    if (depth) {
+      metadataReferencedConceptIds.add(canonical(depth.primaryConceptId));
+      for (const conceptId of depth.secondaryConceptIds) metadataReferencedConceptIds.add(canonical(conceptId));
+      for (const capsule of depth.conceptCapsules) metadataReferencedConceptIds.add(canonical(capsule.conceptId));
+      for (const note of depth.codeWalkthrough) for (const conceptId of note.conceptIds) metadataReferencedConceptIds.add(canonical(conceptId));
+      for (const edit of depth.guidedEdits) for (const conceptId of edit.conceptIds) metadataReferencedConceptIds.add(canonical(conceptId));
+      for (const clinic of depth.errorClinic) for (const conceptId of clinic.conceptIds) metadataReferencedConceptIds.add(canonical(conceptId));
+      for (const conceptId of depth.codeLabBridge.usesConcepts) metadataReferencedConceptIds.add(canonical(conceptId));
+      for (const conceptId of depth.codeLabBridge.verifierOnlyConcepts ?? []) metadataReferencedConceptIds.add(canonical(conceptId));
+    }
+  }
+
+  const lessonById = new Map(pack.lessons.map((lesson) => [lesson.id, lesson]));
+  for (const quiz of pack.quizzes) {
+    // Rule Group P must not count quizzes attached to deprecated lessons as
+    // active metadata; the lesson loop above already skips those lessons.
+    if (lessonById.get(quiz.lessonId)?.curriculum?.deprecated) continue;
+    for (const question of quiz.questions) {
+      for (const conceptId of question.conceptIds ?? []) metadataReferencedConceptIds.add(canonical(conceptId));
+    }
+  }
+
+  return { taughtByActiveLesson, metadataReferencedConceptIds };
+}
+
+/**
+ * Rule Group P: Concept Registry Hygiene (Issue #7), split out so tests can
+ * drive it with crafted packs. (P1) Every non-deprecated concept must be taught
+ * by an active lesson, referenced by active curriculum metadata, or allow-listed
+ * as a supporting concept; alias targets stay exempt for backward compatibility.
+ * (P2) `usesButDoesNotTeach` must not list a concept an earlier lesson at the
+ * same curriculum level already taught.
+ */
+export function findConceptHygieneErrors(
+  pack: typeof contentPack,
+  registry: typeof conceptRegistry,
+  allowList: readonly string[]
+): string[] {
+  const errors: string[] = [];
+
+  const conceptAliasTargets = new Set<string>();
+  for (const concept of registry) {
+    for (const alias of concept.aliases ?? []) conceptAliasTargets.add(alias);
+  }
+
+  const { taughtByActiveLesson, metadataReferencedConceptIds } = collectActiveConceptUsage(pack, registry);
+
+  const supportingConceptIds = new Set(allowList);
+  for (const concept of registry) {
+    // Concepts superseded by another entry's `aliases` are intentionally kept
+    // for backward compatibility and are not orphan candidates.
+    if (conceptAliasTargets.has(concept.id)) continue;
+    if (taughtByActiveLesson.has(concept.id)) continue;
+    if (metadataReferencedConceptIds.has(concept.id)) continue;
+    if (supportingConceptIds.has(concept.id)) continue;
+    errors.push(
+      `Rule Group P: Concept '${concept.id}' is orphaned (not taught by an active lesson, not referenced by active curriculum metadata, and not allow-listed)`
+    );
+  }
+
+  const orderedLessonsByTrack: Record<string, string[]> = {};
+  for (const track of pack.tracks) {
+    const ordered: string[] = [];
+    const modules = pack.modules
+      .filter((moduleItem) => moduleItem.trackId === track.id)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    for (const moduleItem of modules) {
+      for (const lessonId of moduleItem.lessonIds) ordered.push(lessonId);
+    }
+    orderedLessonsByTrack[track.id] = ordered;
+  }
+  const lessonByIdForHygiene = new Map(pack.lessons.map((lesson) => [lesson.id, lesson]));
+  for (const lesson of pack.lessons) {
+    const curriculum = lesson.curriculum;
+    if (curriculum?.deprecated || !curriculum?.usesButDoesNotTeach?.length) continue;
+    const moduleItem = pack.modules.find((candidate) => candidate.id === lesson.moduleId);
+    if (!moduleItem) continue;
+    const ordered = orderedLessonsByTrack[moduleItem.trackId] ?? [];
+    const lessonIndex = ordered.indexOf(lesson.id);
+    if (lessonIndex < 0) continue;
+    const taughtEarlierAtSameLevel = new Set<string>();
+    for (let i = 0; i < lessonIndex; i++) {
+      const earlier = lessonByIdForHygiene.get(ordered[i]);
+      if (!earlier?.curriculum || earlier.curriculum.deprecated) continue;
+      if (earlier.curriculum.level !== curriculum.level) continue;
+      for (const conceptId of earlier.curriculum.teaches) taughtEarlierAtSameLevel.add(conceptId);
+    }
+    for (const conceptId of curriculum.usesButDoesNotTeach) {
+      if (taughtEarlierAtSameLevel.has(conceptId)) {
+        errors.push(
+          `Rule Group P: Lesson '${lesson.id}' lists '${conceptId}' in usesButDoesNotTeach but an earlier level-${curriculum.level} lesson already taught it`
+        );
+      }
+    }
+  }
+
+  return errors;
+}
+
 export function validateContent(): string[] {
   const errors: string[] = [];
 
@@ -964,119 +1141,14 @@ for (const lesson of contentPack.lessons) {
   // stay on an explicit allow-list and contain only schema + seed statements.
   // A SQL check's `code` is also privileged harness SQL that runs before the
   // learner query, so it is held to the same schema + seed standard (the level-7
-  // INSERT harness and legacy EXPECT_ROWS markers must still pass).
-  for (const lesson of contentPack.lessons) {
-    const runnerSpec = lesson.workshop.miniProject.runnerSpec;
-    const setupCode = runnerSpec.setupCode;
-    if (setupCode && setupCode.trim().length > 0) {
-      if (!setupCodeAllowedLessonIds.has(lesson.id)) {
-        errors.push(`Rule Group O: Lesson '${lesson.id}' defines privileged setupCode but is not on the setupCode allow-list`);
-      }
-      const dangerous = findDangerousRunnerStatement(setupCode);
-      if (dangerous) {
-        errors.push(`Rule Group O: Lesson '${lesson.id}' setupCode contains non-schema/seed statement '${dangerous}'`);
-      }
-    }
-
-    if (runnerSpec.language !== "sql") continue;
-
-    errors.push(...findUnsafeRunnerSqlErrors(lesson.id, runnerSpec));
-  }
+  // INSERT harness and legacy EXPECT_ROWS markers must still pass). The guard is
+  // owned by findUnsafeSetupCodeErrors() so tests can drive it with crafted packs.
+  errors.push(...findUnsafeSetupCodeErrors(contentPack.lessons, setupCodeAllowedLessonIds));
 
   // --- RULE GROUP P: Concept Registry Hygiene (Issue #7) ---
-  // (P1) Every non-deprecated concept must be taught by an active lesson,
-  // referenced by active curriculum metadata, or allow-listed as a supporting
-  // concept. Anything else is a truly orphaned registry entry.
-  const conceptAliasTargets = new Set<string>();
-  for (const concept of conceptRegistry) {
-    for (const alias of concept.aliases ?? []) conceptAliasTargets.add(alias);
-  }
-
-  const taughtByActiveLesson = new Set<string>();
-  const metadataReferencedConceptIds = new Set<string>();
-
-  for (const lesson of contentPack.lessons) {
-    const curriculum = lesson.curriculum;
-    const depth = lesson.depth;
-    if (curriculum?.deprecated) continue;
-    if (curriculum) {
-      for (const conceptId of curriculum.teaches) taughtByActiveLesson.add(conceptId);
-      for (const conceptId of curriculum.requires) metadataReferencedConceptIds.add(conceptId);
-      for (const conceptId of curriculum.reinforces ?? []) metadataReferencedConceptIds.add(conceptId);
-      for (const conceptId of curriculum.usesButDoesNotTeach ?? []) metadataReferencedConceptIds.add(conceptId);
-      for (const conceptId of curriculum.visibleCodeConcepts ?? []) metadataReferencedConceptIds.add(conceptId);
-      for (const conceptId of curriculum.quizConcepts ?? []) metadataReferencedConceptIds.add(conceptId);
-    }
-    if (depth) {
-      metadataReferencedConceptIds.add(depth.primaryConceptId);
-      for (const conceptId of depth.secondaryConceptIds) metadataReferencedConceptIds.add(conceptId);
-      for (const capsule of depth.conceptCapsules) metadataReferencedConceptIds.add(capsule.conceptId);
-      for (const note of depth.codeWalkthrough) for (const conceptId of note.conceptIds) metadataReferencedConceptIds.add(conceptId);
-      for (const edit of depth.guidedEdits) for (const conceptId of edit.conceptIds) metadataReferencedConceptIds.add(conceptId);
-      for (const clinic of depth.errorClinic) for (const conceptId of clinic.conceptIds) metadataReferencedConceptIds.add(conceptId);
-      for (const conceptId of depth.codeLabBridge.usesConcepts) metadataReferencedConceptIds.add(conceptId);
-      for (const conceptId of depth.codeLabBridge.verifierOnlyConcepts ?? []) metadataReferencedConceptIds.add(conceptId);
-    }
-  }
-  for (const quiz of contentPack.quizzes) {
-    for (const question of quiz.questions) {
-      for (const conceptId of question.conceptIds ?? []) metadataReferencedConceptIds.add(conceptId);
-    }
-  }
-
-  const supportingConceptIds = new Set(supportingConceptAllowList);
-  for (const concept of conceptRegistry) {
-    // Concepts superseded by another entry's `aliases` are intentionally kept
-    // for backward compatibility and are not orphan candidates.
-    if (conceptAliasTargets.has(concept.id)) continue;
-    if (taughtByActiveLesson.has(concept.id)) continue;
-    if (metadataReferencedConceptIds.has(concept.id)) continue;
-    if (supportingConceptIds.has(concept.id)) continue;
-    errors.push(
-      `Rule Group P: Concept '${concept.id}' is orphaned (not taught by an active lesson, not referenced by active curriculum metadata, and not allow-listed)`
-    );
-  }
-
-  // (P2) usesButDoesNotTeach must not list a concept that an earlier lesson at
-  // the same curriculum level already taught. Cross-level reuse of prior
-  // concepts is an intentional pattern here (Rule Group E premature-module
-  // declarations, capstone review lessons), but a same-level declaration
-  // contradicts that level's own teaching order.
-  const orderedLessonsByTrack: Record<string, string[]> = {};
-  for (const track of contentPack.tracks) {
-    const ordered: string[] = [];
-    const modules = contentPack.modules
-      .filter((moduleItem) => moduleItem.trackId === track.id)
-      .sort((a, b) => a.sortOrder - b.sortOrder);
-    for (const moduleItem of modules) {
-      for (const lessonId of moduleItem.lessonIds) ordered.push(lessonId);
-    }
-    orderedLessonsByTrack[track.id] = ordered;
-  }
-  const lessonByIdForHygiene = new Map(contentPack.lessons.map((lesson) => [lesson.id, lesson]));
-  for (const lesson of contentPack.lessons) {
-    const curriculum = lesson.curriculum;
-    if (curriculum?.deprecated || !curriculum?.usesButDoesNotTeach?.length) continue;
-    const moduleItem = contentPack.modules.find((candidate) => candidate.id === lesson.moduleId);
-    if (!moduleItem) continue;
-    const ordered = orderedLessonsByTrack[moduleItem.trackId] ?? [];
-    const lessonIndex = ordered.indexOf(lesson.id);
-    if (lessonIndex < 0) continue;
-    const taughtEarlierAtSameLevel = new Set<string>();
-    for (let i = 0; i < lessonIndex; i++) {
-      const earlier = lessonByIdForHygiene.get(ordered[i]);
-      if (!earlier?.curriculum || earlier.curriculum.deprecated) continue;
-      if (earlier.curriculum.level !== curriculum.level) continue;
-      for (const conceptId of earlier.curriculum.teaches) taughtEarlierAtSameLevel.add(conceptId);
-    }
-    for (const conceptId of curriculum.usesButDoesNotTeach) {
-      if (taughtEarlierAtSameLevel.has(conceptId)) {
-        errors.push(
-          `Rule Group P: Lesson '${lesson.id}' lists '${conceptId}' in usesButDoesNotTeach but an earlier level-${curriculum.level} lesson already taught it`
-        );
-      }
-    }
-  }
+  // (P1) orphaned registry entries and (P2) same-level usesButDoesNotTeach
+  // conflicts are owned by findConceptHygieneErrors() so tests can drive it.
+  errors.push(...findConceptHygieneErrors(contentPack, conceptRegistry, supportingConceptAllowList));
 
   // --- SURFACE CLASSIFICATION HELPERS ---
   function stripComments(code: string): string {

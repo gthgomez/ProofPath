@@ -54,7 +54,7 @@ const pythonRateLimitPracticeReps: LessonPracticeBlock[] = [
 const pythonCachingPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "class FakeResponse:\n    def __init__(self, status_code, payload=None):\n        self.status_code = status_code\n        self._payload = payload if payload is not None else {}\n    def json(self):\n        return self._payload\n\nclass FakeClient:\n    def __init__(self, responses):\n        self.responses = responses\n        self.call_count = 0\n    def get(self, url, timeout):\n        resp = self.responses[self.call_count]\n        self.call_count += 1\n        return resp\n\ncache = {}\ndef fetch_with_cache(client, url):\n    return []\n\nresponses = [FakeResponse(200, [{'date': '2026-06-01', 'topic': 'python', 'minutes': 30}])]\nclient = FakeClient(responses)\nresult1 = fetch_with_cache(client, 'url')\nresult2 = fetch_with_cache(client, 'url')\nprint(client.call_count)",
-    expectedOutput: "0 — the starter's fetch_with_cache returns [] without calling the client, so call_count stays 0 until the cache lookup and store are implemented.",
+    expectedOutput: "call_count is 1 because the second call is served from cache.",
     checkYourAnswer: "Target behavior: first check cache[url] and return it on a hit, otherwise call the client, store a 200 response's parsed json under the url key, and return it. When implemented, the second call is served from cache and call_count is 1.",
     tier: "replicate"
   },
