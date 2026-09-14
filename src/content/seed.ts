@@ -516,24 +516,6 @@ const pythonFoundationCapstonePracticeReps: LessonPracticeBlock[] = [
   }
 ];
 
-const pythonStringCleanupPracticeReps: LessonPracticeBlock[] = [
-  {
-    starterCode: "raw_topic = \"  PYTHON  \"\nclean_topic = \"\"\nprint(clean_topic)",
-    expectedOutput: "python cleaned topic",
-    checkYourAnswer: "Use strip before lower so edge spaces disappear and capitalization becomes consistent. The cleaned value should not keep the original spacing."
-  },
-  {
-    starterCode: "clean_topic = \"python basics\"\nslug = \"\"\nprint(slug)",
-    expectedOutput: "python-basics slug output",
-    checkYourAnswer: "Create the slug after cleaning the topic. If spaces remain in slug, replace spaces with hyphens on the cleaned value."
-  },
-  {
-    starterCode: "raw_topics = [\" Python \", \"python\", \"PYTHON\"]\ncleaned_topics = []\n# Add the cleaned version of each topic.\nprint(cleaned_topics)",
-    expectedOutput: "['python', 'python', 'python']",
-    checkYourAnswer: "This rep shows why cleanup matters. Three visually different inputs should become the same dependable topic before grouping."
-  }
-];
-
 const pythonFunctionPracticeReps: LessonPracticeBlock[] = [
   {
     starterCode: "def describe_session(topic, minutes):\n    return \"\"\n\nprint(describe_session(\"python\", 30))",

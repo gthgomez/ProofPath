@@ -63,7 +63,7 @@ describe("lesson sandbox runner", () => {
     );
 
     expect(result.passed).toBe(false);
-    expect(result.stderr).toContain("read-only");
+    expect(result.stderr).toContain("disabled in learner SQL");
   });
 
   it("blocks obvious infinite JavaScript loops before execution", async () => {

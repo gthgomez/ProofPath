@@ -505,12 +505,13 @@ async function getPyodide(): Promise<any> {
   return pyodidePromise;
 }
 
-async function runPython(spec: LessonRunnerSpec, code: string, runMode: CodeRunMode): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
+// Only invoked for `run_checks`; `run_file` is routed to `runPythonFile`. Checks
+// therefore always use the neutral import-style sentinel, never "__main__".
+async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
   const pyodide = await getPyodide();
   const testResults: CodeRunTestResult[] = [];
   const stdout: string[] = [];
   const stderr: string[] = [];
-  const moduleName = runMode === "run_file" ? PYTHON_DIRECT_RUN_NAME : PYTHON_IMPORT_RUN_NAME;
 
   pyodide.setStdout({ batched: (text: string) => stdout.push(text) });
   pyodide.setStderr({ batched: (text: string) => stderr.push(text) });
@@ -521,7 +522,7 @@ async function runPython(spec: LessonRunnerSpec, code: string, runMode: CodeRunM
 
     try {
       const wrappedCode = [
-        `_careerforge_globals = {'__builtins__': __builtins__, '__name__': ${JSON.stringify(moduleName)}}`,
+        `_careerforge_globals = {'__builtins__': __builtins__, '__name__': ${JSON.stringify(PYTHON_IMPORT_RUN_NAME)}}`,
         `exec(${JSON.stringify(code)}, _careerforge_globals)`,
         `exec(${JSON.stringify(test.code)}, _careerforge_globals)`
       ].join("\n");
@@ -767,7 +768,7 @@ export async function runLessonSandbox(
     }
 
     if (spec.language === "python") {
-      return runPython(spec, code, runMode);
+      return runPython(spec, code);
     }
 
     if (spec.language === "sql") {

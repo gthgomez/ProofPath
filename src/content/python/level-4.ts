@@ -498,7 +498,7 @@ typeErrorLesson.depth = {
     checkerOwns: ["typeerror-result-correct"],
     runExpectation: "prints typeerror passed"
   },
-  understandingProofPrompt: "What is the minimum change that fixes TypeError: can only concatenate str (not 'int') to str when total = '30' + 20?",
+  understandingProofPrompt: "What is the minimum change that fixes TypeError: can only concatenate str (not \"int\") to str when total = '30' + 20?",
   exitTicket: [
     "I can identify which operand has the wrong type from a TypeError message.",
     "I know int() converts a numeric string to an integer."
