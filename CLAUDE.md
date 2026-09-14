@@ -62,8 +62,10 @@ For lessons under `src/content/python/`:
 2. **Proof-First Stepper** — convert skeletons to `proofLesson` with a complete `depth` block (walkthrough, guided edits, error clinic, bridge, understanding prompt, exit tickets)
 3. **Bridge Integrity (Rule Group J)** — runnable lessons (`usesConcepts` contains values) need non-empty `learnerOwns`/`checkerOwns` lists
 4. **Prerequisites & Imports (Rule Group E)** — declare premature modules (`py.import`, `py.argparse`, `py.csv`, `py.json`, `py.sqlite`) in `usesButDoesNotTeach` if used before formally taught
-5. **No Quiz Position Bias (Rule Group L)** — every checkpoint quiz question needs `conceptIds: ["py.xxx"]` mapping to `concepts.ts`; randomize correct choices via the deterministic shuffle in `shared.ts`
+5. **Quiz `conceptIds` (Rule Group L)** — `conceptIds: ["py.xxx"]` mapping to `concepts.ts` is **required for depth-bearing lessons' quiz questions**; lessons without a `depth` block are out of scope. The 36 inline non-Python (TypeScript/SQL/Git/AI/ML) quizzes assembled in `seed.ts` are intentionally exempt rather than force-mapped to an invented taxonomy. Quiz answer-position bias is checked separately; randomize correct choices via the deterministic shuffle in `shared.ts`
 6. **Curriculum Metadata** — declare `curriculumTags` (track/module/lesson IDs), `estimatedMinutes`, `difficulty`, `skills`
+7. **Concept Registry Hygiene (Rule Group P)** — every registered concept must be taught by an active lesson, referenced by active curriculum metadata, or listed in the `supportingConceptAllowList` in `scripts/validate-content.ts`; `usesButDoesNotTeach` must never re-declare a concept already taught earlier at the same curriculum level
+8. **setupCode Safety (Rule Group O)** — privileged `runnerSpec.setupCode` may only appear on lessons in `setupCodeAllowedLessonIds` and may contain schema + seed statements only (no `DROP`, `ATTACH`, `DETACH`, `PRAGMA`, `load_extension`, `UPDATE`, `DELETE`)
 
 ## Sandbox Boundaries
 

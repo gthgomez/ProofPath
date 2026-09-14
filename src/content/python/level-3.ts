@@ -207,8 +207,8 @@ const functionsCapstonePracticeReps: LessonPracticeBlock[] = [
       "    )",
       ")",
     ].join("\n"),
-    expectedOutput: "3 sessions, 70 minutes, 2 focus session",
-    checkYourAnswer: "focus_sessions uses > 30 instead of >= 30. A 30-minute session should count as focus. Change > 30 to >= 30 in the if condition to include the 30-minute python entry.",
+    expectedOutput: "3 sessions, 70 minutes, 1 focus session",
+    checkYourAnswer: "focus_sessions uses > 30 instead of >= 30, so the buggy run prints 0 focus sessions (no session is strictly over 30). A 30-minute session should count as focus. Change > 30 to >= 30 in the if condition so the summary prints 3 sessions, 70 minutes, 1 focus session.",
     tier: "diagnose"
   },
   {

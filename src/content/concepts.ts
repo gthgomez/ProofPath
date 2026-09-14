@@ -649,13 +649,6 @@ export const conceptRegistry: ConceptDefinition[] = [
     introducedLevel: 6
   },
   {
-    id: "py.pyproject.toml",
-    label: "pyproject.toml",
-    category: "project",
-    description: "Maintain metadata details.",
-    introducedLevel: 6
-  },
-  {
     id: "git.repo.local",
     label: "Local Git repository",
     category: "git",
@@ -805,6 +798,13 @@ export const conceptRegistry: ConceptDefinition[] = [
     label: "Rate Limiting",
     category: "api",
     description: "Handle API rate limits with exponential backoff and Retry-After headers.",
+    introducedLevel: 8
+  },
+  {
+    id: "py.time",
+    label: "Time Module",
+    category: "python",
+    description: "Use time.time() and time.sleep() to measure elapsed time and pace retries.",
     introducedLevel: 8
   },
   {

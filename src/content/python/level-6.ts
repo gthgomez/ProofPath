@@ -70,21 +70,21 @@ const pythonJsonPracticeReps: LessonPracticeBlock[] = [
 
 const professionalLoggingPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "value = '45'\nminutes = parse_minutes(value)\nprint(minutes)",
-    expectedOutput: "45 minutes parsed successfully without warning logs.",
+    starterCode: "class TrackerInputError(Exception):\n    pass\n\ndef parse_minutes(value):\n    try:\n        return int(value)\n    except ValueError:\n        raise TrackerInputError('minutes must be a number')\n\nvalue = '45'\nminutes = parse_minutes(value)\nprint(minutes)",
+    expectedOutput: "45 — the starter prints the parsed integer and emits no warning logs on the success path.",
     checkYourAnswer: "The success path should stay boring. Logging should not turn normal input into noisy warnings.",
     tier: "replicate"
   },
   {
-    starterCode: "try:\n    parse_minutes('')\nexcept TrackerInputError as error:\n    print(error)",
-    expectedOutput: "minutes is required for empty input.",
+    starterCode: "class TrackerInputError(Exception):\n    pass\n\ndef parse_minutes(value):\n    try:\n        return int(value)\n    except ValueError:\n        raise TrackerInputError('minutes must be a number')\n\ntry:\n    parse_minutes('')\nexcept TrackerInputError as error:\n    print(error)",
+    expectedOutput: "minutes must be a number",
     checkYourAnswer: "Failure rep: empty input and non-numeric input may need different user-facing messages.",
     tier: "diagnose"
   },
   {
-    starterCode: "for value in ['30', 'soon']:\n    try:\n        parse_minutes(value)\n    except TrackerInputError:\n        pass\nprint(logs)",
-    expectedOutput: "Logs include the invalid value soon but not the successful value 30.",
-    checkYourAnswer: "Project-shaped rep: logs should preserve useful failure context without flooding normal runs.",
+    starterCode: "logs = []\n\nclass TrackerInputError(Exception):\n    pass\n\ndef parse_minutes(value):\n    # TODO: try to convert value with int(value) and return the result.\n    # TODO: on ValueError, append f'invalid minutes: {value}' to logs and\n    #   then raise TrackerInputError('minutes must be a number').\n    pass\n\nfor value in ['30', 'soon']:\n    try:\n        parse_minutes(value)\n    except TrackerInputError:\n        pass\nprint(logs)",
+    expectedOutput: "['invalid minutes: soon']",
+    checkYourAnswer: "Target output is ['invalid minutes: soon']: 30 parses cleanly and is not logged, while soon appends its failure context to logs before parse_minutes raises TrackerInputError. Logs should preserve useful failure context without flooding normal runs.",
     tier: "synthesize"
   }
 ];
@@ -434,7 +434,7 @@ const dataclassModelsLesson = proofLesson({
   requiredCodeIncludes: ["@dataclass", "StudySession", "__post_init__", "session_from_row"],
   requiredOutputIncludes: ["StudySession", "minutes=30", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "from dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass StudySession:\n    date: str\n    topic: str\n    minutes: int\n\n    def __post_init__(self):\n        if self.minutes < 0:\n            raise ValueError('minutes must be positive')\n\ndef session_from_row(row):\n    try:\n        return StudySession(date=row['date'], topic=row['topic'], minutes=int(row['minutes']))\n    except (ValueError, KeyError):\n        return None\n\nsession = session_from_row({'date': '2026-05-07', 'topic': 'python', 'minutes': '30'})\nprint(session)",
+  runnerStarterCode: "from dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass StudySession:\n    date: str\n    topic: str\n    minutes: int\n\n    def __post_init__(self):\n        # TODO: raise ValueError('minutes must be positive') when minutes < 0.\n        pass\n\ndef session_from_row(row):\n    # TODO: convert row['minutes'] to int and build a StudySession from\n    #   row['date'], row['topic'], and the numeric minutes.\n    # TODO: return None when the conversion fails (ValueError or KeyError).\n    return None\n\nsession = session_from_row({'date': '2026-05-07', 'topic': 'python', 'minutes': '30'})\nprint(session)",
   runnerTestCode: "assert session == StudySession(date='2026-05-07', topic='python', minutes=30)\nassert isinstance(session.minutes, int)\ntry:\n    StudySession(date='2026-05-07', topic='python', minutes=-1)\nexcept ValueError:\n    pass\nelse:\n    raise AssertionError('negative minutes should be rejected')\nprint('StudySession minutes=30 passed')",
   hiddenTests: [
     {
@@ -585,7 +585,7 @@ const jsonReportsLesson = proofLesson({
   requiredCodeIncludes: ["json.dumps", "session_count", "total_minutes", "rejected_count"],
   requiredOutputIncludes: ["session_count", "total_minutes", "45", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "import json\n\nsummary = {'session_count': 2, 'total_minutes': 45, 'rejected_count': 1}\njson_report = json.dumps(summary)\nprint(json_report)",
+  runnerStarterCode: "import json\n\nsummary = {'session_count': 2, 'total_minutes': 45, 'rejected_count': 1}\n# TODO: serialize the summary dict with json.dumps and store the\n#   JSON text in json_report.\njson_report = ''\nprint(json_report)",
   runnerTestCode: "parsed = json.loads(json_report)\nassert parsed == {'session_count': 2, 'total_minutes': 45, 'rejected_count': 1}\nprint('session_count total_minutes 45 passed')",
   hiddenTests: [
     {
@@ -736,7 +736,7 @@ const loggingErrorsLesson = proofLesson({
   requiredCodeIncludes: ["TrackerInputError", "logging", "logger.warning", "parse_minutes"],
   requiredOutputIncludes: ["invalid minutes", "soon", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "import logging\n\nlogs = []\n\nclass TrackerInputError(Exception):\n    pass\n\nclass ListHandler(logging.Handler):\n    def emit(self, record):\n        logs.append(record.getMessage())\n\nlogger = logging.getLogger('study_tracker')\nlogger.handlers = []\nlogger.addHandler(ListHandler())\nlogger.setLevel(logging.INFO)\n\ndef parse_minutes(value):\n    try:\n        return int(value)\n    except ValueError:\n        logger.warning(f\"invalid minutes: {value}\")\n        raise TrackerInputError('minutes must be a number')\n\nvalid_minutes = parse_minutes('30')\nprint(valid_minutes)",
+  runnerStarterCode: "import logging\n\nlogs = []\n\nclass TrackerInputError(Exception):\n    pass\n\nclass ListHandler(logging.Handler):\n    def emit(self, record):\n        logs.append(record.getMessage())\n\nlogger = logging.getLogger('study_tracker')\nlogger.handlers = []\nlogger.addHandler(ListHandler())\nlogger.setLevel(logging.INFO)\n\ndef parse_minutes(value):\n    # TODO: return the integer value when int(value) succeeds.\n    # TODO: otherwise log f'invalid minutes: {value}' with logger.warning,\n    #   then raise TrackerInputError('minutes must be a number').\n    return None\n\nvalid_minutes = parse_minutes('30')\nprint(valid_minutes)",
   runnerTestCode: "assert valid_minutes == 30\ntry:\n    parse_minutes('soon')\nexcept TrackerInputError as error:\n    assert str(error) == 'minutes must be a number'\nelse:\n    raise AssertionError('invalid minutes should raise TrackerInputError')\nassert 'invalid minutes: soon' in logs\nprint('invalid minutes soon passed')",
   hiddenTests: [
     {
@@ -887,7 +887,7 @@ const pytestCiLesson = proofLesson({
   requiredCodeIncludes: ["clean_rows", "messy_rows", "test_summary_totals", "test_rejected_report", "python -m pytest"],
   requiredOutputIncludes: ["pytest", "summary", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "fixtures = ['clean_rows', 'messy_rows']\ntests = ['test_summary_totals', 'test_rejected_report']\nverification_commands = ['python -m pytest', 'python study_tracker.py --input sessions.csv --output summary.txt']\nprint(fixtures)\nprint(tests)\nprint(verification_commands)",
+  runnerStarterCode: "# TODO: name a fixture for clean rows and one for messy rows.\nfixtures = []\n# TODO: name one test for summary totals and one for the rejected report.\ntests = []\n# TODO: document 'python -m pytest' plus a CLI smoke command that runs\n#   study_tracker.py with --input sessions.csv and --output summary.txt.\nverification_commands = []\nprint(fixtures)\nprint(tests)\nprint(verification_commands)",
   runnerTestCode: "assert 'clean_rows' in fixtures\nassert 'messy_rows' in fixtures\nassert 'test_summary_totals' in tests\nassert 'test_rejected_report' in tests\nassert 'python -m pytest' in verification_commands\nassert any('study_tracker.py --input sessions.csv --output summary.txt' in command for command in verification_commands)\nprint('pytest summary passed')",
   hiddenTests: [
     {
@@ -1074,7 +1074,7 @@ const pyprojectMetadataLesson = proofLesson({
   requiredCodeIncludes: ["[project]", "name", "version", "requires-python", "[tool.pytest.ini_options]"],
   requiredOutputIncludes: ["study-tracker", "tests", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "pyproject_toml = \"\"\"\n[project]\nname = \"study-tracker\"\nversion = \"0.1.0\"\nrequires-python = \">=3.11\"\n[project.optional-dependencies]\ndev = [\"pytest\"]\n[tool.pytest.ini_options]\ntestpaths = [\"tests\"]\n\"\"\"\nprint(pyproject_toml)",
+  runnerStarterCode: "pyproject_toml = \"\"\"\n[project]\nname = \"\"\nversion = \"\"\nrequires-python = \"\"\n\n[tool.pytest.ini_options]\ntestpaths = []\n\"\"\"\n# TODO: fill in name \"study-tracker\", version \"0.1.0\",\n#   requires-python \">=3.11\", and testpaths [\"tests\"].\n# TODO: add a [project.optional-dependencies] block with dev = [\"pytest\"].\nprint(pyproject_toml)",
   runnerTestCode: "assert '[project]' in pyproject_toml\nassert 'name = \"study-tracker\"' in pyproject_toml\nassert 'version = \"0.1.0\"' in pyproject_toml\nassert 'requires-python = \">=3.11\"' in pyproject_toml\nassert '[tool.pytest.ini_options]' in pyproject_toml\nassert 'testpaths = [\"tests\"]' in pyproject_toml\nprint('study-tracker tests passed')",
   hiddenTests: [
     {
@@ -1224,7 +1224,7 @@ const installableCliLesson = proofLesson({
   requiredCodeIncludes: ["[project.scripts]", "study-tracker", "study_tracker.cli:main"],
   requiredOutputIncludes: ["study-tracker", "--help", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "project_scripts = {'study-tracker': 'study_tracker.cli:main'}\nmain_function = 'study_tracker.cli:main'\nsmoke_command = 'study-tracker --help'\nprint(project_scripts)\nprint(smoke_command)",
+  runnerStarterCode: "# TODO: map the study-tracker command to the package entry point\n#   (study_tracker.cli:main).\nproject_scripts = {}\n# TODO: store the entry point path string in main_function.\nmain_function = ''\n# TODO: write the smoke command that proves the installed CLI responds.\nsmoke_command = ''\nprint(project_scripts)\nprint(smoke_command)",
   runnerTestCode: "assert project_scripts == {'study-tracker': 'study_tracker.cli:main'}\nassert main_function == 'study_tracker.cli:main'\nassert smoke_command == 'study-tracker --help'\nprint('study-tracker --help passed')",
   hiddenTests: [
     {
@@ -1375,7 +1375,7 @@ const configFilesLesson = proofLesson({
   requiredCodeIncludes: ["DEFAULT_CONFIG", "load_config", "json.loads", "tracker.config.json"],
   requiredOutputIncludes: ["format", "summary.txt", "min_minutes", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "import json\n\nDEFAULT_CONFIG = {'format': 'text', 'output': 'summary.txt', 'min_minutes': 0}\nfiles = {'tracker.config.json': '{\"format\": \"json\", \"min_minutes\": 15}'}\n\ndef load_config(path=None, files=None):\n    merged = DEFAULT_CONFIG.copy()\n    if path and files and path in files:\n        try:\n            overrides = json.loads(files[path])\n            for key in overrides:\n                if key in DEFAULT_CONFIG:\n                    merged[key] = overrides[key]\n        except ValueError:\n            pass\n    return merged\n\nconfig = load_config('tracker.config.json', files)\nprint(config)",
+  runnerStarterCode: "import json\n\nDEFAULT_CONFIG = {'format': 'text', 'output': 'summary.txt', 'min_minutes': 0}\nfiles = {'tracker.config.json': '{\"format\": \"json\", \"min_minutes\": 15}'}\n\ndef load_config(path=None, files=None):\n    # TODO: start from a copy of DEFAULT_CONFIG.\n    # TODO: when path is given and present in files, parse the JSON text and\n    #   copy over ONLY the keys that also exist in DEFAULT_CONFIG\n    #   (unknown keys are ignored; a bad JSON payload falls back to defaults).\n    # TODO: return the merged config.\n    return {}\n\nconfig = load_config('tracker.config.json', files)\nprint(config)",
   runnerTestCode: "assert config == {'format': 'json', 'output': 'summary.txt', 'min_minutes': 15}\nassert load_config(None, files) == DEFAULT_CONFIG\nprint('format summary.txt min_minutes passed')",
   hiddenTests: [
     {
@@ -1526,7 +1526,7 @@ const ciPrecommitLesson = proofLesson({
   requiredCodeIncludes: ["pre-commit", "ruff", "python -m pytest", "study-tracker --help"],
   requiredOutputIncludes: ["ruff", "pytest", "study-tracker", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "precommit_hooks = ['ruff', 'python -m pytest']\nci_commands = ['python -m pytest', 'study-tracker --help']\nrequired_evidence = ['ruff validation passed', 'pytest passed', 'CLI smoke output', 'CI passed']\nprint(precommit_hooks)\nprint(ci_commands)\nprint(required_evidence)",
+  runnerStarterCode: "# TODO: list the local pre-commit hooks (ruff and python -m pytest).\nprecommit_hooks = []\n# TODO: list the CI commands ('python -m pytest' and 'study-tracker --help').\nci_commands = []\n# TODO: require evidence entries including 'CI passed' and 'CLI smoke output'.\nrequired_evidence = []\nprint(precommit_hooks)\nprint(ci_commands)\nprint(required_evidence)",
   runnerTestCode: "assert 'ruff' in precommit_hooks\nassert 'python -m pytest' in precommit_hooks\nassert 'python -m pytest' in ci_commands\nassert 'study-tracker --help' in ci_commands\nassert 'CI passed' in required_evidence\nprint('ruff pytest study-tracker passed')",
   hiddenTests: [
     {
@@ -1676,7 +1676,7 @@ const professionalReviewLesson = proofLesson({
   requiredCodeIncludes: ["structure", "metadata", "command", "config", "logging", "tests"],
   requiredOutputIncludes: ["metadata", "command", "config", "tests", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "review_matrix = [\n    {'area': 'structure', 'evidence': 'study_tracker package'},\n    {'area': 'metadata', 'evidence': 'pyproject.toml exists'},\n    {'area': 'command', 'evidence': 'study-tracker command runs'},\n    {'area': 'config', 'evidence': 'tracker.config.json merges'},\n    {'area': 'logging', 'evidence': 'TrackerInputError raised'},\n    {'area': 'tests', 'evidence': 'pytest passes'},\n]\ncommands = ['python -m pytest', 'study-tracker --help']\nimprovement = 'Implement strict typing using mypy check configurations.'\nprint(review_matrix)\nprint(commands)\nprint(improvement)",
+  runnerStarterCode: "# TODO: build one review row per quality area with real evidence from the\n#   lessons: structure, metadata, command, config, logging, tests.\nreview_matrix = []\n# TODO: list the verification commands ('python -m pytest', 'study-tracker --help').\ncommands = []\n# TODO: name one concrete improvement (at least 20 characters).\nimprovement = ''\nprint(review_matrix)\nprint(commands)\nprint(improvement)",
   runnerTestCode: "areas = {row['area'] for row in review_matrix}\nassert {'structure', 'metadata', 'command', 'config', 'logging', 'tests'}.issubset(areas)\nassert all(row.get('evidence') for row in review_matrix)\nassert any('python -m pytest' in command for command in commands)\nassert any('study-tracker --help' in command for command in commands)\nassert len(improvement) >= 20\nprint('metadata command config tests passed')",
   hiddenTests: [
     {
@@ -1790,14 +1790,14 @@ const pythonVirtualEnvPracticeReps: LessonPracticeBlock[] = [
     tier: "replicate"
   },
   {
-    starterCode: "requirements = ['pandas>=2.0', 'requests==2.31.0']\nprint('Running outside venv - global packages may conflict')\nprint(f'requirements: {requirements}')\npip_freeze_global = 47\npip_freeze_expected = 3\nprint(f'pip freeze shows {pip_freeze_global} packages instead of {pip_freeze_expected}')",
+    starterCode: "requirements = ['pandas>=2.0', 'rich==13.7.0']\nprint('Running outside venv - global packages may conflict')\nprint(f'requirements: {requirements}')\npip_freeze_global = 47\npip_freeze_expected = 3\nprint(f'pip freeze shows {pip_freeze_global} packages instead of {pip_freeze_expected}')",
     expectedOutput: "Running outside venv - global packages may conflict\npip freeze shows 47 packages instead of 3",
     checkYourAnswer: "The diagnosis rep: pip freeze in a global environment lists unrelated packages. The learner should identify that venv isolation is missing.",
     tier: "diagnose"
   },
   {
-    starterCode: "pip_freeze_output = ['pandas==2.2.0', 'requests==2.31.0', 'pytest==8.0.0']\nrequirements_txt = '\\n'.join(pip_freeze_output)\nprint(requirements_txt)",
-    expectedOutput: "pandas==2.2.0\nrequests==2.31.0\npytest==8.0.0",
+    starterCode: "pip_freeze_output = ['pandas==2.2.0', 'rich==13.2.0', 'pytest==8.0.0']\nrequirements_txt = '\\n'.join(pip_freeze_output)\nprint(requirements_txt)",
+    expectedOutput: "pandas==2.2.0\nrich==13.2.0\npytest==8.0.0",
     checkYourAnswer: "Project-shaped rep: pip freeze generates a deployable dependency list. A reviewer can recreate the environment from it.",
     tier: "synthesize"
   }
@@ -1809,7 +1809,7 @@ const virtualEnvLesson = proofLesson({
   slug: "python-virtual-env",
   title: "Manage Virtual Environments",
   summary: "Learn how to create and manage Python virtual environments with venv, pip freeze, and requirements.txt.",
-  bodyMarkdown: "Virtual environments isolate project dependencies so different projects can use different library versions without conflicts. Creating a venv is simple: `python -m venv .venv` creates the environment folder. Activate it with `.venv\\\\Scripts\\\\activate` on Windows or `source .venv/bin/activate` on macOS/Linux. Once active, `pip freeze > requirements.txt` records the exact packages so reviewers can recreate the environment. Professional projects use venvs to keep dependencies clean, and commit requirements.txt (or pyproject.toml dependency lists) instead of the .venv folder itself.",
+  bodyMarkdown: "Virtual environments isolate project dependencies so different projects can use different library versions without conflicts. Creating a venv is simple: `python -m venv .venv` creates the environment folder. Activate it with `.venv\\Scripts\\activate` on Windows or `source .venv/bin/activate` on macOS/Linux. Once active, `pip freeze > requirements.txt` records the exact packages so reviewers can recreate the environment. Professional projects use venvs to keep dependencies clean, and commit requirements.txt (or pyproject.toml dependency lists) instead of the .venv folder itself.",
   estimatedMinutes: 12,
   difficulty: "applied",
   skillIds: ["skill-python-professional"],
@@ -1849,7 +1849,7 @@ const virtualEnvLesson = proofLesson({
   requiredCodeIncludes: ["venv", "activate", "pip freeze", "requirements.txt"],
   requiredOutputIncludes: ["venv", "activate", "pip freeze", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "venv_cmd = 'python -m venv .venv'\nactivation_cmd = '.venv\\\\Scripts\\\\activate'\npip_freeze_cmd = 'pip freeze > requirements.txt'\nprint(venv_cmd)\nprint(activation_cmd)\nprint(pip_freeze_cmd)",
+  runnerStarterCode: "venv_cmd = 'python -m venv .venv'\n# TODO: set the activation command for your operating system\n#   (Windows: .venv\\\\Scripts\\\\activate, macOS/Linux: source .venv/bin/activate).\nactivation_cmd = ''\npip_freeze_cmd = 'pip freeze > requirements.txt'\nprint(venv_cmd)\nprint(activation_cmd)\nprint(pip_freeze_cmd)",
   runnerTestCode: "assert venv_cmd == 'python -m venv .venv'\nassert '.venv' in activation_cmd\nassert 'activate' in activation_cmd\nassert pip_freeze_cmd == 'pip freeze > requirements.txt'\nprint('venv activate pip freeze passed')",
   hiddenTests: [
     {
@@ -1865,7 +1865,10 @@ const virtualEnvLesson = proofLesson({
     lessonKind: "concept_only",
     teaches: ["py.env.virtual"],
     requires: ["py.metadata.dependencies"],
-    usesButDoesNotTeach: ["py.import", "py.pyproject.toml"],
+    // py.metadata.pyproject is taught earlier in this same level
+    // (lesson-python-pyproject-metadata), so it is prior knowledge here, not a
+    // "used but not taught" concept. Only genuinely premature imports remain.
+    usesButDoesNotTeach: ["py.import"],
     visibleCodeConcepts: ["py.env.virtual"],
     quizConcepts: ["py.env.virtual"],
     proofOutputs: ["reflection"]
@@ -2098,10 +2101,10 @@ export const level6Quizzes: Quiz[] = [
       {
         id: "question-python-pytest-ci-3",
         prompt: "Why use a clean_rows fixture with known data instead of hardcoding the same list in every test?",
-        choices: ["Because hardcoded data is always wrong", "Because fixtures are automatically shared across tests and eliminate duplication", "Because fixtures cannot be reused"],
+        choices: ["Because hardcoded data is always wrong", "Because fixtures define the data once and pytest injects a fresh copy into each test that requests it", "Because fixtures cannot be reused"],
         correctChoiceIndex: 1,
         conceptIds: ["py.pytest.fixtures"],
-        explanation: "Fixtures reduce duplication by defining reusable test data in one place."
+        explanation: "Fixtures remove duplication by declaring the data in one place. By default they are function-scoped, so each test gets its own fresh copy rather than one shared dataset mutated by earlier tests."
       }
     ]
   },
@@ -2185,11 +2188,11 @@ export const level6Quizzes: Quiz[] = [
       },
       {
         id: "question-python-config-2",
-        prompt: "Your config merge replaces the entire defaults instead of updating only specified keys. What went wrong?",
-        choices: ["The defaults are too large", "The merge uses .update() instead of copying defaults and filtering known keys", "The config format is wrong"],
+        prompt: "Your loader does merged = json.loads(files[path]) and returns it, so every default missing from the file disappears. What went wrong?",
+        choices: ["The defaults are too large", "The loader rebinds the result to the file config instead of starting from a copy of the defaults and merging known keys into it", "The config format is wrong"],
         correctChoiceIndex: 1,
         conceptIds: ["py.config.loader"],
-        explanation: "Using .update() without copying first or filtering keys can replace defaults instead of merging selectively."
+        explanation: "Assignment/rebind wholesale-replaces the settings: whatever is not in the file is lost. Start from DEFAULT_CONFIG.copy() and copy over only known keys so omitted defaults survive."
       },
       {
         id: "question-python-config-3",

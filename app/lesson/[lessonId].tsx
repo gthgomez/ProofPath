@@ -52,7 +52,7 @@ export default function LessonDetailScreen(): ReactElement {
           language: lesson.workshop.miniProject.runnerSpec.language,
           instructions: "",
           starterCode: code,
-          setupCode: "",
+          setupCode: lesson.workshop.miniProject.runnerSpec.setupCode ?? "",
           visibleTests: [],
           hiddenTests: [],
           expectedOutput: [],

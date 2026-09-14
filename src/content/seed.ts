@@ -1,5 +1,5 @@
-import type { ContentPack, Difficulty, Lesson, LessonMiniProject, LessonMiniProjectTester, LessonMisconceptionCheck, LessonPracticeBlock, LessonRecallCard, LessonRunnerSpec, LessonWorkshop, MissionEvidenceRequirements, ProjectMissionPhase, Quiz, RunnerLanguage } from "@/domain/types";
-import { deterministicShuffle } from "./python/shared";
+import type { ContentPack, Difficulty, Lesson, LessonMiniProject, LessonMiniProjectTester, LessonMisconceptionCheck, LessonPracticeBlock, LessonRecallCard, LessonRunnerSpec, LessonWorkshop, MissionEvidenceRequirements, ProjectMissionPhase, Quiz, QuizQuestion, RunnerLanguage } from "@/domain/types";
+import { balanceQuizChoices, deterministicShuffle, normalizeQuizPassingScore } from "./python/shared";
 import { level0Lessons, level0Quizzes } from "./python/level-0";
 import { level1Lessons, level1Quizzes, deprecatedLevel1Lessons } from "./python/level-1";
 import { level2Lessons, level2Quizzes } from "./python/level-2";
@@ -377,34 +377,52 @@ function checkpointQuiz(
   const q3Choices = deterministicShuffle(q3Raw, `${id}-cp-3`);
   const q3CorrectIndex = q3Choices.indexOf("Skipping the failure case");
 
+  const questions: Quiz["questions"] = [
+    {
+      id: `${id}-1`,
+      prompt: `What is the main purpose of ${concept}?`,
+      choices: q1Choices,
+      correctChoiceIndex: q1CorrectIndex,
+      explanation
+    },
+    {
+      id: `${id}-2`,
+      prompt: `Which check makes ${concept} reviewable?`,
+      choices: q2Choices,
+      correctChoiceIndex: q2CorrectIndex,
+      explanation: "CareerForge treats finished work as an inspectable result plus a check result or explicit review note."
+    },
+    {
+      id: `${id}-3`,
+      prompt: `What should a beginner avoid when practicing ${concept}?`,
+      choices: q3Choices,
+      correctChoiceIndex: q3CorrectIndex,
+      explanation: "The failure case shows whether the work handles real-world mess instead of only the happy path."
+    }
+  ];
+
   return {
     id,
     lessonId,
     title,
-    passingScore: 80,
-    questions: [
-      {
-        id: `${id}-1`,
-        prompt: `What is the main purpose of ${concept}?`,
-        choices: q1Choices,
-        correctChoiceIndex: q1CorrectIndex,
-        explanation
-      },
-      {
-        id: `${id}-2`,
-        prompt: `Which check makes ${concept} reviewable?`,
-        choices: q2Choices,
-        correctChoiceIndex: q2CorrectIndex,
-        explanation: "CareerForge treats finished work as an inspectable result plus a check result or explicit review note."
-      },
-      {
-        id: `${id}-3`,
-        prompt: `What should a beginner avoid when practicing ${concept}?`,
-        choices: q3Choices,
-        correctChoiceIndex: q3CorrectIndex,
-        explanation: "The failure case shows whether the work handles real-world mess instead of only the happy path."
-      }
-    ]
+    passingScore: questions.length > 0 ? Math.floor(((questions.length - 1) / questions.length) * 100) : 0,
+    questions
+  };
+}
+
+/**
+ * Deterministically spreads the correct answer position for inline quiz
+ * questions (Rule Group L). The question id seeds the same shuffle used by the
+ * shared quiz builders, so the stored correctChoiceIndex always matches the
+ * shuffled choices and no quiz depends on a single answer position.
+ */
+function shuffleQuizChoices(question: QuizQuestion): QuizQuestion {
+  const indexed = question.choices.map((choice, index) => ({ choice, index }));
+  const shuffled = deterministicShuffle(indexed, question.id);
+  return {
+    ...question,
+    choices: shuffled.map((entry) => entry.choice),
+    correctChoiceIndex: shuffled.findIndex((entry) => entry.index === question.correctChoiceIndex)
   };
 }
 
@@ -1058,7 +1076,7 @@ export const contentPack: ContentPack = {
       title: "Python Fundamentals",
       summary: "Small automation, professional structure, typed models, logs, and tests for real project proof.",
       roleTargets: ["Software Foundations", "Backend, APIs & Data Systems"],
-      moduleIds: ["module-python-core", "module-python-professional", "module-python-dashboard"],
+      moduleIds: ["module-python-core", "module-python-professional", "module-python-dashboard", "module-python-api-resilience", "module-python-ops"],
       accentColor: "#0B2F6A"
     },
     {
@@ -2944,8 +2962,22 @@ export const contentPack: ContentPack = {
           choices: ["It replaces UI design", "It clarifies what the UI can safely read", "It removes the need for tests"],
           correctChoiceIndex: 1,
           explanation: "The type creates a reliable contract between content, logic, and display."
+        },
+        {
+          id: "question-typescript-2",
+          prompt: "What happens when a screen reads a field the type does not define?",
+          choices: ["TypeScript reports the mismatch before the app runs", "The field silently appears at runtime", "The screen stops needing data"],
+          correctChoiceIndex: 0,
+          explanation: "A type contract catches unknown or misspelled fields before the app runs instead of inside a finished screen."
+        },
+        {
+          id: "question-typescript-3",
+          prompt: "Which change keeps a type contract trustworthy?",
+          choices: ["Updating the type whenever the data shape changes", "Casting any value to bypass the shape", "Renaming fields without touching the type"],
+          correctChoiceIndex: 0,
+          explanation: "A contract stays reliable only when the declared type matches the data the screen actually receives."
         }
-      ]
+      ].map(shuffleQuizChoices)
     },
     ...level4Quizzes,
     ...level5Quizzes,
@@ -2965,8 +2997,22 @@ export const contentPack: ContentPack = {
           choices: ["What color should the button be?", "Which missions have no evidence?", "What is the app name?"],
           correctChoiceIndex: 1,
           explanation: "That answer needs mission rows connected to evidence rows."
+        },
+        {
+          id: "question-sql-2",
+          prompt: "What does an inner join drop from the results?",
+          choices: ["Rows without a matching row on the other side", "Columns with repeated names", "Tables with more than two columns"],
+          correctChoiceIndex: 0,
+          explanation: "An inner join keeps only paired rows, so unmatched records disappear from the output."
+        },
+        {
+          id: "question-sql-3",
+          prompt: "Why match rows on IDs instead of display names?",
+          choices: ["IDs stay stable and unique while names can repeat or change", "IDs are shorter to type in queries", "Names cannot be stored in tables"],
+          correctChoiceIndex: 0,
+          explanation: "Joining on stable keys avoids merging two different records that happen to share a label."
         }
-      ]
+      ].map(shuffleQuizChoices)
     },
     {
       id: "quiz-git-evidence",
@@ -2980,8 +3026,22 @@ export const contentPack: ContentPack = {
           choices: ["A vague completed badge", "A repo with setup, tests, and a demo", "A private note with no commands"],
           correctChoiceIndex: 1,
           explanation: "Reviewers need inspectable artifacts and commands, not only completion claims."
+        },
+        {
+          id: "question-git-2",
+          prompt: "What makes a commit useful to a reviewer?",
+          choices: ["A message that explains why the change was made", "A large bundle of unrelated edits", "A commit made without running checks"],
+          correctChoiceIndex: 0,
+          explanation: "Reviewers can follow and verify work when each commit has a clear purpose and scope."
+        },
+        {
+          id: "question-git-3",
+          prompt: "Why run the checks before committing?",
+          choices: ["So the recorded state of the project actually works", "So the commit is larger", "So the README can be skipped"],
+          correctChoiceIndex: 0,
+          explanation: "A commit that passes its checks is evidence, while an unverified commit is only a claim."
         }
-      ]
+      ].map(shuffleQuizChoices)
     },
     {
       id: "quiz-ai-test-loop",
@@ -2995,8 +3055,22 @@ export const contentPack: ContentPack = {
           choices: ["When it looks plausible", "When local evidence verifies it", "When it uses modern syntax"],
           correctChoiceIndex: 1,
           explanation: "The proof comes from reproduction, tests, inspection, and verification output."
+        },
+        {
+          id: "question-ai-2",
+          prompt: "What is the first thing to do with a generated code suggestion?",
+          choices: ["Run it against a small local check", "Paste it into the main branch", "Ask the model to confirm it was right"],
+          correctChoiceIndex: 0,
+          explanation: "A local check shows whether the suggestion actually behaves as claimed."
+        },
+        {
+          id: "question-ai-3",
+          prompt: "What does the test loop add to AI assistance?",
+          choices: ["Evidence that the produced code works on real inputs", "Faster typing without review", "A reason to skip reading the diff"],
+          correctChoiceIndex: 0,
+          explanation: "The loop turns model output into verified work by pairing each suggestion with a runnable check."
         }
-      ]
+      ].map(shuffleQuizChoices)
     },
     {
       id: "quiz-ai-app-boundaries",
@@ -3010,8 +3084,22 @@ export const contentPack: ContentPack = {
           choices: ["Inside the mobile bundle", "Behind a server boundary", "In a screenshot"],
           correctChoiceIndex: 1,
           explanation: "Client bundles can be inspected, so privileged secrets must stay server-side."
+        },
+        {
+          id: "question-ai-boundary-2",
+          prompt: "What should the app send when it calls a model provider?",
+          choices: ["A request proxied through a server that holds the key", "The API key copied into the request from the device", "A list of local user files"],
+          correctChoiceIndex: 0,
+          explanation: "A server-side proxy keeps the credential private while the app sends only the prompt data."
+        },
+        {
+          id: "question-ai-boundary-3",
+          prompt: "Why keep model outputs behind the same review as human edits?",
+          choices: ["Generated code can be wrong in ways only checks reveal", "Models refuse to write tests", "Reviews slow down releases"],
+          correctChoiceIndex: 0,
+          explanation: "Treating model output like any other draft keeps verification in charge of what ships."
         }
-      ]
+      ].map(shuffleQuizChoices)
     },
     {
       id: "quiz-ml-metrics",
@@ -3025,15 +3113,29 @@ export const contentPack: ContentPack = {
           choices: ["It never uses numbers", "It may hide class imbalance or failure cases", "It only works for SQL"],
           correctChoiceIndex: 1,
           explanation: "A single metric needs data context and error analysis."
+        },
+        {
+          id: "question-ml-2",
+          prompt: "Which situation makes a raw accuracy score look better than the model is?",
+          choices: ["A dataset where one class is almost the whole dataset", "A dataset with balanced classes", "A model with zero features"],
+          correctChoiceIndex: 0,
+          explanation: "Predicting the majority class can score high on accuracy while missing every rare case."
+        },
+        {
+          id: "question-ml-3",
+          prompt: "What should accompany a metric before the model ships?",
+          choices: ["An error analysis with examples the model missed", "A promise that the metric will not change", "A removal of the test dataset"],
+          correctChoiceIndex: 0,
+          explanation: "Looking at specific errors explains what the metric hides and where the model is unsafe to trust."
         }
-      ]
+      ].map(shuffleQuizChoices)
     },
     {
       id: "quiz-typescript-events-state",
       lessonId: "lesson-typescript-events-state",
       title: "Typed events checkpoint",
       passingScore: 80,
-      questions: [
+      questions: ([
         {
           id: "question-typescript-events-1",
           prompt: "Why model UI actions as typed events?",
@@ -3055,14 +3157,14 @@ export const contentPack: ContentPack = {
           correctChoiceIndex: 0,
           explanation: "Non-mutating updates let tests compare before and after state reliably."
         }
-      ]
+      ].map(shuffleQuizChoices)),
     },
     {
       id: "quiz-sql-constraints",
       lessonId: "lesson-sql-constraints",
       title: "SQL constraints checkpoint",
       passingScore: 80,
-      questions: [
+      questions: ([
         {
           id: "question-sql-constraints-1",
           prompt: "What does a foreign key protect?",
@@ -3084,14 +3186,14 @@ export const contentPack: ContentPack = {
           correctChoiceIndex: 0,
           explanation: "The rejection is evidence that the database rule is active, not just documented."
         }
-      ]
+      ].map(shuffleQuizChoices)),
     },
     {
       id: "quiz-github-review-flow",
       lessonId: "lesson-github-review-flow",
       title: "GitHub review flow checkpoint",
       passingScore: 80,
-      questions: [
+      questions: ([
         {
           id: "question-github-review-1",
           prompt: "What should a commit message add beyond the diff?",
@@ -3113,14 +3215,14 @@ export const contentPack: ContentPack = {
           correctChoiceIndex: 0,
           explanation: "Focused commits make review, verification, and recovery simpler."
         }
-      ]
+      ].map(shuffleQuizChoices)),
     },
     {
       id: "quiz-ai-diff-review",
       lessonId: "lesson-ai-diff-review",
       title: "AI diff review checkpoint",
       passingScore: 80,
-      questions: [
+      questions: ([
         {
           id: "question-ai-diff-1",
           prompt: "How should you treat an AI-generated diff before review?",
@@ -3142,14 +3244,14 @@ export const contentPack: ContentPack = {
           correctChoiceIndex: 0,
           explanation: "Package and schema changes can widen blast radius beyond the requested fix."
         }
-      ]
+      ].map(shuffleQuizChoices)),
     },
     {
       id: "quiz-ai-retrieval-grounding",
       lessonId: "lesson-ai-retrieval-grounding",
       title: "Retrieval grounding checkpoint",
       passingScore: 80,
-      questions: [
+      questions: ([
         {
           id: "question-ai-retrieval-1",
           prompt: "What should retrieval provide before answer generation?",
@@ -3171,14 +3273,14 @@ export const contentPack: ContentPack = {
           correctChoiceIndex: 0,
           explanation: "Citation checks make grounding inspectable instead of decorative."
         }
-      ]
+      ].map(shuffleQuizChoices)),
     },
     {
       id: "quiz-ml-confusion-matrix",
       lessonId: "lesson-ml-confusion-matrix",
       title: "Confusion matrix checkpoint",
       passingScore: 80,
-      questions: [
+      questions: ([
         {
           id: "question-ml-confusion-1",
           prompt: "What is a false negative?",
@@ -3200,7 +3302,7 @@ export const contentPack: ContentPack = {
           correctChoiceIndex: 0,
           explanation: "Small samples can teach error patterns but cannot justify broad quality claims."
         }
-      ]
+      ].map(shuffleQuizChoices))
     }
     ,
     checkpointQuiz("quiz-testing-regression-harness", "lesson-testing-regression-harness", "Regression harness checkpoint", "a regression harness", "Preventing a fixed bug from returning with repeatable checks", "Replacing tests with a screenshot", "Removing failure cases after the fix works", "A regression harness preserves known behavior with a repeatable verifier."),
@@ -3221,7 +3323,7 @@ export const contentPack: ContentPack = {
     checkpointQuiz("quiz-data-rejected-row-proof", "lesson-data-rejected-row-proof", "Rejected-row proof checkpoint", "rejected-row proof", "Keeping row number, raw value, and reason for each rejected input", "Returning only a rejected count", "Dropping bad rows silently", "Rejected-row proof makes bad data fixable instead of invisible."),
     checkpointQuiz("quiz-data-pipeline-lineage", "lesson-data-pipeline-lineage", "Pipeline lineage checkpoint", "pipeline lineage", "Tracing source, transform, output, owner, and verifier for each stage", "Treating final numbers as self-explanatory", "Removing owners from the pipeline note", "Lineage makes report outputs traceable."),
     checkpointQuiz("quiz-data-reproducible-report", "lesson-data-reproducible-report", "Reproducible report checkpoint", "a reproducible report", "Naming input version, query logic, output, verifier, and limitations", "Sharing a one-off screenshot with no source", "Omitting limitations to sound more confident", "Reproducible reports can be rerun and critiqued.")
-  ],
+  ].map(normalizeQuizPassingScore).map(balanceQuizChoices),
   projectMissions: [
     {
       id: "mission-cli-study-tracker",

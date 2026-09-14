@@ -28,19 +28,19 @@ const pythonRegexPracticeReps: LessonPracticeBlock[] = [
 
 const pythonServicePracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "tracker = StudyTrackerService()\n# Add python 30 and sql 20, then calculate total minutes.\nprint(tracker)",
+    starterCode: "class StudyTrackerService:\n    def __init__(self):\n        self.sessions = []\n    def add_session(self, topic, minutes):\n        self.sessions.append({'topic': topic, 'minutes': minutes})\n    def total_minutes(self):\n        return sum(s['minutes'] for s in self.sessions)\n\ntracker = StudyTrackerService()\n# Add python 30 and sql 20, then calculate total minutes.\nprint(tracker)",
     expectedOutput: "total_minutes returns 50 after adding python and sql sessions.",
     checkYourAnswer: "Repeat the same service behavior with new data. The total should come from stored sessions, not from a hardcoded return value.",
     tier: "replicate"
   },
   {
-    starterCode: "first = StudyTrackerService()\nsecond = StudyTrackerService()\n# Prove adding to first does not change second.\nprint(first, second)",
+    starterCode: "class StudyTrackerService:\n    def __init__(self):\n        self.sessions = []\n    def add_session(self, topic, minutes):\n        self.sessions.append({'topic': topic, 'minutes': minutes})\n    def total_minutes(self):\n        return sum(s['minutes'] for s in self.sessions)\n\nfirst = StudyTrackerService()\nsecond = StudyTrackerService()\n# Prove adding to first does not change second.\nprint(first, second)",
     expectedOutput: "The second service still has 0 minutes after the first service changes.",
     checkYourAnswer: "This failure rep catches shared mutable state. Sessions should live on self for each instance, not on the class.",
     tier: "diagnose"
   },
   {
-    starterCode: "tracker = StudyTrackerService()\n# Add repeated topics and ask for topic_minutes('python').\nprint(tracker)",
+    starterCode: "class StudyTrackerService:\n    def __init__(self):\n        self.sessions = []\n    def add_session(self, topic, minutes):\n        self.sessions.append({'topic': topic, 'minutes': minutes})\n    def total_minutes(self):\n        return sum(s['minutes'] for s in self.sessions)\n\ntracker = StudyTrackerService()\n# Add repeated topics and ask for topic_minutes('python').\nprint(tracker)",
     expectedOutput: "topic_minutes('python') returns only the python total.",
     checkYourAnswer: "Project-shaped service methods answer product questions. A topic total should skip unrelated sessions without changing caller code.",
     tier: "synthesize"
@@ -49,21 +49,21 @@ const pythonServicePracticeReps: LessonPracticeBlock[] = [
 
 const pythonSqlitePracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "CREATE TABLE sessions (id INTEGER PRIMARY KEY, date TEXT NOT NULL, topic TEXT NOT NULL, minutes INTEGER NOT NULL);\n-- Insert api and python rows, then query totals by topic.",
-    expectedOutput: "api | 25\npython | 30",
-    checkYourAnswer: "Repeat persistence with new data. The grouped query should calculate totals from rows, not from handwritten output.",
+    starterCode: "-- The lesson seeds this table for you: python 30 + python 20, and git 15.\n-- Report total minutes per topic with SUM and GROUP BY, ordered by topic.\nSELECT topic, SUM(minutes) FROM sessions GROUP BY topic ORDER BY topic;",
+    expectedOutput: "git | 15\npython | 50",
+    checkYourAnswer: "Repeat the read-only aggregate on the seeded data. SUM(minutes) with GROUP BY topic turns the two python rows into one 50-minute row and keeps git at 15; ORDER BY topic makes the output stable.",
     tier: "replicate"
   },
   {
-    starterCode: "CREATE TABLE sessions (id INTEGER PRIMARY KEY, date TEXT NOT NULL, topic TEXT NOT NULL, minutes INTEGER NOT NULL CHECK (minutes > 0));\n-- Try inserting a negative minutes row inside a transaction.",
-    expectedOutput: "The invalid insert fails or rolls back, and no negative minutes row appears.",
-    checkYourAnswer: "This failure rep makes persistence safer. A transaction should leave the database in a trustworthy state when one row is invalid.",
+    starterCode: "-- This query forgets SUM, so it returns one raw row per session instead of a per-topic total.\nSELECT topic, minutes FROM sessions ORDER BY topic;",
+    expectedOutput: "git | 15\npython | 30\npython | 20",
+    checkYourAnswer: "This failure rep shows what happens without aggregation: you get one row per session, not one total per topic. Add SUM(minutes) and GROUP BY topic so python collapses to a single 50-minute total.",
     tier: "diagnose"
   },
   {
-    starterCode: "class SessionRepository:\n    def add_session(self, session):\n        pass\n    def totals_by_topic(self):\n        return []\nprint(SessionRepository)",
-    expectedOutput: "Repository methods hide SQL details behind add_session and totals_by_topic.",
-    checkYourAnswer: "Project-shaped persistence keeps SQL at the repository boundary. The service should ask for behavior, not build SQL strings everywhere.",
+    starterCode: "-- Project question: how many sessions and total minutes does each topic have?\nSELECT topic, COUNT(*) AS session_count, SUM(minutes) AS total_minutes\nFROM sessions\nGROUP BY topic\nORDER BY topic;",
+    expectedOutput: "git | 1 | 15\npython | 2 | 50",
+    checkYourAnswer: "Aggregate queries answer product questions at the data boundary: COUNT(*) reports the session count and SUM(minutes) reports the topic total. Keeping this in SQL means service code never has to build query strings.",
     tier: "synthesize"
   }
 ];
@@ -487,13 +487,13 @@ const oopServiceLesson = proofLesson({
   requiredCodeIncludes: ["class StudyTrackerService", "__init__", "add_session", "total_minutes"],
   requiredOutputIncludes: ["service", "30", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "class StudyTrackerService:\n    def __init__(self):\n        pass\n\n    def add_session(self, topic, minutes):\n        pass\n\n    def total_minutes(self):\n        return 0\n\ntracker = StudyTrackerService()\ntracker.add_session('python', 30)\nprint(tracker.total_minutes())",
+  runnerStarterCode: "class StudyTrackerService:\n    def __init__(self):\n        self.sessions = []\n\n    def add_session(self, topic, minutes):\n        # TODO: store the session on self so each instance keeps its own list.\n        pass\n\n    def total_minutes(self):\n        # TODO: return the sum of all stored session minutes.\n        return 0\n\n    def topic_minutes(self, topic):\n        # TODO: return the sum of minutes for sessions matching topic only.\n        return 0\n\ntracker = StudyTrackerService()\ntracker.add_session('python', 30)\nprint(tracker.total_minutes())",
   runnerTestCode: "tracker.add_session('git', 15)\nassert tracker.total_minutes() == 45\nother = StudyTrackerService()\nassert other.total_minutes() == 0\nother.add_session('sql', 20)\nassert other.total_minutes() == 20\nassert tracker.total_minutes() == 45\nprint('service 30 passed')",
   hiddenTests: [
     {
       id: "oop-service-topic-minutes",
-      name: "Service supports topic totals when implemented",
-      code: "if hasattr(tracker, 'topic_minutes'):\n    assert tracker.topic_minutes('python') == 30"
+      name: "Service supports topic totals",
+      code: "assert hasattr(tracker, 'topic_minutes'), 'topic_minutes method is missing'\nassert tracker.topic_minutes('python') == 30, f\"expected 30, got {tracker.topic_minutes('python')}\""
     }
   ],
   curriculum: {
@@ -581,8 +581,8 @@ const sqlitePersistenceLesson = proofLesson({
   difficulty: "applied",
   skillIds: ["skill-python-integration", "skill-sql-joins", "skill-testing-debugging"],
   quizId: "quiz-python-sqlite-persistence",
-  desktopTask: "Create a SQLite sessions table and queries for inserting sessions and totaling minutes by topic.",
-  evidencePrompt: "Record the schema, seed rows, total-by-topic query, and command output.",
+  desktopTask: "Write a read-only SQL aggregate query over a pre-seeded sessions table that totals study minutes per topic.",
+  evidencePrompt: "Record the aggregate SELECT, the computed per-topic totals from the seeded sessions table, and a note explaining why GROUP BY is required and why hardcoded rows would not survive the hidden re-check.",
   language: "SQLite for Python utilities",
   tools: ["SQLite", "schema", "aggregate query"],
   synopsis: "You are learning how a Python utility can persist session data with SQLite. Persist means save data so it is still available after the program exits.",
@@ -590,36 +590,36 @@ const sqlitePersistenceLesson = proofLesson({
     "Know the session fields date, topic, and minutes.",
     "Know that SQL tables store rows and queries calculate answers."
   ],
-  testingFocus: "You will test the schema by inserting rows, querying total minutes by topic, and explaining how an invalid insert should fail without leaving bad rows behind.",
+  testingFocus: "You will test that the read-only aggregate query computes one total row per topic from the sessions table instead of one row per session, and that it still works when a hidden check seeds an extra topic.",
   objective: "Store study sessions in a SQLite table.",
   whyItMatters: "A professional local utility should not lose data every time it exits. SQLite gives the tracker durable structured storage.",
   coreConcept: "A schema is the shape of a database table. A good first schema stores date, topic, and minutes with types and a simple primary key. A repository function can hide SQL details from service code while queries answer real product questions.",
   workedExample: "SELECT topic, SUM(minutes) FROM sessions GROUP BY topic returns totals that the report layer can use.",
-  guidedExercise: "Create the sessions table, insert sample rows, query totals by topic, and plan one invalid-row transaction check.",
+  guidedExercise: "Write one read-only SELECT that totals minutes per topic from the pre-seeded sessions table using SUM and GROUP BY, then order the rows by topic.",
   missionConnection: "This closes the database persistence gap and connects the Python path to the SQL path.",
   reflectionPrompt: "Which fields belong in the database, and which calculated values can be derived by query?",
-  practiceStarter: "CREATE TABLE sessions (\n  id INTEGER PRIMARY KEY,\n  date TEXT NOT NULL,\n  topic TEXT NOT NULL,\n  minutes INTEGER NOT NULL\n);\n\n-- Insert python and git sessions, then query totals by topic.",
-  practiceExpected: "python | 50\ngit | 15",
-  practiceCheck: "If the query returns one row per session, add GROUP BY topic so the database groups sessions by topic before calculating totals.",
+  practiceStarter: "-- The sessions table is already seeded for you: python 30 + python 20, and git 15.\n-- TODO: swap SELECT 1 for one SELECT that reports total minutes per topic\n-- using SUM and GROUP BY, ordered by topic.\nSELECT 1;",
+  practiceExpected: "git | 15\npython | 50",
+  practiceCheck: "The seeded table has python 30 + python 20 and git 15, so the target output is python | 50 and git | 15. GROUP BY topic is required: without it, SUM(minutes) would collapse every session into a single total instead of one total per topic.",
   practiceReps: pythonSqlitePracticeReps,
   miniTitle: "Create durable session storage",
-  miniGoal: "Build a SQLite schema and total-by-topic query for tracker sessions.",
-  miniSteps: ["Create the sessions table", "Insert at least three sample rows", "Query total minutes grouped by topic", "Name the invalid insert or rollback check"],
-  miniDeliverables: ["CREATE TABLE statement", "Seed inserts", "Aggregate query output", "Invalid-row or transaction failure note"],
-  verifierCommand: "sqlite3 tracker.db < schema_and_query.sql",
-  expectedEvidence: "SQL output showing python and git totals from inserted session rows plus a note about the invalid-row or rollback check.",
+  miniGoal: "Write the read-only aggregate query that reports total minutes per topic from the pre-seeded sessions table.",
+  miniSteps: ["Inspect the pre-seeded rows: python 30, python 20, and git 15", "Write one SELECT with SUM(minutes) and GROUP BY topic", "Add ORDER BY topic and confirm the totals are git 15 and python 50"],
+  miniDeliverables: ["The read-only SELECT statement", "Query output showing python | 50 and git | 15", "A one-line note explaining why GROUP BY is required"],
+  verifierCommand: "Code Lab check: SELECT topic, SUM(minutes) FROM sessions GROUP BY topic ORDER BY topic;",
+  expectedEvidence: "Query output showing the per-topic totals python | 50 and git | 15 from the seeded sessions table, plus a note that GROUP BY is required to aggregate one row per topic and that the totals must be computed from the table rather than hardcoded.",
   projectConnection: "This turns the tracker into a local persistent utility.",
-  requiredCodeIncludes: ["CREATE TABLE", "sessions", "INSERT", "SUM", "GROUP BY"],
+  requiredCodeIncludes: ["SELECT", "sessions", "SUM", "GROUP BY"],
   requiredOutputIncludes: ["python", "50", "git", "15"],
   runnerLanguage: "sql",
-  runnerStarterCode: "CREATE TABLE sessions (\n  id INTEGER PRIMARY KEY,\n  date TEXT NOT NULL,\n  topic TEXT NOT NULL,\n  minutes INTEGER NOT NULL\n);\n\n-- Insert python and git sessions, then query totals by topic.",
-  runnerTestCode: "EXPECT_ROWS:python|50\ngit|15",
+  runnerStarterCode: "-- The sessions table already exists and is seeded for you by the lesson\n-- setup (python 30 + python 20, git 15).\n-- TODO: swap the placeholder query for one SELECT that reports total\n-- minutes per topic using SUM and GROUP BY.\nSELECT 1;",
+  runnerTestCode: "-- The SQL runner builds a freshly seeded database for each check, runs this\n-- check's trusted harness SQL (none for the visible check), then re-runs the\n-- learner query and checks its output.",
   hiddenTests: [
     {
-      id: "sqlite-session-invalid-row-note",
-      name: "SQLite depth includes an invalid row or rollback check",
-      code: "EXPECT_ROWS:python|50\ngit|15",
-      expectedOutputIncludes: ["python", "50", "git", "15"]
+      id: "sqlite-session-totals-recheck",
+      name: "SQLite depth re-checks totals for a newly seeded topic",
+      code: "-- Trusted harness SQL: add a topic the learner has not seen so a hardcoded\n-- UNION cannot pass. The learner query must compute totals from the table.\nINSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-04', 'sql', 45);",
+      expectedOutputIncludes: ["python", "50", "git", "15", "sql", "45"]
     }
   ],
   curriculum: {
@@ -635,6 +635,20 @@ const sqlitePersistenceLesson = proofLesson({
     proofOutputs: ["terminal_stdout"]
   }
 });
+
+// The SQL runner (src/sandbox/runner.ts runSql) builds a freshly seeded database
+// for every check: it creates a new SQL.Database, runs setupCode to seed it, runs
+// the check's trusted harness SQL when present, then re-runs the learner query.
+// The sandbox policy blocks mutation statements in learner submissions
+// (src/sandbox/policy.ts), so setupCode holds the schema and seed rows, hidden
+// checks may seed extra rows, and the learner writes only the read-only
+// aggregation query. A hardcoded UNION cannot know the hidden extra topic.
+//
+// setupCode and hidden-check harness SQL are privileged/trusted content executed
+// once per check WITHOUT the sandbox policy checks that gate learner
+// submissions. Keep them limited to the lesson database schema plus seed
+// statements, and never put learner-facing or dangerous SQL in them.
+sqlitePersistenceLesson.workshop.miniProject.runnerSpec.setupCode = "CREATE TABLE sessions (\n  id INTEGER PRIMARY KEY,\n  date TEXT NOT NULL,\n  topic TEXT NOT NULL,\n  minutes INTEGER NOT NULL CHECK (minutes > 0)\n);\nINSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-01', 'python', 30);\nINSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-02', 'python', 20);\nINSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-03', 'git', 15);";
 
 sqlitePersistenceLesson.depth = {
   primaryConceptId: "py.sqlite",
@@ -675,29 +689,29 @@ sqlitePersistenceLesson.depth = {
   guidedEdits: [
     {
       id: "g-sql-1",
-      instruction: "Add a CHECK constraint on minutes to ensure only positive numbers are stored.",
+      instruction: "Add ORDER BY topic so the grouped totals come back in a deterministic order.",
       conceptIds: ["py.sqlite"],
-      targetCodeFragment: "minutes INTEGER NOT NULL",
-      expectedObservation: "Inserting negative minutes results in a CHECK constraint failure.",
-      wrongTurnHint: "Define CHECK (minutes > 0) directly inline with the minutes column declaration."
+      targetCodeFragment: "SELECT topic, SUM(minutes) FROM sessions GROUP BY topic",
+      expectedObservation: "With ORDER BY topic the query returns git | 15 first and python | 50 second, every time.",
+      wrongTurnHint: "Place ORDER BY topic after GROUP BY topic, at the end of the SELECT statement."
     }
   ],
   errorClinic: [
     {
       id: "e-sql-1",
       conceptIds: ["py.sqlite.query"],
-      brokenExample: "cursor.execute(f\"INSERT INTO sessions VALUES ('{date}', '{topic}')\")",
-      symptom: "Security alerts or syntax errors when inputs contain quotes or special characters.",
-      likelyCause: "String interpolation inserts raw input directly into the SQL command stream.",
-      fixStrategy: "Change the string to use ? placeholders and pass inputs as a tuple: cursor.execute('INSERT INTO sessions VALUES (?, ?)', (date, topic))"
+      brokenExample: "SELECT topic, minutes FROM sessions GROUP BY topic",
+      symptom: "The totals are wrong: the query shows one raw minutes value per topic instead of the summed total.",
+      likelyCause: "Selecting minutes without SUM(minutes) returns one arbitrary row per group instead of aggregating the column.",
+      fixStrategy: "Select SUM(minutes) with GROUP BY topic and add ORDER BY topic for a stable result: SELECT topic, SUM(minutes) FROM sessions GROUP BY topic ORDER BY topic."
     }
   ],
   codeLabBridge: {
     story: "Now that we can manage parsed sessions in memory, we need to save them persistently so they survive script restarts.",
     usesConcepts: ["py.sqlite", "py.sqlite.query"],
-    learnerOwns: ["sessions"],
-    checkerOwns: ["sqlite-session-invalid-row-note"],
-    runExpectation: "prints python|50 and git|15"
+    learnerOwns: ["totals_by_topic"],
+    checkerOwns: ["sqlite-session-totals-recheck"],
+    runExpectation: "prints git | 15 and python | 50 rows"
   },
   understandingProofPrompt: "Why does database persistence require a defined schema, whereas saving raw CSV rows does not?",
   exitTicket: [
@@ -845,21 +859,21 @@ apiClientLesson.depth = {
 
 const pythonTestingMocksPracticeReps: LessonPracticeBlock[] = [
   {
-    starterCode: "from unittest.mock import patch\n\ndef test_fetch_sessions():\n    with patch('api_client.ApiClient.get') as mock_get:\n        mock_get.return_value = [{'topic': 'python', 'minutes': 30}]\n        # Call the function and verify mock was called\n        pass\n\nprint('TODO')",
-    expectedOutput: "mock_get was called once with the expected arguments.",
-    checkYourAnswer: "Use patch as a context manager to replace a real function with a controlled double. Verify the mock was called with assert_called_once_with.",
+    starterCode: "from unittest.mock import patch\n\nclass ApiClient:\n    def get(self, url, timeout=None):\n        raise RuntimeError('network is disabled in tests; mock this method')\n\nclient = ApiClient()\n\ndef fetch_sessions(api, url, timeout=5):\n    # TODO: call api.get(url, timeout=timeout) and return the result.\n    pass\n\ndef test_fetch_sessions():\n    with patch.object(ApiClient, 'get') as mock_get:\n        mock_get.return_value = [{'topic': 'python', 'minutes': 30}]\n        # TODO: call fetch_sessions(client, '/sessions') and check the result.\n        # TODO: assert mock_get was called once with '/sessions' and timeout=5.\n        pass\n\nprint('TODO')",
+    expectedOutput: "The test passes and mock_get was called once with '/sessions' and timeout=5.",
+    checkYourAnswer: "patch.object(ApiClient, 'get') replaces the real method on the class, so every ApiClient instance returns fake data. Call assert_called_once_with('/sessions', timeout=5) to prove the code under test used the right arguments.",
     tier: "replicate"
   },
   {
-    starterCode: "from unittest.mock import patch\n\ndef test_fetch_sessions_failure():\n    with patch('api_client.ApiClient.get') as mock_get:\n        mock_get.side_effect = ConnectionError('timeout')\n        # This test expects ApiError but mock raises ConnectionError\n        pass\n\nprint('TODO')",
-    expectedOutput: "The mock side_effect causes the test to fail or raise an unexpected error because the test expects ApiError, not ConnectionError.",
-    checkYourAnswer: "This failure rep shows that mocks can simulate errors, but the test must handle the same exception type the real code raises. Asserting ApiError fails if the mock raises ConnectionError.",
+    starterCode: "from unittest.mock import patch\n\nclass ApiClient:\n    def get(self, url, timeout=None):\n        raise RuntimeError('network is disabled in tests; mock this method')\n\nclient = ApiClient()\n\ndef fetch_sessions(api, url, timeout=5):\n    return api.get(url, timeout=timeout)\n\ndef test_fetch_sessions_failure():\n    with patch.object(ApiClient, 'get') as mock_get:\n        mock_get.side_effect = ConnectionError('timeout')\n        # TODO: call fetch_sessions(client, '/sessions') and expect the raised error.\n        pass\n\nprint('TODO')",
+    expectedOutput: "Calling fetch_sessions raises ConnectionError('timeout') instead of returning data.",
+    checkYourAnswer: "This failure rep shows that side_effect raises the configured exception. The test must expect the same error type the real client raises; catching ApiError will not catch a ConnectionError.",
     tier: "diagnose"
   },
   {
-    starterCode: "from unittest.mock import patch\n\ndef test_tracker_service():\n    # Write a test that patches StudyTrackerService.add_session\n    # to verify it is called with the correct arguments\n    pass\n\nprint('TODO')",
-    expectedOutput: "The mock verifies add_session was called with the right topic and minutes.",
-    checkYourAnswer: "Project-shaped testing means using mocks to verify service-layer interactions without real side effects. assert_called_with confirms the arguments.",
+    starterCode: "from unittest.mock import patch\n\nclass StudyTrackerService:\n    def add_session(self, topic, minutes):\n        raise RuntimeError('database is disabled in tests; mock this method')\n\nservice = StudyTrackerService()\n\ndef test_tracker_service():\n    with patch.object(StudyTrackerService, 'add_session') as mock_add:\n        # TODO: call service.add_session('python', 30) and assert the mock.\n        pass\n\nprint('TODO')",
+    expectedOutput: "The mock proves add_session was called once with 'python' and 30.",
+    checkYourAnswer: "Project-shaped testing uses patch.object to replace service-layer side effects. mock_add.assert_called_once_with('python', 30) verifies the interaction without touching a real database.",
     tier: "synthesize"
   }
 ];
@@ -870,7 +884,7 @@ const testingMocksLesson = proofLesson({
   slug: "python-testing-mocks",
   title: "Replace Real APIs With Mock Test Doubles",
   summary: "Learn to replace real API calls with controlled test doubles using unittest.mock.patch.",
-  bodyMarkdown: "Real API calls make tests slow, flaky, and dependent on network access. The `unittest.mock` module lets you replace real functions with controlled test doubles that you can inspect and configure.\n\n## Using `patch()` as a context manager\n\nThe `patch()` function temporarily replaces a real object with a `MagicMock` during the `with` block:\n\n```python\nfrom unittest.mock import patch\n\ndef test_fetch_sessions():\n    with patch('api_client.ApiClient.get') as mock_get:\n        mock_get.return_value = [{'topic': 'python', 'minutes': 30}]\n        result = fetch_sessions()\n        mock_get.assert_called_once_with('/sessions', timeout=5)\n```\n\n## Key mock methods\n\n- **`return_value`** — What the mock returns when called.\n- **`side_effect`** — An exception to raise or an iterable of return values.\n- **`assert_called_once_with()`** — Verifies the mock was called exactly once with specific arguments.\n- **`assert_called_with()`** — Verifies the most recent call matched specific arguments.\n\n## Testing the Study Tracker service\n\nYou can mock the `StudyTrackerService` methods to isolate the code being tested from real side effects like database writes or network calls:",
+  bodyMarkdown: "Real API calls make tests slow, flaky, and dependent on network access. The `unittest.mock` module lets you replace real functions with controlled test doubles that you can inspect and configure.\n\n## Using `patch()` as a context manager\n\nThe `patch()` function temporarily replaces a real object with a `MagicMock` during the `with` block:\n\n```python\nfrom unittest.mock import patch\n\nclass ApiClient:\n    def get(self, url, timeout=None):\n        raise RuntimeError('network is disabled in tests; mock this method')\n\nclient = ApiClient()\n\ndef fetch_sessions(api, url, timeout=5):\n    return api.get(url, timeout=timeout)\n\ndef test_fetch_sessions():\n    with patch.object(ApiClient, 'get') as mock_get:\n        mock_get.return_value = [{'topic': 'python', 'minutes': 30}]\n        result = fetch_sessions(client, '/sessions')\n        mock_get.assert_called_once_with('/sessions', timeout=5)\n```\n\n## Key mock methods\n\n- **`return_value`** — What the mock returns when called.\n- **`side_effect`** — An exception to raise or an iterable of return values.\n- **`assert_called_once_with()`** — Verifies the mock was called exactly once with specific arguments.\n- **`assert_called_with()`** — Verifies the most recent call matched specific arguments.\n\n## Testing the Study Tracker service\n\nYou can mock the `StudyTrackerService` methods to isolate the code being tested from real side effects like database writes or network calls:\n\n```python\nfrom unittest.mock import patch\n\ndef test_tracker_add_session():\n    with patch.object(StudyTrackerService, 'add_session') as mock_add:\n        tracker = StudyTrackerService()\n        tracker.add_session('python', 30)\n        mock_add.assert_called_once_with('python', 30)\n```\n\n## Choosing the patch target\n\n`patch('package.module.Attribute')` needs an importable module path, which is the right tool in a real project with a `tests/` folder. When the class lives in the same file — as in this lesson's sandbox — patch it directly with `patch.object(ApiClient, 'get')`. Both forms record calls exactly the same way.",
   estimatedMinutes: 14,
   difficulty: "applied",
   skillIds: ["skill-python-integration", "skill-testing-debugging"],
@@ -888,11 +902,11 @@ const testingMocksLesson = proofLesson({
   objective: "Use unittest.mock.patch to create test doubles for the API client and service layer.",
   whyItMatters: "Professional Python tests isolate the code being tested from external dependencies. Mocking lets you verify that your code calls external services with the right arguments without actually calling them.",
   coreConcept: "unittest.mock.patch temporarily replaces a real function or object with a MagicMock instance during a test block. The mock records every call and its arguments, so you can assert the call happened with the expected inputs.",
-  workedExample: "with patch('api_client.ApiClient.get') as mock_get: replaces ApiClient.get with a mock. Setting mock_get.return_value = [...] controls what the mock returns. Calling mock_get.assert_called_once_with('/sessions', timeout=5) verifies the arguments.",
-  guidedExercise: "Write a test that patches fetch_sessions, sets a return_value, calls the function, and asserts the mock was called with the right URL and timeout.",
+  workedExample: "with patch.object(ApiClient, 'get') as mock_get: replaces the get method with a mock. Setting mock_get.return_value = [...] controls what the mock returns. Calling mock_get.assert_called_once_with('/sessions', timeout=5) verifies the arguments.",
+  guidedExercise: "Write a test that patches ApiClient.get with patch.object, sets a return_value, calls fetch_sessions through it, and asserts the mock was called with the right URL and timeout.",
   missionConnection: "Mocking lets the integration tests run without a live API, making them fast enough to run before every commit.",
   reflectionPrompt: "What is the difference between mocking return_value and using side_effect? When would you use each one?",
-  practiceStarter: "from unittest.mock import patch\n\ndef test_fetch_sessions():\n    with patch('api_client.ApiClient.get') as mock_get:\n        mock_get.return_value = [{'topic': 'python', 'minutes': 30}]\n        # Call the function and verify mock was called\n        pass\n\nprint('TODO')",
+  practiceStarter: "from unittest.mock import patch\n\nclass ApiClient:\n    def get(self, url, timeout=None):\n        raise RuntimeError('network is disabled in tests; mock this method')\n\nclient = ApiClient()\n\ndef fetch_sessions(api, url, timeout=5):\n    # TODO: call api.get(url, timeout=timeout) and return the result.\n    pass\n\ndef test_fetch_sessions():\n    # TODO: replace ApiClient.get with a mock: with patch.object(ApiClient, 'get') as mock_get:\n    # TODO: set mock_get.return_value = [{'topic': 'python', 'minutes': 30}]\n    # TODO: call fetch_sessions(client, '/sessions') and assert the returned data.\n    # TODO: assert the mock was called once with the expected arguments:\n    #   mock_get.assert_called_once_with('/sessions', timeout=5)\n    pass\n\nprint('TODO')",
   practiceExpected: "mock_get was called once with '/sessions' and timeout=5.",
   practiceCheck: "If the mock was not called, the function may not be reaching the API client. If assert_called_once_with fails, check the actual arguments passed.",
   practiceReps: pythonTestingMocksPracticeReps,
@@ -906,13 +920,13 @@ const testingMocksLesson = proofLesson({
   requiredCodeIncludes: ["patch", "mock_get", "assert_called", "return_value"],
   requiredOutputIncludes: ["mock", "called", "passed"],
   runnerLanguage: "python",
-  runnerStarterCode: "from unittest.mock import patch\n\ndef test_fetch_sessions():\n    with patch('api_client.ApiClient.get') as mock_get:\n        mock_get.return_value = [{'topic': 'python', 'minutes': 30}]\n        # Call the function and verify mock was called\n        pass\n\nprint('TODO')",
-  runnerTestCode: "from unittest.mock import patch\n\ndef test_fetch_sessions():\n    with patch('api_client.ApiClient.get') as mock_get:\n        mock_get.return_value = [{'topic': 'python', 'minutes': 30}]\n        result = mock_get('/sessions', timeout=5)\n        mock_get.assert_called_once_with('/sessions', timeout=5)\n        assert result == [{'topic': 'python', 'minutes': 30}]\n\ntest_fetch_sessions()\nprint('mock called passed')",
+  runnerStarterCode: "from unittest.mock import patch\n\nclass ApiClient:\n    def get(self, url, timeout=None):\n        raise RuntimeError('network is disabled in tests; mock this method')\n\nclient = ApiClient()\n\ndef fetch_sessions(api, url, timeout=5):\n    # TODO: call api.get(url, timeout=timeout) and return the result.\n    pass\n\ndef test_fetch_sessions():\n    # TODO: replace ApiClient.get with a mock: with patch.object(ApiClient, 'get') as mock_get:\n    # TODO: set mock_get.return_value = [{'topic': 'python', 'minutes': 30}]\n    # TODO: call fetch_sessions(client, '/sessions') and assert the returned data.\n    # TODO: assert the mock was called once with the expected arguments:\n    #   mock_get.assert_called_once_with('/sessions', timeout=5)\n    pass\n\nprint('TODO')",
+  runnerTestCode: "from unittest.mock import patch\n\n# The check runs the LEARNER's test, then verifies the learner's\n# fetch_sessions goes through the mocked client method.\ntest_fetch_sessions()\n\nwith patch.object(ApiClient, 'get') as mock_get:\n    mock_get.return_value = [{'topic': 'python', 'minutes': 30}]\n    result = fetch_sessions(client, '/sessions')\n    assert result == [{'topic': 'python', 'minutes': 30}], 'fetch_sessions should return the api data'\n    mock_get.assert_called_once_with('/sessions', timeout=5)\n\nprint('mock called passed')",
   hiddenTests: [
     {
       id: "testing-mocks-side-effect",
       name: "Mock test handles side_effect errors",
-      code: "from unittest.mock import patch\n\nwith patch('api_client.ApiClient.get') as mock_get:\n    mock_get.side_effect = ConnectionError('timeout')\n    try:\n        mock_get('/sessions')\n        assert False, 'should have raised'\n    except ConnectionError as e:\n        assert 'timeout' in str(e)"
+      code: "from unittest.mock import patch\n\nwith patch.object(ApiClient, 'get') as mock_get:\n    mock_get.side_effect = ConnectionError('timeout')\n    try:\n        fetch_sessions(client, '/sessions')\n        assert False, 'fetch_sessions should propagate the client error'\n    except ConnectionError as e:\n        assert 'timeout' in str(e)"
     }
   ],
   curriculum: {
@@ -949,9 +963,9 @@ testingMocksLesson.depth = {
     {
       id: "w-mock-1",
       label: "Patch as context manager",
-      codeFragment: "with patch('api_client.ApiClient.get') as mock_get:\n    mock_get.return_value = [{'topic': 'python', 'minutes': 30}]",
+      codeFragment: "with patch.object(ApiClient, 'get') as mock_get:\n    mock_get.return_value = [{'topic': 'python', 'minutes': 30}]",
       conceptIds: ["py.testing.mock"],
-      explanation: "patch replaces ApiClient.get with a MagicMock within the with block. The mock automatically restores the original after the block exits.",
+      explanation: "patch.object replaces ApiClient.get with a MagicMock within the with block. The mock automatically restores the original after the block exits.",
       learnerShouldBeAbleToSay: "I use patch as a context manager to temporarily replace a function with a controlled mock that records calls."
     },
     {
@@ -968,7 +982,7 @@ testingMocksLesson.depth = {
       id: "g-mock-1",
       instruction: "Add an assertion that mock_get was called with the URL '/sessions' and timeout=5.",
       conceptIds: ["py.testing.mock"],
-      targetCodeFragment: "with patch('api_client.ApiClient.get') as mock_get:",
+      targetCodeFragment: "with patch.object(ApiClient, 'get') as mock_get:",
       expectedObservation: "The mock assertion passes and confirms the call arguments.",
       wrongTurnHint: "Use mock_get.assert_called_once_with('/sessions', timeout=5) after the function call."
     },
@@ -985,7 +999,7 @@ testingMocksLesson.depth = {
     {
       id: "e-mock-1",
       conceptIds: ["py.testing.mock"],
-      brokenExample: "with patch('api_client.ApiClient.get') as mock_get:\n    mock_get.return_value = [{'topic': 'python', 'minutes': 30}]\n    result = mock_get('/sessions', timeout=5)\n# No assertion checks the mock was called",
+      brokenExample: "with patch.object(ApiClient, 'get') as mock_get:\n    mock_get.return_value = [{'topic': 'python', 'minutes': 30}]\n    result = mock_get('/sessions', timeout=5)\n# No assertion checks the mock was called",
       symptom: "The test passes but does not verify the code under test actually calls the mocked function.",
       likelyCause: "The test exercises the mock but never asserts that the real code path calls the function with the expected arguments.",
       fixStrategy: "Add mock_get.assert_called_once_with('/sessions', timeout=5) after the function call."
@@ -993,7 +1007,7 @@ testingMocksLesson.depth = {
     {
       id: "e-mock-2",
       conceptIds: ["py.testing.mock"],
-      brokenExample: "with patch('api_client.ApiClient.get') as mock_get:\n    mock_get.side_effect = ConnectionError('timeout')\n    result = mock_get('/sessions')\nassert result is None  # This assertion passes silently",
+      brokenExample: "with patch.object(ApiClient, 'get') as mock_get:\n    mock_get.side_effect = ConnectionError('timeout')\n    result = mock_get('/sessions')\nassert result is None  # This assertion passes silently",
       symptom: "The test passes but the ConnectionError was never raised because side_effect needs to be triggered.",
       likelyCause: "The mock is set up but the test uses it directly rather than through the function under test.",
       fixStrategy: "Call the function under test inside the with block and use a try/except to catch the expected exception."
@@ -1074,7 +1088,7 @@ const integrationCapstoneLesson = proofLesson({
   requiredOutputIncludes: ["python", "30", "sql", "20", "Total"],
   runnerLanguage: "python",
   runnerStarterCode: "class SessionRepository:\n    def __init__(self, db_path):\n        pass\n    def create_table(self):\n        pass\n    def add_session(self, topic, minutes):\n        pass\n    def get_all(self):\n        return []\n    def totals_by_topic(self):\n        return []\n\nclass TrackerService:\n    def __init__(self, repository):\n        pass\n    def add_session(self, topic, minutes):\n        pass\n    def generate_report(self):\n        return ''\n\nrepo = SessionRepository(':memory:')\nrepo.create_table()\nservice = TrackerService(repo)\nservice.add_session('python', 30)\nservice.add_session('sql', 20)\nprint(service.generate_report())",
-  runnerTestCode: "import sqlite3\n\n# Test 1: Repository accepts and retrieves sessions\nrepo = SessionRepository(':memory:')\nrepo.create_table()\nrepo.add_session('python', 30)\nrepo.add_session('sql', 20)\nall_sessions = repo.get_all()\nassert len(all_sessions) == 2, f'Expected 2 sessions, got {len(all_sessions)}'\ntotals = repo.totals_by_topic()\nassert len(totals) == 2, f'Expected 2 topic totals, got {len(totals)}'\nprint('repository sessions passed')\n\n# Test 2: Service generates a report\nservice = TrackerService(repo)\nreport = service.generate_report()\nassert 'python' in report\nassert 'sql' in report\nassert 'Total' in report\nprint('service report passed')\nprint('python 30 sql 20 Total: 50')\n\n# Test 3: Service validates input\ntry:\n    service.add_session('', 30)\n    print('FAIL: should have raised ValueError for empty topic')\nexcept ValueError:\n    print('validation topic passed')",
+  runnerTestCode: "import sqlite3\n\n# Test 1: Repository accepts and retrieves sessions\nrepo = SessionRepository(':memory:')\nrepo.create_table()\nrepo.add_session('python', 30)\nrepo.add_session('sql', 20)\nall_sessions = repo.get_all()\nassert len(all_sessions) == 2, f'Expected 2 sessions, got {len(all_sessions)}'\ntotals = repo.totals_by_topic()\nassert len(totals) == 2, f'Expected 2 topic totals, got {len(totals)}'\nprint('repository sessions passed')\n\n# Test 2: Service generates a report\nservice = TrackerService(repo)\nreport = service.generate_report()\nassert 'python' in report\nassert 'sql' in report\nassert 'Total' in report\nprint('service report passed')\nprint('python 30 sql 20 Total: 50')\n\n# Test 3: Service validates input\ntry:\n    service.add_session('', 30)\n    raise AssertionError('empty topic should raise ValueError')\nexcept ValueError:\n    print('validation topic passed')",
   hiddenTests: [
     {
       id: "integration-capstone-handles-empty-db",
@@ -1084,7 +1098,7 @@ const integrationCapstoneLesson = proofLesson({
     {
       id: "integration-capstone-rejects-negative-minutes",
       name: "Integration rejects negative minutes",
-      code: "repo = SessionRepository(':memory:')\nrepo.create_table()\nservice = TrackerService(repo)\ntry:\n    service.add_session('python', -5)\n    print('FAIL: should have raised ValueError for negative minutes')\nexcept ValueError:\n    pass"
+      code: "repo = SessionRepository(':memory:')\nrepo.create_table()\nservice = TrackerService(repo)\ntry:\n    service.add_session('python', -5)\n    raise AssertionError('negative minutes should raise ValueError')\nexcept ValueError:\n    pass"
     }
   ],
   curriculum: {
@@ -1380,10 +1394,10 @@ export const level7Quizzes: Quiz[] = [
       },
       {
         id: "question-python-regex-2",
-        prompt: "Your date validator re.match allows 'bad-2026-05-08' to pass. What is wrong?",
+        prompt: "Your date validator accepts '2026-05-08-garbage':\n```python\nimport re\nDATE_PATTERN = r\"\\d{4}-\\d{2}-\\d{2}\"\ndef is_valid_date(value):\n    return bool(re.match(DATE_PATTERN, value))\n```\nWhat is wrong?",
         choices: ["re.match only checks the beginning of the string, not the whole string", "The regex pattern is too short", "Python does not support regex"],
         correctChoiceIndex: 0,
-        explanation: "re.match finds a match at the beginning. 'bad-2026-05-08' does not match, but a prefix match would pass if the pattern is at the start.",
+        explanation: "re.match anchors only at the start, so the prefix '2026-05-08' matches and the trailing garbage is ignored. Anchor the pattern with $ or use re.fullmatch so the whole string must match.",
         conceptIds: ["py.validation.schema"]
       },
       {
@@ -1540,7 +1554,7 @@ export const level7Quizzes: Quiz[] = [
     "quiz-python-testing-mocks",
     "lesson-python-testing-mocks",
     "Testing with mocks checkpoint",
-    "from unittest.mock import patch\n\ndef test_fetch_sessions():\n    with patch('api_client.ApiClient.get') as mock_get:\n        mock_get.return_value = [{'topic': 'python'}]\n        result = mock_get('/sessions', timeout=5)\n        mock_get.assert_called_once_with('/sessions', timeout=5)",
+    "from unittest.mock import patch\n\nclass ApiClient:\n    def get(self, url, timeout=None):\n        raise RuntimeError('network is disabled in tests; mock this method')\n\nclient = ApiClient()\n\ndef fetch_sessions(api, url, timeout=5):\n    return api.get(url, timeout=timeout)\n\ndef test_fetch_sessions():\n    with patch.object(ApiClient, 'get') as mock_get:\n        mock_get.return_value = [{'topic': 'python'}]\n        result = fetch_sessions(client, '/sessions')\n        mock_get.assert_called_once_with('/sessions', timeout=5)",
     "unittest.mock.patch",
     "It patches ApiClient.get to return fake data and verifies the call was made with the right arguments",
     "It makes a real HTTP request and checks the server response",

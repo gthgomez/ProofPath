@@ -9,6 +9,11 @@ interface PatternRule {
   rule: string;
   pattern: RegExp;
   message: string;
+  /**
+   * Optional pre-processing applied to the submission before `pattern` runs.
+   * Used to ignore keywords that appear in comments or string literals.
+   */
+  sanitize?: (code: string) => string;
 }
 
 const MAX_CODE_LENGTH = 20000;
@@ -29,20 +34,246 @@ const javascriptRules: PatternRule[] = [
   { rule: "infinite-loop", pattern: /while\s*\(\s*true\s*\)|for\s*\(\s*;\s*;\s*\)/i, message: "Obvious infinite loops are blocked before execution." }
 ];
 
+/**
+ * Removes Python comments and string literals so policy rules match executable
+ * code rather than words inside `#` comments or string data. Newlines are
+ * preserved so line-oriented rules keep their meaning. Handles single- and
+ * double-quoted strings (including backslash escapes) and triple-quoted
+ * strings; a `#` inside a string is not treated as a comment and a quote inside
+ * a comment is not treated as a string delimiter. A bare package name inside a
+ * string/list (e.g. 'requests==2.31.0') is therefore ignored, which avoids
+ * false positives on requirements files.
+ */
+function stripPythonCommentsAndStrings(code: string): string {
+  let sanitized = "";
+  let index = 0;
+
+  const blankChar = (char: string): string => (char === "\n" ? "\n" : " ");
+
+  while (index < code.length) {
+    const char = code[index];
+
+    if (char === "#") {
+      while (index < code.length && code[index] !== "\n") {
+        sanitized += " ";
+        index += 1;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      const quote = char;
+      const tripled = code[index + 1] === quote && code[index + 2] === quote;
+
+      if (tripled) {
+        sanitized += "   ";
+        index += 3;
+        while (index < code.length) {
+          if (code[index] === "\\" && index + 1 < code.length) {
+            sanitized += blankChar(code[index]) + blankChar(code[index + 1]);
+            index += 2;
+            continue;
+          }
+          if (code[index] === quote && code[index + 1] === quote && code[index + 2] === quote) {
+            sanitized += "   ";
+            index += 3;
+            break;
+          }
+          sanitized += blankChar(code[index]);
+          index += 1;
+        }
+        continue;
+      }
+
+      sanitized += " ";
+      index += 1;
+      while (index < code.length) {
+        if (code[index] === "\\" && index + 1 < code.length) {
+          sanitized += blankChar(code[index]) + blankChar(code[index + 1]);
+          index += 2;
+          continue;
+        }
+        if (code[index] === quote) {
+          sanitized += " ";
+          index += 1;
+          break;
+        }
+        if (code[index] === "\n") {
+          // Unterminated single-line string; preserve the newline so following
+          // lines remain analyzable.
+          sanitized += "\n";
+          index += 1;
+          break;
+        }
+        sanitized += " ";
+        index += 1;
+      }
+      continue;
+    }
+
+    sanitized += char;
+    index += 1;
+  }
+
+  return sanitized;
+}
+
+/**
+ * Collapses Python explicit line continuations (`\` at the end of a physical
+ * line) into spaces so a statement split across lines is matched as one logical
+ * line. This must run after comments/strings are stripped, where a trailing
+ * backslash can only be a continuation, otherwise `import \<newline>socket`
+ * would slip past the line-oriented network rule (which the old bare-keyword
+ * pattern caught) and also defeats reflective imports via string operands.
+ */
+function collapsePythonLineContinuations(code: string): string {
+  return code.replace(/\\\r?\n/g, "  ");
+}
+
+/**
+ * Python-rule pre-processing: strip comments/strings, then join explicit line
+ * continuations. Every Python rule uses this so a keyword hidden in a comment
+ * or string is ignored, and a blocked keyword cannot be split across lines.
+ */
+function sanitizePythonCode(code: string): string {
+  return collapsePythonLineContinuations(stripPythonCommentsAndStrings(code));
+}
+
+// Matches real Python network module usage after comments/strings are stripped:
+// module names anywhere in an import list (e.g. `import os, socket`,
+// `from http import client`) and attribute access (`requests.get`, `http.client`).
+const PYTHON_NETWORK_PATTERN =
+  /\b(?:import|from)\s+[^\n]*\b(?:socket|urllib|requests|http)\b|\b(?:socket|urllib|requests)\s*\.|\bhttp\.client\b/i;
+
 const pythonRules: PatternRule[] = [
-  { rule: "python-js-bridge", pattern: /^\s*(from\s+js\s+import|import\s+js\b)/im, message: "The Pyodide JavaScript bridge is disabled in beginner Python lessons." },
-  { rule: "python-package-install", pattern: /\b(micropip|pyodide)\b/i, message: "Package installation/runtime control is disabled in beginner Python lessons." },
-  { rule: "python-process", pattern: /\b(subprocess|os\.system|shutil|pathlib)\b/i, message: "Process and filesystem helpers are disabled in beginner Python lessons." },
-  { rule: "python-network", pattern: /\b(socket|urllib|requests|http\.client)\b/i, message: "Python network modules are disabled in beginner sandboxes." },
-  { rule: "python-dynamic-code", pattern: /\b(eval|exec|__import__)\s*\(/, message: "Dynamic Python execution is disabled in learner submissions." },
-  { rule: "python-file-io", pattern: /\bopen\s*\(/, message: "File I/O is disabled; use the in-memory inputs provided by the lesson." },
-  { rule: "python-infinite-loop", pattern: /while\s+True\s*:/, message: "Obvious infinite loops are blocked before execution." }
+  { rule: "python-js-bridge", pattern: /^\s*(from\s+js\s+import|import\s+js\b)/im, message: "The Pyodide JavaScript bridge is disabled in beginner Python lessons.", sanitize: sanitizePythonCode },
+  { rule: "python-package-install", pattern: /\b(micropip|pyodide)\b/i, message: "Package installation/runtime control is disabled in beginner Python lessons.", sanitize: sanitizePythonCode },
+  { rule: "python-process", pattern: /\b(subprocess|os\.system|shutil|pathlib)\b/i, message: "Process and filesystem helpers are disabled in beginner Python lessons.", sanitize: sanitizePythonCode },
+  { rule: "python-network", pattern: PYTHON_NETWORK_PATTERN, message: "Python network modules are disabled in beginner sandboxes.", sanitize: sanitizePythonCode },
+  { rule: "python-dynamic-import", pattern: /\b(importlib|import_module)\b/, message: "Dynamic Python imports are disabled in learner submissions.", sanitize: sanitizePythonCode },
+  // Bare names (not just `name(`) so rebinding first — `e = eval; e(...)` — is
+  // still caught. Sanitized so a keyword inside a comment/string is ignored.
+  { rule: "python-dynamic-code", pattern: /\b(eval|exec|compile|__import__)\b/, message: "Dynamic Python execution is disabled in learner submissions.", sanitize: sanitizePythonCode },
+  // Reflective access to the import machinery (`getattr(builtins, '__import__')`,
+  // `vars(builtins)['__import__']`) that the sanitized network rule can no longer
+  // see because the module name lives inside a string literal.
+  { rule: "python-builtins-access", pattern: /\b(builtins|__builtins__)\b/, message: "Reflective access to Python builtins is disabled in learner submissions.", sanitize: sanitizePythonCode },
+  { rule: "python-file-io", pattern: /\bopen\s*\(/, message: "File I/O is disabled; use the in-memory inputs provided by the lesson.", sanitize: sanitizePythonCode },
+  { rule: "python-infinite-loop", pattern: /while\s+True\s*:/, message: "Obvious infinite loops are blocked before execution.", sanitize: sanitizePythonCode }
 ];
 
+/**
+ * Faithful SQL tokenizer that blanks comments and all quoted regions so keyword
+ * rules match executable statements rather than words inside comments or quoted
+ * data. It understands line comments, block comments, single-quoted strings
+ * (`''` escapes), double-quoted identifiers (`""` escapes), backtick
+ * identifiers (doubled backtick escapes), and `[...]` identifiers (which SQLite
+ * closes at the first `]`).
+ * Because each quoted region is consumed as a unit, a single quote inside a
+ * double-quoted/backtick/bracketed identifier cannot swallow a following
+ * statement. Real statements keep their keywords outside those regions, so
+ * `UPDATE t SET x = 'DROP'` is still blocked while `SELECT 'DROP'` and
+ * `SELECT "DROP"` are not.
+ */
+function stripSqlCommentsAndStrings(code: string): string {
+  let sanitized = "";
+  let index = 0;
+
+  const blankChar = (char: string): string => (char === "\n" ? "\n" : " ");
+
+  const blankComment = (): void => {
+    // Already positioned after the opening delimiter; consume to the closer (or EOF).
+    while (index < code.length) {
+      if (code[index] === "*" && code[index + 1] === "/") {
+        sanitized += "  ";
+        index += 2;
+        return;
+      }
+      sanitized += blankChar(code[index]);
+      index += 1;
+    }
+  };
+
+  const blankQuoted = (quote: string, escapeDoubled: boolean): void => {
+    while (index < code.length) {
+      if (code[index] === quote) {
+        if (escapeDoubled && code[index + 1] === quote) {
+          sanitized += "  ";
+          index += 2;
+          continue;
+        }
+        sanitized += " ";
+        index += 1;
+        return;
+      }
+      sanitized += blankChar(code[index]);
+      index += 1;
+    }
+  };
+
+  while (index < code.length) {
+    const char = code[index];
+    const next = code[index + 1];
+
+    if (char === "-" && next === "-") {
+      sanitized += "  ";
+      index += 2;
+      while (index < code.length && code[index] !== "\n") {
+        sanitized += " ";
+        index += 1;
+      }
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      sanitized += "  ";
+      index += 2;
+      blankComment();
+      continue;
+    }
+
+    if (char === "'") {
+      sanitized += " ";
+      index += 1;
+      blankQuoted("'", true);
+      continue;
+    }
+
+    if (char === '"') {
+      sanitized += " ";
+      index += 1;
+      blankQuoted('"', true);
+      continue;
+    }
+
+    if (char === "`") {
+      sanitized += " ";
+      index += 1;
+      blankQuoted("`", true);
+      continue;
+    }
+
+    if (char === "[") {
+      // SQLite closes a bracket identifier at the first `]` (unlike `""`/`` `` ``,
+      // `]]` is not an escape), so match that exactly to avoid swallowing a
+      // following statement that SQLite would still execute.
+      sanitized += " ";
+      index += 1;
+      blankQuoted("]", false);
+      continue;
+    }
+
+    sanitized += char;
+    index += 1;
+  }
+
+  return sanitized;
+}
+
 const sqlRules: PatternRule[] = [
-  { rule: "sql-attach", pattern: /\b(ATTACH|DETACH)\b/i, message: "Attaching external databases is disabled." },
-  { rule: "sql-extension", pattern: /\b(load_extension|CREATE\s+VIRTUAL\s+TABLE)\b/i, message: "SQLite extensions and virtual tables are disabled." },
-  { rule: "sql-mutation", pattern: /\b(DROP|DELETE|UPDATE|INSERT|ALTER|REPLACE|VACUUM|PRAGMA)\b/i, message: "Learner SQL sandboxes are read-only; write statements are disabled." }
+  { rule: "sql-attach", pattern: /\b(ATTACH|DETACH)\b/i, message: "Attaching external databases is disabled.", sanitize: stripSqlCommentsAndStrings },
+  { rule: "sql-extension", pattern: /\b(load_extension|CREATE\s+VIRTUAL\s+TABLE)\b/i, message: "SQLite extensions and virtual tables are disabled.", sanitize: stripSqlCommentsAndStrings },
+  { rule: "sql-mutation", pattern: /\b(DROP|DELETE|UPDATE|INSERT|ALTER|REPLACE|VACUUM|PRAGMA)\b/i, message: "Learner SQL sandboxes are read-only; write statements are disabled.", sanitize: stripSqlCommentsAndStrings }
 ];
 
 function rulesForLanguage(language: LessonRunnerSpec["language"]): PatternRule[] {
@@ -68,7 +299,8 @@ export function validateSandboxSubmission(spec: LessonRunnerSpec, code: string):
   }
 
   for (const rule of rulesForLanguage(spec.language)) {
-    if (rule.pattern.test(code)) {
+    const subject = rule.sanitize ? rule.sanitize(code) : code;
+    if (rule.pattern.test(subject)) {
       violations.push({
         rule: rule.rule,
         message: rule.message

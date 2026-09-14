@@ -151,13 +151,14 @@ export const level0Lessons: Lesson[] = [
     requiredCodeIncludes: ["print"],
     requiredOutputIncludes: ["first run"],
     runnerLanguage: "python",
-    runnerStarterCode: "# Write code to print first run\nprint(\"first run\")",
-    runnerTestCode: "print('first run')",
+    runnerStarterCode: "# Write code to print first run\n# TODO: add a print statement below that prints: first run\n",
+    runnerTestCode: "# Proof check: the verifier reads your script's own printed output and\n# looks for the phrase 'first run'. This check prints nothing itself, so the\n# phrase can only come from your code.",
     hiddenTests: [
       {
         id: "check-first-run-hidden",
         name: "Check first run output exists",
-        code: "import sys; assert 'first run' in sys.stdout.getvalue(), 'Expected first run to be printed'"
+        code: "# The learner's script is exec'd like an import before this check runs, so its\n# print output is already captured by the verifier. This hidden check prints\n# nothing itself, so it fails unless the learner's own code printed the phrase.",
+        expectedOutputIncludes: ["first run"]
       }
     ]
   }),
@@ -208,13 +209,14 @@ export const level0Lessons: Lesson[] = [
     requiredCodeIncludes: ["print"],
     requiredOutputIncludes: ["rerun success"],
     runnerLanguage: "python",
-    runnerStarterCode: "# Write print statement for rerun success\nprint(\"rerun success\")",
-    runnerTestCode: "print('rerun success')",
+    runnerStarterCode: "# Change the printed string to: rerun success\nprint(\"hello\")",
+    runnerTestCode: "# Proof check: the verifier reads your script's own printed output and\n# looks for the phrase 'rerun success'. This check prints nothing itself, so\n# the phrase can only come from your edited code.",
     hiddenTests: [
       {
         id: "check-rerun-hidden",
         name: "Check rerun success is present",
-        code: "import sys; assert 'rerun success' in sys.stdout.getvalue(), 'Expected rerun success to be printed'"
+        code: "# The learner's script is exec'd like an import before this check runs, so its\n# print output is already captured by the verifier. This hidden check prints\n# nothing itself, so it fails unless the learner's edited code printed the phrase.",
+        expectedOutputIncludes: ["rerun success"]
       }
     ]
   }),
@@ -266,13 +268,14 @@ export const level0Lessons: Lesson[] = [
     requiredCodeIncludes: ["print"],
     requiredOutputIncludes: ["fixed syntax"],
     runnerLanguage: "python",
-    runnerStarterCode: "# Fix error by closing the quotes\nprint(\"fixed syntax\")",
-    runnerTestCode: "print('fixed syntax')",
+    runnerStarterCode: "# Fix error by closing the quotes\nprint(\"fixed syntax)",
+    runnerTestCode: "# Proof check: the verifier reads your script's own printed output and\n# looks for the phrase 'fixed syntax'. This check prints nothing itself, and\n# it only runs once the syntax error is gone.",
     hiddenTests: [
       {
         id: "check-fixed-syntax-hidden",
         name: "Check syntax error is fixed",
-        code: "import sys; assert 'fixed syntax' in sys.stdout.getvalue(), 'Expected fixed syntax to be printed'"
+        code: "# The learner's script is exec'd like an import before this check runs. While\n# the quote is still unclosed the file cannot even run, and after the fix this\n# hidden check prints nothing itself, so the phrase must come from the learner's code.",
+        expectedOutputIncludes: ["fixed syntax"]
       }
     ]
   })

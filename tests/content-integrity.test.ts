@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { roleTargets } from "@/content/roles";
 import { contentPack } from "@/content/seed";
+import { conceptRegistry } from "@/content/concepts";
 import { contentPackSchema, roleTargetSchema } from "@/domain/schemas";
-import { validateContent } from "../scripts/validate-content";
+import { validateSandboxSubmission } from "@/sandbox/policy";
+import {
+  findDangerousRunnerStatement,
+  findUnsafeRunnerSqlErrors,
+  setupCodeAllowedLessonIds,
+  supportingConceptAllowList,
+  validateContent
+} from "../scripts/validate-content";
 
 describe("content pack", () => {
   it("matches the schema", () => {
@@ -67,7 +75,14 @@ describe("content pack", () => {
         && check.checkPrompt.length >= 50
       ))).toBe(true);
       expect(lesson.workshop.miniProject.tester.requiredOutputIncludes.length).toBeGreaterThan(0);
-      expect(lesson.workshop.miniProject.tester.forbiddenOutputIncludes).toContain("traceback");
+      const forbiddenOutputIncludes = lesson.workshop.miniProject.tester.forbiddenOutputIncludes;
+      expect(forbiddenOutputIncludes.length).toBeGreaterThan(0);
+      // The read-traceback lesson deliberately asks the learner to print a
+      // readable NameError line, so it intentionally drops the generic
+      // "error:"/"traceback" terms that would block the correct output.
+      if (lesson.id !== "lesson-python-read-traceback") {
+        expect(forbiddenOutputIncludes).toContain("traceback");
+      }
       expect(lesson.workshop.miniProject.runnerSpec.allowNetwork).toBe(false);
       expect(lesson.workshop.miniProject.runnerSpec.visibleTests.length).toBeGreaterThan(0);
       expect(lesson.workshop.miniProject.runnerSpec.timeoutMs).toBeGreaterThan(0);
@@ -180,5 +195,497 @@ describe("content pack", () => {
   it("passes all static integrity rules (Groups A-G)", () => {
     const errors = validateContent();
     expect(errors).toEqual([]);
+  });
+});
+
+describe("structural invariants", () => {
+  const registeredConceptIds = new Set(conceptRegistry.map((concept) => concept.id));
+
+  // Module-python lessons that intentionally run in a non-Python sandbox (or are
+  // concept-only simulations). Used by the sandbox-language test below.
+  const documentedSimulations = new Set([
+    "lesson-python-portfolio-proof",
+    "lesson-python-sqlite-persistence",
+    "lesson-python-env-config",
+    "lesson-python-ci-workflow",
+    "lesson-python-secrets-management",
+    "lesson-python-deployment-strategies",
+    "lesson-python-monitoring-basics"
+  ]);
+
+  function collectConceptIds(collect: (push: (id: string) => void) => void): string[] {
+    const ids: string[] = [];
+    collect((id) => ids.push(id));
+    return ids;
+  }
+
+  it("resolves every referenced concept id against the registry", () => {
+    const dangling: string[] = [];
+
+    for (const lesson of contentPack.lessons) {
+      const curriculum = lesson.curriculum;
+      if (curriculum) {
+        const curriculumIds = collectConceptIds((push) => {
+          for (const id of curriculum.teaches) push(id);
+          for (const id of curriculum.requires) push(id);
+          for (const id of curriculum.reinforces ?? []) push(id);
+          for (const id of curriculum.visibleCodeConcepts ?? []) push(id);
+          for (const id of curriculum.usesButDoesNotTeach ?? []) push(id);
+          for (const id of curriculum.quizConcepts ?? []) push(id);
+        });
+        for (const id of curriculumIds) {
+          if (!registeredConceptIds.has(id)) dangling.push(`lesson ${lesson.id} references unknown concept '${id}'`);
+        }
+      }
+
+      const depth = lesson.depth;
+      if (depth) {
+        const depthIds = collectConceptIds((push) => {
+          push(depth.primaryConceptId);
+          for (const id of depth.secondaryConceptIds) push(id);
+          for (const capsule of depth.conceptCapsules) push(capsule.conceptId);
+          for (const note of depth.codeWalkthrough) for (const id of note.conceptIds) push(id);
+          for (const edit of depth.guidedEdits) for (const id of edit.conceptIds) push(id);
+          for (const clinic of depth.errorClinic) for (const id of clinic.conceptIds) push(id);
+          for (const id of depth.codeLabBridge.usesConcepts) push(id);
+        });
+        for (const id of depthIds) {
+          if (!registeredConceptIds.has(id)) dangling.push(`lesson ${lesson.id} depth references unknown concept '${id}'`);
+        }
+      }
+    }
+
+    for (const quiz of contentPack.quizzes) {
+      for (const question of quiz.questions) {
+        for (const id of question.conceptIds ?? []) {
+          if (!registeredConceptIds.has(id)) dangling.push(`quiz ${quiz.id} question ${question.id} references unknown concept '${id}'`);
+        }
+      }
+    }
+
+    expect(dangling).toEqual([]);
+
+    // Rule Group L scope (Issue #8, CLAUDE.md Content Integrity Rule 5):
+    // conceptIds are required for exactly the quizzes of depth-bearing lessons.
+    // scripts/validate-content.ts enforces this inside its `if (!lesson.depth)
+    // continue` loop, so depth-less quizzes -- notably the 36 inline non-Python
+    // (TypeScript/SQL/Git/AI/ML) questions assembled in seed.ts -- are
+    // intentionally out of scope rather than force-mapped to an invented
+    // taxonomy. Keep this assertion in lockstep with that validator gate.
+    const missingConceptMappings: string[] = [];
+    const lessonById = new Map(contentPack.lessons.map((lesson) => [lesson.id, lesson]));
+    for (const quiz of contentPack.quizzes) {
+      if (!lessonById.get(quiz.lessonId)?.depth) continue;
+      for (const question of quiz.questions) {
+        if (!question.conceptIds || question.conceptIds.length === 0) {
+          missingConceptMappings.push(`quiz ${quiz.id} question ${question.id} lacks conceptIds`);
+        }
+      }
+    }
+
+    expect(missingConceptMappings).toEqual([]);
+  });
+
+  it("keeps the concept registry free of orphans and contradictory usesButDoesNotTeach declarations", () => {
+    // Mirrors Rule Group P in scripts/validate-content.ts (Issue #7).
+    const supportingConceptIds = new Set(supportingConceptAllowList);
+
+    // A registry entry is superseded/deprecated when another entry lists it in
+    // `aliases` (for example py.open.read -> py.file.input), so it is exempt.
+    const aliasTargets = new Set<string>();
+    for (const concept of conceptRegistry) {
+      for (const alias of concept.aliases ?? []) aliasTargets.add(alias);
+    }
+
+    const taughtByActiveLesson = new Set<string>();
+    const metadataReferenced = new Set<string>();
+    for (const lesson of contentPack.lessons) {
+      const curriculum = lesson.curriculum;
+      const depth = lesson.depth;
+      if (curriculum?.deprecated) continue;
+      if (curriculum) {
+        for (const id of curriculum.teaches) taughtByActiveLesson.add(id);
+        for (const id of curriculum.requires) metadataReferenced.add(id);
+        for (const id of curriculum.reinforces ?? []) metadataReferenced.add(id);
+        for (const id of curriculum.usesButDoesNotTeach ?? []) metadataReferenced.add(id);
+        for (const id of curriculum.visibleCodeConcepts ?? []) metadataReferenced.add(id);
+        for (const id of curriculum.quizConcepts ?? []) metadataReferenced.add(id);
+      }
+      if (depth) {
+        metadataReferenced.add(depth.primaryConceptId);
+        for (const id of depth.secondaryConceptIds) metadataReferenced.add(id);
+        for (const capsule of depth.conceptCapsules) metadataReferenced.add(capsule.conceptId);
+        for (const note of depth.codeWalkthrough) for (const id of note.conceptIds) metadataReferenced.add(id);
+        for (const edit of depth.guidedEdits) for (const id of edit.conceptIds) metadataReferenced.add(id);
+        for (const clinic of depth.errorClinic) for (const id of clinic.conceptIds) metadataReferenced.add(id);
+        for (const id of depth.codeLabBridge.usesConcepts) metadataReferenced.add(id);
+        for (const id of depth.codeLabBridge.verifierOnlyConcepts ?? []) metadataReferenced.add(id);
+      }
+    }
+    for (const quiz of contentPack.quizzes) {
+      for (const question of quiz.questions) {
+        for (const id of question.conceptIds ?? []) metadataReferenced.add(id);
+      }
+    }
+
+    const orphans = conceptRegistry
+      .filter((concept) => !aliasTargets.has(concept.id))
+      .filter((concept) => !taughtByActiveLesson.has(concept.id))
+      .filter((concept) => !metadataReferenced.has(concept.id))
+      .filter((concept) => !supportingConceptIds.has(concept.id))
+      .map((concept) => concept.id);
+    expect(orphans).toEqual([]);
+
+    // The allow-list must stay meaningful: every entry is a real registry concept.
+    const unknownAllowedConcepts = supportingConceptAllowList.filter((id) => !registeredConceptIds.has(id));
+    expect(unknownAllowedConcepts).toEqual([]);
+
+    // usesButDoesNotTeach must not claim a concept is untaught when an earlier
+    // lesson at the same curriculum level already taught it.
+    const orderedLessonsByTrack = new Map<string, string[]>();
+    for (const track of contentPack.tracks) {
+      const ordered: string[] = [];
+      const modules = contentPack.modules
+        .filter((moduleItem) => moduleItem.trackId === track.id)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      for (const moduleItem of modules) {
+        for (const lessonId of moduleItem.lessonIds) ordered.push(lessonId);
+      }
+      orderedLessonsByTrack.set(track.id, ordered);
+    }
+    const lessonById = new Map(contentPack.lessons.map((lesson) => [lesson.id, lesson]));
+    const conflicts: string[] = [];
+    for (const lesson of contentPack.lessons) {
+      const curriculum = lesson.curriculum;
+      if (curriculum?.deprecated || !curriculum?.usesButDoesNotTeach?.length) continue;
+      const moduleItem = contentPack.modules.find((candidate) => candidate.id === lesson.moduleId);
+      if (!moduleItem) continue;
+      const ordered = orderedLessonsByTrack.get(moduleItem.trackId) ?? [];
+      const lessonIndex = ordered.indexOf(lesson.id);
+      if (lessonIndex < 0) continue;
+      const taughtEarlierAtSameLevel = new Set<string>();
+      for (let i = 0; i < lessonIndex; i++) {
+        const earlier = lessonById.get(ordered[i]);
+        if (!earlier?.curriculum || earlier.curriculum.deprecated) continue;
+        if (earlier.curriculum.level !== curriculum.level) continue;
+        for (const id of earlier.curriculum.teaches) taughtEarlierAtSameLevel.add(id);
+      }
+      for (const id of curriculum.usesButDoesNotTeach) {
+        if (taughtEarlierAtSameLevel.has(id)) {
+          conflicts.push(
+            `${lesson.id} lists ${id} in usesButDoesNotTeach but an earlier level-${curriculum.level} lesson already taught it`
+          );
+        }
+      }
+    }
+    expect(conflicts).toEqual([]);
+  });
+
+  it("keeps track and module containment bidirectional", () => {
+    const moduleById = new Map(contentPack.modules.map((moduleItem) => [moduleItem.id, moduleItem]));
+    const problems: string[] = [];
+
+    for (const track of contentPack.tracks) {
+      for (const moduleId of track.moduleIds) {
+        const moduleItem = moduleById.get(moduleId);
+        if (!moduleItem) {
+          problems.push(`track ${track.id} lists missing module '${moduleId}'`);
+        } else if (moduleItem.trackId !== track.id) {
+          problems.push(`track ${track.id} lists module '${moduleId}' whose trackId is '${moduleItem.trackId}'`);
+        }
+      }
+    }
+
+    for (const moduleItem of contentPack.modules) {
+      const track = contentPack.tracks.find((candidate) => candidate.id === moduleItem.trackId);
+      if (!track) {
+        problems.push(`module ${moduleItem.id} points at missing track '${moduleItem.trackId}'`);
+      } else if (!track.moduleIds.includes(moduleItem.id)) {
+        problems.push(`module ${moduleItem.id} is missing from track ${moduleItem.trackId}.moduleIds`);
+      }
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  it("has an acyclic concept-prerequisite graph (requires -> teaches)", () => {
+    const nodes = new Set<string>();
+    const edges = new Map<string, string[]>();
+    const indegree = new Map<string, number>();
+
+    for (const lesson of contentPack.lessons) {
+      if (lesson.curriculum?.deprecated) continue;
+      for (const requiredId of lesson.curriculum?.requires ?? []) nodes.add(requiredId);
+      for (const taughtId of lesson.curriculum?.teaches ?? []) nodes.add(taughtId);
+    }
+    for (const node of nodes) {
+      edges.set(node, []);
+      indegree.set(node, 0);
+    }
+
+    for (const lesson of contentPack.lessons) {
+      if (lesson.curriculum?.deprecated) continue;
+      for (const requiredId of lesson.curriculum?.requires ?? []) {
+        for (const taughtId of lesson.curriculum?.teaches ?? []) {
+          if (requiredId === taughtId) continue;
+          edges.get(requiredId)?.push(taughtId);
+          indegree.set(taughtId, (indegree.get(taughtId) ?? 0) + 1);
+        }
+      }
+    }
+
+    let queue = [...nodes].filter((node) => (indegree.get(node) ?? 0) === 0);
+    let drained = 0;
+    while (queue.length > 0) {
+      const next: string[] = [];
+      for (const node of queue) {
+        drained++;
+        for (const neighbor of edges.get(node) ?? []) {
+          indegree.set(neighbor, (indegree.get(neighbor) ?? 0) - 1);
+          if (indegree.get(neighbor) === 0) next.push(neighbor);
+        }
+      }
+      queue = next;
+    }
+
+    const stuck = [...nodes].filter((node) => (indegree.get(node) ?? 0) > 0);
+    expect(drained).toBe(nodes.size);
+    expect(stuck).toEqual([]);
+  });
+
+  it("keeps required lesson code inside the sandbox policy", () => {
+    const violations: string[] = [];
+    let scannedLessons = 0;
+
+    for (const lesson of contentPack.lessons) {
+      if (lesson.curriculum?.deprecated) continue;
+      scannedLessons++;
+      const spec = lesson.workshop.miniProject.runnerSpec;
+      const requiredLines = lesson.workshop.miniProject.tester.requiredCodeIncludes;
+      // Practice code is run through the same sandbox as the runner spec
+      // (app/lesson/[lessonId].tsx handleRunPractice), so the policy must accept
+      // it too. Include the practice starter and every practice rep.
+      const practiceCodes = [
+        lesson.workshop.practice.starterCode,
+        ...(lesson.workshop.practiceReps ?? []).map((practiceRep) => practiceRep.starterCode)
+      ];
+      const submission = [spec.starterCode, ...requiredLines, ...practiceCodes].join("\n");
+      for (const violation of validateSandboxSubmission(spec, submission)) {
+        violations.push(`lesson ${lesson.id} [${spec.language}] violates ${violation.rule}: ${violation.message}`);
+      }
+    }
+
+    expect(scannedLessons).toBeGreaterThan(0);
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps privileged runner setupCode to vetted schema-and-seed lessons", () => {
+    // setupCode runs WITHOUT the sandbox policy checks that gate learner code
+    // (see src/sandbox/runner.ts). Rule Group O in scripts/validate-content.ts
+    // owns both the allow-list and the dangerous-operation pattern; this test
+    // reuses those exports so the invariant cannot drift from the validator.
+    const problems: string[] = [];
+    let setupCodeLessons = 0;
+    let sqlCheckHarnesses = 0;
+
+    for (const lesson of contentPack.lessons) {
+      const runnerSpec = lesson.workshop.miniProject.runnerSpec;
+      const setupCode = runnerSpec.setupCode;
+      if (setupCode && setupCode.trim().length > 0) {
+        setupCodeLessons++;
+        if (!setupCodeAllowedLessonIds.has(lesson.id)) {
+          problems.push(`lesson ${lesson.id} defines privileged setupCode but is not on the validator allow-list`);
+        }
+        const dangerous = findDangerousRunnerStatement(setupCode);
+        if (dangerous) {
+          problems.push(`lesson ${lesson.id} setupCode contains non-schema/seed statement '${dangerous}'`);
+        }
+      }
+
+      // A SQL check's `code` is privileged harness SQL too: it runs before the
+      // learner query, outside the sandbox policy gate. Mirror Rule Group O's
+      // schema-and-seed requirement so a dangerous harness cannot ship.
+      if (runnerSpec.language !== "sql") continue;
+      for (const test of [...runnerSpec.visibleTests, ...runnerSpec.hiddenTests]) {
+        if (!test.code || test.code.trim().length === 0) continue;
+        sqlCheckHarnesses++;
+        const dangerous = findDangerousRunnerStatement(test.code);
+        if (dangerous) {
+          problems.push(`lesson ${lesson.id} SQL check '${test.id}' code contains non-schema/seed statement '${dangerous}'`);
+        }
+      }
+    }
+
+    expect(setupCodeLessons).toBeGreaterThan(0);
+    expect(sqlCheckHarnesses).toBeGreaterThan(0);
+    expect(problems).toEqual([]);
+
+    // The allow-list must stay tight: every vetted lesson actually ships setupCode,
+    // so stale permissions are caught rather than silently accumulating.
+    const allowlistedWithoutSetupCode = [...setupCodeAllowedLessonIds].filter((lessonId) => {
+      const lesson = contentPack.lessons.find((candidate) => candidate.id === lessonId);
+      return !lesson?.workshop.miniProject.runnerSpec.setupCode?.trim();
+    });
+    expect(allowlistedWithoutSetupCode).toEqual([]);
+  });
+
+  it("rejects dangerous trusted SQL harness code in runner checks (negative fixture)", () => {
+    // Negative fixture: Rule Group O must fail closed on privileged harness SQL.
+    // These crafted strings stand in for a malicious content pack, so the rule is
+    // proven to reject bad input rather than merely passing the real content.
+    const rejected: Array<[string, string]> = [
+      ["DROP TABLE sessions;", "DROP"],
+      ["  -- seed then destroy\nDROP TABLE sessions;", "DROP"],
+      ["UPDATE sessions SET minutes = 0;", "UPDATE"],
+      ["DELETE FROM sessions;", "DELETE"],
+      ["ALTER TABLE sessions ADD COLUMN hidden TEXT;", "ALTER"],
+      ["PRAGMA table_info(sessions);", "PRAGMA"],
+      ["ATTACH DATABASE 'evil.db' AS evil;", "ATTACH"],
+      ["DETACH DATABASE evil;", "DETACH"],
+      ["VACUUM;", "VACUUM"],
+      ["REINDEX;", "REINDEX"],
+      ["ANALYZE;", "ANALYZE"],
+      ["CREATE VIRTUAL TABLE fts USING fts5(topic);", "CREATE VIRTUAL TABLE"],
+      ["CREATE TRIGGER t AFTER INSERT ON sessions BEGIN SELECT 1; END;", "CREATE TRIGGER"],
+      ["CREATE TEMP TRIGGER t AFTER INSERT ON sessions BEGIN SELECT 1; END;", "CREATE TEMP TRIGGER"],
+      ["CREATE TEMPORARY TRIGGER t AFTER INSERT ON sessions BEGIN SELECT 1; END;", "CREATE TEMPORARY TRIGGER"],
+      ["REPLACE INTO sessions VALUES (1);", "REPLACE INTO"],
+      ["INSERT INTO sessions VALUES (1); DROP TABLE sessions;", "DROP"]
+    ];
+
+    for (const [code, expectedOperator] of rejected) {
+      expect(findDangerousRunnerStatement(code)).toBe(expectedOperator);
+    }
+
+    // Schema + seed harnesses and legacy non-SQL markers must be allowed, and
+    // keywords inside seed literals/comments must not false-positive.
+    const allowed = [
+      "INSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-04', 'sql', 45);",
+      "-- Trusted harness SQL: seed an unseen topic\nINSERT INTO sessions (date, topic, minutes) VALUES ('2026-06-04', 'sql', 45);",
+      "CREATE TABLE IF NOT EXISTS seed (topic TEXT);\nINSERT INTO seed VALUES ('sql');",
+      "INSERT INTO sessions (topic) VALUES ('delete my notes');",
+      "-- UPDATE nothing here\nINSERT INTO sessions (topic) VALUES ('sql');",
+      "CREATE TABLE t (note TEXT DEFAULT 'drop me');",
+      "SELECT 1;",
+      "WITH seed AS (SELECT 1 AS n) SELECT n FROM seed;",
+      "EXPECT_ROWS:no evidence",
+      "-- visible check runs no harness SQL",
+      ""
+    ];
+
+    for (const code of allowed) {
+      expect(findDangerousRunnerStatement(code)).toBeNull();
+    }
+
+    // Belt-and-braces: the real content must satisfy the same predicate.
+    for (const lesson of contentPack.lessons) {
+      const runnerSpec = lesson.workshop.miniProject.runnerSpec;
+      if (runnerSpec.language !== "sql") continue;
+      for (const test of [...runnerSpec.visibleTests, ...runnerSpec.hiddenTests]) {
+        expect(findDangerousRunnerStatement(test.code)).toBeNull();
+      }
+    }
+
+    // Prove the actual Rule Group O guard fails closed on a crafted lesson whose
+    // SQL check harness is destructive (a whole malicious pack cannot be
+    // injected because validateContent reads the shipped pack).
+    const craftedErrors = findUnsafeRunnerSqlErrors("lesson-crafted-evil", {
+      language: "sql",
+      visibleTests: [{ id: "visible", code: "SELECT 1;" }],
+      hiddenTests: [{ id: "hidden", code: "DROP TABLE sessions;" }]
+    });
+    expect(craftedErrors).toHaveLength(1);
+    expect(craftedErrors[0]).toContain("lesson-crafted-evil");
+    expect(craftedErrors[0]).toContain("hidden");
+    expect(craftedErrors[0]).toContain("DROP");
+
+    // Non-SQL specs and safe SQL harnesses produce no errors.
+    expect(findUnsafeRunnerSqlErrors("lesson-crafted-safe", {
+      language: "sql",
+      visibleTests: [{ id: "visible", code: "EXPECT_ROWS:no evidence" }],
+      hiddenTests: [{ id: "hidden", code: "-- seed\nINSERT INTO sessions (topic) VALUES ('sql');" }]
+    })).toEqual([]);
+    expect(findUnsafeRunnerSqlErrors("lesson-crafted-js", {
+      language: "javascript",
+      visibleTests: [{ id: "visible", code: "DROP TABLE sessions;" }],
+      hiddenTests: []
+    })).toEqual([]);
+  });
+
+  it("runs module-python lessons in the python sandbox except documented simulations", () => {
+    const problems: string[] = [];
+    let allowlistedFound = 0;
+
+    for (const lesson of contentPack.lessons) {
+      if (!lesson.moduleId.startsWith("module-python-")) continue;
+      if (documentedSimulations.has(lesson.id)) {
+        allowlistedFound++;
+        continue;
+      }
+      const language = lesson.workshop.miniProject.runnerSpec.language;
+      if (language !== "python") {
+        problems.push(`lesson ${lesson.id} runs in '${language}' sandbox but is not in the documented simulation allowlist`);
+      }
+    }
+
+    expect(allowlistedFound).toBe(documentedSimulations.size);
+    expect(problems).toEqual([]);
+  });
+
+  it("keeps quiz answer positions unbiased (no quiz >=80% at one index)", () => {
+    const biased: string[] = [];
+
+    for (const quiz of contentPack.quizzes) {
+      if (quiz.questions.length < 3) continue;
+      const counts = new Map<number, number>();
+      for (const question of quiz.questions) {
+        counts.set(question.correctChoiceIndex, (counts.get(question.correctChoiceIndex) ?? 0) + 1);
+      }
+      const maxCount = Math.max(...counts.values());
+      // Mirror scripts/validate-content.ts:1192, which warns when a single answer
+      // position holds >= 80% of a quiz's questions. Staying at least as strict as
+      // the validator keeps this invariant honest instead of trailing it.
+      if (maxCount / quiz.questions.length >= 0.8) {
+        biased.push(`${quiz.id}: ${maxCount}/${quiz.questions.length} questions share one correctChoiceIndex`);
+      }
+    }
+
+    expect(biased).toEqual([]);
+  });
+
+  it("gives every quiz at least three questions and a passingScore that tolerates one miss", () => {
+    const problems: string[] = [];
+
+    for (const quiz of contentPack.quizzes) {
+      const questionCount = quiz.questions.length;
+      if (questionCount < 3) {
+        problems.push(`quiz ${quiz.id} has only ${questionCount} questions`);
+      }
+      if (quiz.passingScore > 100) {
+        problems.push(`quiz ${quiz.id} passingScore ${quiz.passingScore} exceeds 100`);
+      }
+      if (questionCount === 0) continue;
+
+      // Replay the real grading in src/domain/progress.ts submitQuizAttempt:
+      // score = Math.round((correct / questionCount) * 100), passed = score >= passingScore.
+      // Find the smallest number of correct answers that actually passes.
+      let requiredCorrect = -1;
+      for (let correct = 0; correct <= questionCount; correct++) {
+        if (Math.round((correct / questionCount) * 100) >= quiz.passingScore) {
+          requiredCorrect = correct;
+          break;
+        }
+      }
+
+      if (requiredCorrect < 1) {
+        problems.push(`quiz ${quiz.id} can be passed with 0 correct answers (passingScore ${quiz.passingScore})`);
+      } else if (requiredCorrect > questionCount - 1) {
+        problems.push(
+          `quiz ${quiz.id} passingScore ${quiz.passingScore} needs a perfect ${requiredCorrect}/${questionCount}; a learner cannot miss even one question`
+        );
+      }
+    }
+
+    expect(problems).toEqual([]);
   });
 });

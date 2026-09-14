@@ -1,5 +1,6 @@
 import { normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
 import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec } from "@/domain/types";
+import { PYTHON_DIRECT_RUN_NAME, PYTHON_IMPORT_RUN_NAME, SQL_HARNESS_PATTERN } from "./runner";
 
 export interface NativeWebViewRunnerRequest {
   lessonId: string;
@@ -15,6 +16,15 @@ export const SANDBOX_ASSET_PATHS = {
 } as const;
 
 export const NATIVE_ANDROID_SANDBOX_BASE_URL = "file:///android_asset/";
+
+/**
+ * The trusted-harness gate mirrored by the embedded WebView script. The web
+ * runner (`src/sandbox/runner.ts`) and the native script both derive this from
+ * the shared `SQL_HARNESS_PATTERN` so the two cannot drift.
+ */
+export function nativeWebViewTrustedSqlHarness(code: string): boolean {
+  return SQL_HARNESS_PATTERN.test(code);
+}
 
 export interface NativeWebViewRunnerReadyMessage {
   type: "sandbox-ready";
@@ -38,6 +48,11 @@ export function createNativeWebViewRunnerHtml(): string {
 <body>
   <script>
     window.CAREERFORGE_SANDBOX_ASSETS = ${JSON.stringify(SANDBOX_ASSET_PATHS)};
+    // Shared with the web runner (src/sandbox/runner.ts) so the two runners
+    // cannot drift on Python run-mode fidelity or SQL harness gating.
+    const PYTHON_DIRECT_RUN_NAME = ${JSON.stringify(PYTHON_DIRECT_RUN_NAME)};
+    const PYTHON_IMPORT_RUN_NAME = ${JSON.stringify(PYTHON_IMPORT_RUN_NAME)};
+    const SQL_HARNESS_PATTERN = new RegExp(${JSON.stringify(SQL_HARNESS_PATTERN.source)}, "i");
     function post(payload) {
       window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
     }
@@ -194,6 +209,11 @@ export function createNativeWebViewRunnerHtml(): string {
             visible,
             message: formatSandboxFailureMessage(error, spec.language)
           });
+        } finally {
+          // Hidden check output must never reach learner-visible stdout.
+          if (!visible) {
+            stdout.length = stdoutStart;
+          }
         }
       }
 
@@ -244,9 +264,14 @@ export function createNativeWebViewRunnerHtml(): string {
       const stderr = [];
       const testResults = [];
       const tests = spec.visibleTests.concat(spec.hiddenTests || []);
+      // Mirror the web runner: run_file executes as the direct entry module
+      // ("__main__") so guarded if __name__ == "__main__" blocks run, while
+      // checks use an import-style sentinel that guarantees a non-__main__ name.
+      const moduleName = request.runMode === "run_file" ? PYTHON_DIRECT_RUN_NAME : PYTHON_IMPORT_RUN_NAME;
 
       pyodide.setStdout({ batched: (text) => stdout.push(text) });
       pyodide.setStderr({ batched: (text) => stderr.push(text) });
+      pyodide.globals.set("__name__", moduleName);
 
       if (request.runMode === "run_file") {
         try {
@@ -264,7 +289,7 @@ export function createNativeWebViewRunnerHtml(): string {
 
         try {
           const wrappedCode = [
-            "_careerforge_globals = {'__builtins__': __builtins__}",
+            "_careerforge_globals = {'__builtins__': __builtins__, '__name__': " + JSON.stringify(moduleName) + "}",
             "exec(" + JSON.stringify(request.code) + ", _careerforge_globals)",
             "exec(" + JSON.stringify(test.code) + ", _careerforge_globals)"
           ].join("\\n");
@@ -284,6 +309,12 @@ export function createNativeWebViewRunnerHtml(): string {
             visible,
             message: formatSandboxFailureMessage(error, spec.language)
           });
+        } finally {
+          // Hidden checks must never contribute to learner-visible stdout: their
+          // harness can reveal the anti-forgery seed. Keep only visible output.
+          if (!visible) {
+            stdout.length = stdoutStart;
+          }
         }
       }
 
@@ -312,23 +343,25 @@ export function createNativeWebViewRunnerHtml(): string {
       const startedAt = Date.now();
       const spec = request.spec;
       const SQL = await getSqlRuntime();
-      const db = new SQL.Database();
       const stdout = [];
       const stderr = [];
       const testResults = [];
       const tests = spec.visibleTests.concat(spec.hiddenTests || []);
 
-      if (spec.setupCode) {
-        db.run(spec.setupCode);
-      }
-
       if (request.runMode === "run_file") {
+        const fileDb = new SQL.Database();
         try {
-          const result = db.exec(request.code);
+          if (spec.setupCode) {
+            fileDb.run(spec.setupCode);
+          }
+
+          const result = fileDb.exec(request.code);
           const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\\n");
           stdout.push(output);
         } catch (error) {
           stderr.push(error instanceof Error ? error.message : String(error));
+        } finally {
+          fileDb.close();
         }
         return buildAttempt(request, startedAt, stdout.filter(Boolean), stderr, testResults);
       }
@@ -336,11 +369,30 @@ export function createNativeWebViewRunnerHtml(): string {
       for (let index = 0; index < tests.length; index += 1) {
         const test = tests[index];
         const visible = index < spec.visibleTests.length;
+        // Each check gets a fresh database seeded by setupCode so learner
+        // scripts cannot leak state (for example a CREATE TABLE) into later
+        // checks, and so a hidden harness seed cannot affect a visible check.
+        const db = new SQL.Database();
 
         try {
+          if (spec.setupCode) {
+            db.run(spec.setupCode);
+          }
+
+          // A check's code is trusted harness SQL (like setupCode): it runs
+          // against the freshly seeded database before the learner query and is
+          // gated to seed-safe statements by the shared SQL_HARNESS_PATTERN.
+          if (test.code && SQL_HARNESS_PATTERN.test(test.code)) {
+            db.run(test.code);
+          }
+
           const result = db.exec(request.code);
           const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\\n");
-          stdout.push(output);
+          // Hidden checks must never contribute to learner-visible stdout: their
+          // output reveals the anti-forgery seed inserted by the harness.
+          if (visible) {
+            stdout.push(output);
+          }
 
           if (!includesAll(output, test.expectedOutputIncludes)) {
             throw new Error("Output missing");
@@ -355,6 +407,8 @@ export function createNativeWebViewRunnerHtml(): string {
             visible,
             message: formatSandboxFailureMessage(error, spec.language)
           });
+        } finally {
+          db.close();
         }
       }
 
