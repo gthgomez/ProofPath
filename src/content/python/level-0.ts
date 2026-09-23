@@ -124,7 +124,7 @@ export const level0Lessons: Lesson[] = [
     difficulty: "foundation",
     skillIds: ["skill-python-basics"],
     quizId: "quiz-python-zero-first-script",
-    desktopTask: "Write a script that prints a literal string and run it.",
+    desktopTask: "Fill in the starter script's missing text and run it to print the literal string.",
     evidencePrompt: "Provide the terminal transcript showing the printed output.",
     language: "Python",
     tools: ["Python CLI", "Script"],
@@ -135,7 +135,7 @@ export const level0Lessons: Lesson[] = [
     whyItMatters: "Every python project runs scripts to perform work.",
     coreConcept: "Running python with a script path executes print functions to produce output.",
     workedExample: "print('hello') prints hello.",
-    guidedExercise: "Add a print statement to print 'first run'.",
+    guidedExercise: "Fill in the missing text between the quotes so the print statement outputs 'first run'.",
     missionConnection: "Enables executing files from the command line.",
     reflectionPrompt: "What does the print function output to?",
     practiceStarter: "# Print the literal string first run\nprint(\"first run\")",
@@ -151,7 +151,7 @@ export const level0Lessons: Lesson[] = [
     requiredCodeIncludes: ["print"],
     requiredOutputIncludes: ["first run"],
     runnerLanguage: "python",
-    runnerStarterCode: "# Write code to print first run\n# TODO: add a print statement below that prints: first run\n",
+    runnerStarterCode: "# Your first script: the print statement below is already written for you.\n# Fill in the missing text between the quotes so it prints: first run\nprint(\"\")\n",
     runnerTestCode: "# Proof check: the verifier reads your script's own printed output and\n# looks for the phrase 'first run'. This check prints nothing itself, so the\n# phrase can only come from your code.",
     hiddenTests: [
       {
@@ -463,9 +463,9 @@ level0Lessons[2].depth = {
     }
   ],
   codeLabBridge: {
-    story: "Add a print statement that outputs the text literal 'first run'.",
+    story: "Fill in the missing string between the quotes so the print statement outputs the text literal 'first run'.",
     usesConcepts: ["py.print.literal"],
-    learnerOwns: ["print"],
+    learnerOwns: ["the string between the quotes"],
     checkerOwns: ["check-first-run"],
     runExpectation: "first run"
   },
