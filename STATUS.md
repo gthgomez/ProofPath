@@ -20,11 +20,12 @@ Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite lo
 - Sandboxes: Pyodide WASM for full Python (WebView), native regex Python fallback for levels 0-1, sql.js WASM for SQL; policy engine blocks fetch, DOM mutations, and filesystem access.
 - Content integrity validation suite (`npm run validate:content`, `npm run scan:redaction`).
 - Career Readiness Scoring model (0-100) with proof-cap enforcement.
-- Vitest suite green: 21 test files, 292 tests (verified 2026-09-23).
+- Concepts reference + global search (`/concepts`, `/concepts/[conceptId]`, `/search` plus dashboard shortcuts), backed by `src/domain/reference.ts` (concept index with alias normalization and ranked search).
+- Vitest suite green: 24 test files, 334 tests (verified 2026-09-23).
 
 ## Recent Evidence
 
-- `npm run verify` run on 2026-09-23: integrity validation SUCCESS, sandbox redaction scan passed, `tsc --noEmit` clean, 292/292 tests green.
+- `npm run verify` run on 2026-09-23: integrity validation SUCCESS, sandbox redaction scan passed, `tsc --noEmit` clean, 334/334 tests green.
 - `QA_CHECKLIST.md` documents the 9-section automated verification pipeline (`npm run verify`).
 - `PROJECT_CONTEXT.md` details TypeScript/RN/Expo stack invariants and content integrity rules.
 
