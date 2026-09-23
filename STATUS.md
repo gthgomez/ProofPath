@@ -44,7 +44,7 @@ Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite lo
 
 ## Verification
 
-- Command: `npm run verify` (runs `validate:content`, `report:content`, `scan:redaction`, `tsc --noEmit`, and Vitest tests).
+- Command: `npm run verify` (runs the three content-integrity stages through the single-process `verify:content` runner — `validate:content`, `report:content`, `scan:redaction` — then `tsc --noEmit` with incremental build info cached in `node_modules/.cache`, and Vitest tests).
 
 ## Next Actions
 
