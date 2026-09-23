@@ -5,14 +5,14 @@ import {
 } from "../src/domain/code-run";
 import { parseNativeWebViewRunnerResult } from "../src/sandbox/native-webview-runner";
 
-const HIDDEN_SENTINEL = "CAREERFORGE_HIDDEN_SENTINEL_DO_NOT_LEAK";
+const HIDDEN_SENTINEL = "PROOFPATH_HIDDEN_SENTINEL_DO_NOT_LEAK";
 
 const rawAttempt = normalizeCodeRunAttempt({
   id: "redaction-scan-attempt",
   lessonId: "lesson-redaction-scan",
   language: "javascript",
   runMode: "run_checks",
-  command: "careerforge checks lesson.js",
+  command: "proofpath checks lesson.js",
   codeSnapshot: "console.log('visible ok')",
   stdout: "visible ok",
   stderr: "",

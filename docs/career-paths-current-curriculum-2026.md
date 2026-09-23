@@ -1,11 +1,11 @@
-# CareerForge Current Core And Path Curriculum, 2026
+# ProofPath Current Core And Path Curriculum, 2026
 
-**Last updated:** 2026-06-01
+**Last updated:** 2026-09-23
 **Status:** Current product direction and implementation summary. Active app path IDs now use `path-*`, not the older `role-*` IDs.
 
 ## Executive Summary
 
-CareerForge should teach a **shared proof-first CS core** and then let learners specialize into 2026-relevant career paths. The app no longer treats old job-title IDs as the product taxonomy.
+ProofPath should teach a **shared proof-first CS core** and then let learners specialize into 2026-relevant career paths. The app no longer treats old job-title IDs as the product taxonomy.
 
 Active selectable paths live in `src/content/roles.ts` and are available from:
 
@@ -96,23 +96,23 @@ AI Product is not ML engineering. It opens:
 
 Current implemented tracks:
 
-- `track-python` — Python Fundamentals
-- `track-typescript` — TypeScript and Web
-- `track-sql` — SQL and Postgres
-- `track-git` — Git and GitHub
-- `track-testing-debugging` — Testing and Debugging
-- `track-ai-tools` — AI-Assisted Coding
-- `track-secure-software` — Secure Software
-- `track-ai-apps` — Practical AI Apps
-- `track-ml` — ML Foundations, present in catalog but still an advanced unlock
-- `track-cloud-platform-basics` — Cloud Platform Basics, present as backend/security unlock curriculum
-- `track-data-systems` — Data Systems, present as backend/data unlock curriculum
+- `track-python` — Python Fundamentals (71 lessons, 6 missions)
+- `track-typescript` — TypeScript and Web (3 lessons, 2 missions)
+- `track-sql` — SQL and Postgres (2 lessons, 2 missions)
+- `track-git` — Git and GitHub (2 lessons, 1 mission)
+- `track-testing-debugging` — Testing and Debugging (2 lessons, 1 mission)
+- `track-ai-tools` — AI-Assisted Coding (2 lessons, 2 missions)
+- `track-secure-software` — Secure Software (6 lessons, 1 mission)
+- `track-ai-apps` — Practical AI Apps (2 lessons, 2 missions)
+- `track-ml` — ML Foundations, present in catalog but still an advanced unlock (2 lessons, 1 mission)
+- `track-cloud-platform-basics` — Cloud Platform Basics, present as backend/security unlock curriculum (4 lessons, 1 mission)
+- `track-data-systems` — Data Systems, present as backend/data unlock curriculum (5 lessons, 1 mission)
 
-Current catalog count: **11 tracks, 63 lessons, 63 quizzes, and 18 missions**.
+Current catalog count: **11 tracks, 15 modules, 104 lessons (101 active plus 3 deprecated Python lessons), 104 quizzes with 380 quiz questions, 160 registered concepts, and 20 missions**. Every lesson ships a quiz and a code runner spec. The authoritative source for these totals is `npm run report:content`.
 
 Current portfolio missions cover:
 
-- Python CLI/data cleaner/professional utility/integration service.
+- Python CLI/data cleaner/professional utility/integration service, plus resilient API integration and production-readiness drills.
 - TypeScript web progress board/API contract playground.
 - SQL portfolio ledger/job tracker schema.
 - Git portfolio README.

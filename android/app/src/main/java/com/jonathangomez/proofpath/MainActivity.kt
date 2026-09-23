@@ -1,4 +1,4 @@
-package com.jonathangomez.careerforge
+package com.jonathangomez.proofpath
 
 import android.os.Build
 import android.os.Bundle

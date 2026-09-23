@@ -1425,7 +1425,7 @@ This capstone combines everything you have learned about reading tracebacks, fix
   objective: "Fix 5 deliberate bugs of different types in one script, adding regression assertions for each fix.",
   whyItMatters: "Real debugging is rarely one bug at a time. This capstone builds the systematic workflow you need for complex debugging sessions.",
   coreConcept: "Systematic debugging: (1) run the code, (2) read the traceback last line first, (3) classify the exception type, (4) apply the targeted fix, (5) write an assert that proves the fix. Re-run to expose the next bug. When no traceback remains, check for silent logic errors and add assertions to confirm correct output.",
-  workedExample: "Bug: NameError on 'app_name'. Fix: add app_name = 'CareerForge' before the print. Assert: assert isinstance(app_name, str), 'app_name must be a string'. Re-run to see the next bug.",
+  workedExample: "Bug: NameError on 'app_name'. Fix: add app_name = 'ProofPath' before the print. Assert: assert isinstance(app_name, str), 'app_name must be a string'. Re-run to see the next bug.",
   guidedExercise: "Run the broken script, read the first traceback, classify the bug, fix it, add an assert, re-run, and repeat for all 5 bugs. The IndentationError must be fixed first since it is a parse-time error that stops everything.",
   missionConnection: "The Study Tracker is built incrementally — each new feature can introduce bugs in existing code. Regression assertions catch them immediately.",
   reflectionPrompt: "Which bug was hardest to find and why? What does that tell you about your debugging blind spot?",
@@ -1676,7 +1676,7 @@ debuggingCapstoneLesson.depth = {
     },
     {
       id: "g-dc-2",
-      instruction: "Add app_name = 'CareerForge' before the print that uses app_name. Then add an assert verifying app_name is a string. Re-run and observe the next bug.",
+      instruction: "Add app_name = 'ProofPath' before the print that uses app_name. Then add an assert verifying app_name is a string. Re-run and observe the next bug.",
       conceptIds: ["debug.regression"],
       targetCodeFragment: 'print("Welcome to " + app_name)',
       expectedObservation: "The NameError disappears. The loop now runs but hits a TypeError on mins + 5.",

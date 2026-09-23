@@ -163,7 +163,7 @@ export function isTrustedSqlHarness(code: string): boolean {
 declare global {
   // Test environments that run code inside a VM may not allow dynamic import from new Function.
   // Production bundles should leave this unset and use the bundler-safe import path below.
-  var __careerforgeImportRuntimeModuleForTests: ((specifier: string) => Promise<unknown>) | undefined;
+  var __proofpathImportRuntimeModuleForTests: ((specifier: string) => Promise<unknown>) | undefined;
 
   interface Window {
     loadPyodide?: (options?: { indexURL?: string }) => Promise<unknown>;
@@ -172,8 +172,8 @@ declare global {
 }
 
 async function importRuntimeModule(specifier: string): Promise<unknown> {
-  if (globalThis.__careerforgeImportRuntimeModuleForTests) {
-    return globalThis.__careerforgeImportRuntimeModuleForTests(specifier);
+  if (globalThis.__proofpathImportRuntimeModuleForTests) {
+    return globalThis.__proofpathImportRuntimeModuleForTests(specifier);
   }
 
   const isHermes = typeof globalThis !== "undefined" && (globalThis as any).HermesInternal !== undefined;
@@ -522,9 +522,9 @@ async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<Cod
 
     try {
       const wrappedCode = [
-        `_careerforge_globals = {'__builtins__': __builtins__, '__name__': ${JSON.stringify(PYTHON_IMPORT_RUN_NAME)}}`,
-        `exec(${JSON.stringify(code)}, _careerforge_globals)`,
-        `exec(${JSON.stringify(test.code)}, _careerforge_globals)`
+        `_proofpath_globals = {'__builtins__': __builtins__, '__name__': ${JSON.stringify(PYTHON_IMPORT_RUN_NAME)}}`,
+        `exec(${JSON.stringify(code)}, _proofpath_globals)`,
+        `exec(${JSON.stringify(test.code)}, _proofpath_globals)`
       ].join("\n");
 
       await pyodide.runPythonAsync(wrappedCode);

@@ -206,7 +206,8 @@ function SQLiteProgressProvider({ children }: PropsWithChildren): ReactElement {
   );
 }
 
-const WEB_PROGRESS_KEY = "careerforge.progress.v1";
+const WEB_PROGRESS_KEY = "proofpath.progress.v1";
+const LEGACY_WEB_PROGRESS_KEY = "careerforge.progress.v1";
 
 function loadWebProgress(): UserProgress {
   if (typeof window === "undefined") {
@@ -214,11 +215,24 @@ function loadWebProgress(): UserProgress {
   }
 
   const stored = window.localStorage.getItem(WEB_PROGRESS_KEY);
-  if (!stored) {
+  if (stored) {
+    return createInitialProgressSafe(stored);
+  }
+
+  // One-time migration: rename left no migration path for the legacy
+  // "careerforge.progress.v1" localStorage entry, so copy it under the new key.
+  const legacyStored = window.localStorage.getItem(LEGACY_WEB_PROGRESS_KEY);
+  if (!legacyStored) {
     return createInitialProgress();
   }
 
-  return createInitialProgressSafe(stored);
+  try {
+    window.localStorage.setItem(WEB_PROGRESS_KEY, legacyStored);
+  } catch {
+    // Quota errors must not block loading migrated progress for this session.
+  }
+
+  return createInitialProgressSafe(legacyStored);
 }
 
 function createInitialProgressSafe(serializedProgress: string): UserProgress {

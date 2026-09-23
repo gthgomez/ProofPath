@@ -47,7 +47,7 @@
 ## 5. Tests
 
 - [ ] npm run test passes
-- [ ] All 19 test suites green
+- [ ] All 21 test suites green (21 test files, 292 test cases)
 
 **Pass criteria: 2/2**
 
@@ -88,4 +88,4 @@
 
 - [ ] No proprietary content from SoloLearn/freeCodeCamp/etc
 - [ ] seed.ts restructuring passes all validation
-- [ ] New Python levels (5-7) fix any esbuild/tsc errors
+- [ ] All Python levels (0-9) pass tsc --noEmit and content validation

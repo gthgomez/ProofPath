@@ -54,7 +54,7 @@ function Draw-ForgeSpark([System.Drawing.Graphics]$Graphics, [float]$Scale) {
   $sparkBrush.Dispose()
 }
 
-function Draw-CareerForgeIcon([System.Drawing.Graphics]$Graphics, [int]$Size, [bool]$IncludeBackground = $true) {
+function Draw-ProofPathIcon([System.Drawing.Graphics]$Graphics, [int]$Size, [bool]$IncludeBackground = $true) {
   $scale = $Size / 512.0
   $rect = New-Object System.Drawing.Rectangle 0, 0, $Size, $Size
 
@@ -138,7 +138,7 @@ function Draw-CareerForgeIcon([System.Drawing.Graphics]$Graphics, [int]$Size, [b
 function Save-Png([string]$Path, [int]$Size, [bool]$Round = $false, [bool]$IncludeBackground = $true) {
   $canvas = New-Canvas $Size $Round
   try {
-    Draw-CareerForgeIcon $canvas.Graphics $Size $IncludeBackground
+    Draw-ProofPathIcon $canvas.Graphics $Size $IncludeBackground
     $directory = Split-Path -Parent $Path
     if (!(Test-Path -LiteralPath $directory)) {
       New-Item -ItemType Directory -Path $directory -Force | Out-Null
@@ -162,8 +162,8 @@ function Write-TextFile([string]$Path, [string]$Content) {
 function Write-AdaptiveIconXml([string]$Path) {
   Write-TextFile $Path @'
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-  <background android:drawable="@color/careerforge_icon_background"/>
-  <foreground android:drawable="@drawable/careerforge_icon_foreground"/>
+  <background android:drawable="@color/proofpath_icon_background"/>
+  <foreground android:drawable="@drawable/proofpath_icon_foreground"/>
 </adaptive-icon>
 '@
 }
@@ -230,7 +230,7 @@ function Write-SplashBackgroundXml([string]$Path) {
 
 $docsDir = Join-Path $Root "docs"
 $assetsDir = Join-Path $Root "assets"
-$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "careerforge-icon"
+$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "proofpath-icon"
 $resDir = Join-Path $Root "android\app\src\main\res"
 New-Item -ItemType Directory -Path $docsDir -Force | Out-Null
 New-Item -ItemType Directory -Path $assetsDir -Force | Out-Null
@@ -238,9 +238,9 @@ New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 
 $storeIcon = Join-Path $docsDir "careerforge-icon-512.png"
 Save-Png $storeIcon 512 $false $true
-Copy-Item -LiteralPath $storeIcon -Destination (Join-Path $assetsDir "careerforge-icon.png") -Force
+Copy-Item -LiteralPath $storeIcon -Destination (Join-Path $assetsDir "proofpath-icon.png") -Force
 
-Write-VectorForeground (Join-Path $resDir "drawable\careerforge_icon_foreground.xml")
+Write-VectorForeground (Join-Path $resDir "drawable\proofpath_icon_foreground.xml")
 Write-SplashBackgroundXml (Join-Path $resDir "drawable\ic_launcher_background.xml")
 Write-AdaptiveIconXml (Join-Path $resDir "mipmap-anydpi-v26\ic_launcher.xml")
 Write-AdaptiveIconXml (Join-Path $resDir "mipmap-anydpi-v26\ic_launcher_round.xml")
@@ -303,4 +303,4 @@ foreach ($entry in $launcherDensities.GetEnumerator()) {
   Move-Item -LiteralPath $roundWebp -Destination (Join-Path $folder "ic_launcher_round.webp") -Force
 }
 
-Write-Output "Generated CareerForge shield/forge launcher icons, splash logos, adaptive icon XML, and Play listing icon."
+Write-Output "Generated ProofPath shield/forge launcher icons, splash logos, adaptive icon XML, and Play listing icon."

@@ -14,7 +14,7 @@ ProofPath is a **local-only** career-learning app. Your progress stays on your d
 
 ## Data storage
 
-Career path selection, lesson completion, quiz attempts, portfolio evidence, review queue state, and weekly plan progress are stored locally in an on-device SQLite database (`careerforge.db` via expo-sqlite).
+Career path selection, lesson completion, quiz attempts, portfolio evidence, review queue state, and weekly plan progress are stored locally in an on-device SQLite database (`proofpath.db` via expo-sqlite). Existing installs migrate data from the app's previous `careerforge.db` on first launch after the rename.
 
 ## Code Lab sandbox
 

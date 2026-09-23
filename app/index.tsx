@@ -59,7 +59,7 @@ export default function DashboardScreen(): ReactElement {
   }
 
   return (
-    <Screen eyebrow="CareerForge Mobile" title="Today">
+    <Screen eyebrow="ProofPath" title="Today">
       {error ? (
         <Panel accessibilityLabel="Storage attention" accessibilityLiveRegion="polite">
           <SectionTitle>Storage attention</SectionTitle>
@@ -70,7 +70,7 @@ export default function DashboardScreen(): ReactElement {
       {!progress.profile.dashboardTourDismissed ? (
         <Panel accessibilityLabel="Welcome onboarding tour">
           <Row>
-            <Badge tone="blue">Welcome to CareerForge</Badge>
+            <Badge tone="blue">Welcome to ProofPath</Badge>
           </Row>
           <SectionTitle>Your Career Prep Cockpit</SectionTitle>
           <BodyText>Here is how the cockpit sections work together to build your readiness score:</BodyText>
@@ -108,7 +108,7 @@ export default function DashboardScreen(): ReactElement {
           {isSaving ? <Badge tone="amber">saving</Badge> : null}
         </Row>
         <SectionTitle>Today's 3-step plan</SectionTitle>
-        <BodyText>CareerForge turns practice into work you can explain. Start with Learn, Build, and Portfolio; use Browse all areas when you need the full map.</BodyText>
+        <BodyText>ProofPath turns practice into work you can explain. Start with Learn, Build, and Portfolio; use Browse all areas when you need the full map.</BodyText>
 
         {nextLesson ? (
           <TodayTask

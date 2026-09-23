@@ -1,9 +1,10 @@
-# CareerForge Docs Router
+# ProofPath Docs Router
 
 This folder contains current product documentation, supporting research, sandbox QA evidence, generated preview assets, and historical migration records. Treat this file as the entrypoint before using any other document in `docs/`.
 
 ## Current Product Truth
 
+- [PROJECT_LAYOUT.md](./PROJECT_LAYOUT.md) - canonical directory map for the repo (tree is relative to `ProofPath/`): app routes, `src/` responsibilities, scripts, tests, and sandbox assets, with each directory's key invariant.
 - [career-paths-current-curriculum-2026.md](./career-paths-current-curriculum-2026.md) - canonical current summary for active `path-*` IDs, shared core, selectable paths, implemented proof gates, unlock labels, and curriculum gaps.
 - [career-paths-status-and-plan-2026.md](./career-paths-status-and-plan-2026.md) - maintainer view for path routing, track membership, and phase planning. Superseded where it still describes the old role-ID era.
 - [career-paths-future-roadmap-2026.md](./career-paths-future-roadmap-2026.md) - research-led roadmap behind the `path-*` replacement while lessons are still movable.
@@ -29,15 +30,15 @@ These documents inform product decisions but are not themselves implementation a
 
 ## Generated Preview Assets
 
-- [careerforge-web-preview/](./careerforge-web-preview/) contains generated web-preview runtime assets, including Pyodide and sql.js bundles.
-- `expo-web*.log` files are local preview logs and may be empty.
-- [careerforge-icon-512.png](./careerforge-icon-512.png) is the icon image artifact.
+- [careerforge-web-preview/](./careerforge-web-preview/) (legacy directory name) is generated locally for web-preview runtime assets, including Pyodide and sql.js bundles. It is not committed, so it may be absent from a fresh checkout — generate it locally rather than expecting it on disk.
+- `expo-web*.log` files are local preview logs and may be empty or absent between runs.
+- [careerforge-icon-512.png](./careerforge-icon-512.png) (legacy file name) is the icon image artifact.
 
 Generated assets are evidence or preview support, not policy or source-of-truth documentation.
 
 ## Historical Migration Evidence
 
-The following files are retained for provenance from the earlier SoloLearnDup working name and path. They are historical records only. Do not use their `C:\Workspace\SoloLearnDup` paths, writable-path envelopes, or phase instructions as current routing for CareerForge Mobile.
+The following files are retained for provenance from the earlier SoloLearnDup working name and path. They are historical records only. Do not use their `C:\Workspace\SoloLearnDup` paths, writable-path envelopes, or phase instructions as current routing for ProofPath.
 
 - [complete-app-mission-prompt-2026-05-04.md](./complete-app-mission-prompt-2026-05-04.md)
 - [ralph-state/sololearndup-phase0-2026-05-04.md](./ralph-state/sololearndup-phase0-2026-05-04.md)
@@ -45,7 +46,7 @@ The following files are retained for provenance from the earlier SoloLearnDup wo
 
 ## Current Project Anchors
 
-- Current project path: `C:\Workspace\Project_Android\CareerForgeMobile`
-- App name: CareerForge Mobile
-- Package: `com.jonathangomez.careerforge`
+- Current project path: the `ProofPath/` repo root (all doc trees are relative to it)
+- App name: ProofPath
+- Package: `com.jonathangomez.proofpath`
 - Stack: Expo, React Native, TypeScript, Expo SQLite

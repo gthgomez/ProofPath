@@ -21,7 +21,7 @@ describe("native WebView sandbox runner bridge", () => {
   it("exposes the bridge entrypoint and ready handshake in the generated HTML", () => {
     const html = createNativeWebViewRunnerHtml();
 
-    expect(html).toContain("window.CareerForgeSandbox");
+    expect(html).toContain("window.ProofPathSandbox");
     expect(html).toContain("sandbox-ready");
     expect(html).toContain(SANDBOX_ASSET_PATHS.pyodide);
     expect(html).toContain(SANDBOX_ASSET_PATHS.sqlJs);
@@ -203,7 +203,7 @@ describe("native WebView sandbox runner bridge", () => {
       lessonId: "lesson",
       language: "javascript",
       runMode: "run_checks",
-      command: "careerforge checks lesson.js",
+      command: "proofpath checks lesson.js",
       codeSnapshot: "console.log('ok')",
       stdout: "ok",
       stderr: "",
@@ -302,7 +302,7 @@ function runEmbeddedNativeRunner(options: EmbeddedRunnerOptions): Promise<Embedd
   };
 
   new Function("window", "document", script)(windowStub, documentStub);
-  windowStub.CareerForgeSandbox.run({ type: "run", request: options.request });
+  windowStub.ProofPathSandbox.run({ type: "run", request: options.request });
   return resultPromise;
 }
 

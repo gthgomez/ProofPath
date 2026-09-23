@@ -1449,7 +1449,7 @@ const portfolioProofLesson = proofLesson({
   whyItMatters: "Portfolio proof is not the code alone; it is code plus setup, verification, and honest scope.",
   coreConcept: "A README is the project note a reviewer reads first. A reviewer-friendly README answers what the project does, how to run it, how it was verified, and what remains unfinished.",
   workedExample: "README sections: Problem, Run, Verify, Sample Output, Known Gaps.",
-  guidedExercise: "Update one Python mission README and record the exact check output in CareerForge evidence.",
+  guidedExercise: "Update one Python mission README and record the exact check output in ProofPath evidence.",
   missionConnection: "This unlocks mission completion for CLI Study Tracker and improves readiness through evidence quality.",
   reflectionPrompt: "What would a reviewer still be unable to verify from your README?",
   practiceStarter: "## Verify\n\n```bash\npython -m pytest\n```\n\nExpected result:\n```text\n2 passed\n```\n\n## Known gaps\n- Sample data is small.\n- No date-range filtering yet.",
@@ -1484,7 +1484,7 @@ const portfolioProofLesson = proofLesson({
     "Known-gaps note"
   ],
   verifierCommand: "python -m pytest",
-  expectedEvidence: "README excerpt plus the exact check output recorded in CareerForge evidence.",
+  expectedEvidence: "README excerpt plus the exact check output recorded in ProofPath evidence.",
   projectConnection: "This upgrades CLI Study Tracker or Study Data Cleaner toward portfolio readiness.",
   requiredCodeIncludes: ["## Verify", "## Known gaps"],
   requiredOutputIncludes: ["passed"],

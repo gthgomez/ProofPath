@@ -8,7 +8,7 @@
 
 ## Tech Stack
 
-TypeScript 5.9 (strict) · React Native 0.83 / Expo SDK 55 · Expo Router (file-based) · React Context (`src/state/progress-provider.tsx`) · SQLite via `expo-sqlite` (local-first, offline) · Zod 4.4 · Pyodide / sql.js / native regex runners · Vitest 4.1 · EAS + `tsc --noEmit` · package `com.jonathangomez.careerforge`
+TypeScript 5.9 (strict) · React Native 0.83 / Expo SDK 55 · Expo Router (file-based) · React Context (`src/state/progress-provider.tsx`) · SQLite via `expo-sqlite` (local-first, offline) · Zod 4.4 · Pyodide / sql.js / native regex runners · Vitest 4.1 · EAS + `tsc --noEmit` · package `com.jonathangomez.proofpath`
 
 **No Gradle, Kotlin, Jetpack Compose, or Google Play Billing.** Disregard inherited Android/Kotlin patterns (FileProvider, Play Billing, Gradle, Jetpack Compose) from root workspace docs — they do not apply here.
 

@@ -33,7 +33,7 @@ describe("production-style sandbox workflow contracts", () => {
     expect(phaseLabelsFor("typescript", "run_checks").join("\n")).not.toMatch(/typecheck/i);
 
     const runningEvents = buildRunningTerminalEvents("python", "run_checks", 1);
-    expect(runningEvents[0]).toEqual({ type: "context", cwd: "careerforge://lesson-sandbox", file: "study_session.py", language: "python" });
+    expect(runningEvents[0]).toEqual({ type: "context", cwd: "proofpath://lesson-sandbox", file: "study_session.py", language: "python" });
     expect(runningEvents[1]).toEqual({ type: "command", text: `$ ${codeRunCommand("python", "run_checks")}` });
     expect(runningEvents.some((event) => event.type === "phase" && event.status === "active")).toBe(true);
   });
@@ -73,7 +73,7 @@ describe("production-style sandbox workflow contracts", () => {
       lessonId: "lesson-python-values",
       language: "python",
       runMode: "run_checks",
-      command: "careerforge checks study_session.py",
+      command: "proofpath checks study_session.py",
       codeSnapshot: "print('python')",
       stdout: "python",
       stderr: "",
@@ -139,7 +139,7 @@ describe("production-style sandbox workflow contracts", () => {
       lessonId: "lesson-python-values",
       language: "python",
       runMode: "run_checks",
-      command: "careerforge checks study_session.py",
+      command: "proofpath checks study_session.py",
       codeSnapshot: "print('wrong')",
       stdout: "wrong",
       stderr: "",
@@ -173,7 +173,7 @@ describe("production-style sandbox workflow contracts", () => {
       lessonId: "lesson-python-values",
       language: "python",
       runMode: "run_checks",
-      command: "careerforge checks study_session.py",
+      command: "proofpath checks study_session.py",
       codeSnapshot: "print(",
       stdout: "",
       stderr: 'File "<string>", line 2\nSyntaxError: invalid syntax',
@@ -200,7 +200,7 @@ describe("production-style sandbox workflow contracts", () => {
       lessonId: "lesson-python-values",
       language: "python",
       runMode: "run_checks",
-      command: "careerforge checks study_session.py",
+      command: "proofpath checks study_session.py",
       codeSnapshot: "print(minutes)",
       stdout: "",
       stderr: "NameError: minutes is not defined",

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { buildRunningTerminalEvents, buildTerminalTranscript, codeRunCommand, emptyHiddenCheckSummary, formatTerminalTranscript, normalizeCodeRunAttempt, runtimeCapabilitiesFor } from "@/domain/code-run";
+import { isScaffoldStarter, scaffoldStarterNotice, type ScaffoldStarterNotice } from "@/domain/starter-expectation";
 import type { CodeRunAttempt, CodeRunMode, TerminalEvent } from "@/domain/types";
 import { buildProblemDiagnostics } from "@/sandbox/diagnostics";
 import { formatPolicyViolationFeedback, formatSandboxFailureFeedback } from "@/sandbox/feedback";
@@ -236,7 +237,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
     }, nativeTimeoutMs);
 
     webViewRef.current?.injectJavaScript(
-      `window.CareerForgeSandbox && window.CareerForgeSandbox.run(${JSON.stringify(payload)}); true;`
+      `window.ProofPathSandbox && window.ProofPathSandbox.run(${JSON.stringify(payload)}); true;`
     );
   };
 
@@ -296,6 +297,8 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
     ? buildRunningTerminalEvents(runnerSpec.language, activeRunMode, activePhaseIndex)
     : latestRun?.terminalTranscript ?? buildRunningTerminalEvents(runnerSpec.language, "run_checks", -1);
   const diagnostics = latestRun?.diagnostics ?? [];
+  const scaffoldNotice = isScaffoldStarter(runnerSpec.starterCode) ? scaffoldStarterNotice() : null;
+  const failedGradedRun = latestRun?.runMode === "run_checks" && !latestRun.passed;
   const runState = isRunning
     ? activeRunMode === "run_file"
       ? "Running file"
@@ -344,6 +347,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
       </Row>
       <SectionTitle>Code Lab</SectionTitle>
       <BodyText>{runnerSpec.instructions}</BodyText>
+      {scaffoldNotice && !latestRun ? <ScaffoldStarterCard notice={scaffoldNotice} /> : null}
       <View style={[styles.statusCard, proofCaptured ? styles.statusPass : latestRun && !latestRun.passed ? styles.statusFail : null]}>
         <Row>
           <Badge tone={proofCaptured ? "green" : latestRun && !latestRun.passed ? "rose" : isRunning ? "amber" : fileRan ? "blue" : "teal"}>{runState}</Badge>
@@ -419,6 +423,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
           onCopyStdout={copyStdout}
         />
       ) : null}
+      {scaffoldNotice && failedGradedRun ? <ScaffoldStarterCard notice={scaffoldNotice} /> : null}
       {attemptHistory.length > 1 ? <RunHistory attempts={attemptHistory.slice(0, 5)} /> : null}
       {runError ? <MutedText>{runError}</MutedText> : null}
     </View>
@@ -441,6 +446,17 @@ function formatNativeTimeoutFeedback(language: CodeLabProps["runnerSpec"]["langu
       : "The code may be waiting or repeating longer than this lesson allows.",
     "If it keeps happening, remove input(), infinite loops, recursion, or repeated work that continues after the answer is already known."
   ].join("\n");
+}
+
+function ScaffoldStarterCard({ notice }: { notice: ScaffoldStarterNotice }): ReactElement {
+  return (
+    <View accessibilityLabel={notice.title} style={styles.scaffoldNotice}>
+      <Row>
+        <Badge tone="amber">{notice.title}</Badge>
+      </Row>
+      <MutedText>{notice.body}</MutedText>
+    </View>
+  );
 }
 
 function CodeRunResult({
@@ -631,5 +647,13 @@ const styles = StyleSheet.create({
   statusFail: {
     backgroundColor: semanticColors.dangerSoft,
     borderColor: semanticColors.danger
+  },
+  scaffoldNotice: {
+    backgroundColor: semanticColors.warningSoft,
+    borderColor: semanticColors.warning,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: spacing.xs,
+    padding: spacing.md
   }
 });
