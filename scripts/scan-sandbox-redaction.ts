@@ -61,7 +61,7 @@ const leakedSurfaceIndex = scannedSurfaces.findIndex((surface) => surface.includ
 
 if (leakedSurfaceIndex >= 0) {
   console.error(`Hidden check sentinel leaked from sandbox surface ${leakedSurfaceIndex}.`);
-  process.exit(1);
+  process.exitCode = 1;
+} else {
+  console.log("Sandbox redaction scan passed.");
 }
-
-console.log("Sandbox redaction scan passed.");

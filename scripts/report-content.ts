@@ -460,8 +460,7 @@ if (errors.length > 0) {
     console.error(`[ERROR] ${err}`);
   }
   console.error(`\nReport failed with ${errors.length} integrity errors.`);
-  process.exit(1);
+  process.exitCode = 1;
 } else {
   console.log("Integrity validation: SUCCESS. No orphan references, duplicate IDs, or missing required fields found.");
-  process.exit(0);
 }
