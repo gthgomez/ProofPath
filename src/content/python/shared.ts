@@ -176,7 +176,7 @@ export function workshop(
   customRepairs?: Record<string, string>,
   beginnerContext: Pick<LessonWorkshop, "language" | "tools" | "synopsis" | "prerequisites" | "testingFocus"> & { codeShape?: string } = {
     language: "Career skill",
-    tools: ["CareerForge"],
+    tools: ["ProofPath"],
     synopsis: objective,
     prerequisites: ["No prior setup required beyond opening this lesson."],
     testingFocus: "You will test the idea with a small task and a short evidence note."
@@ -655,7 +655,7 @@ export function checkpointQuiz(
         prompt: `Which check makes ${concept} reviewable?`,
         choices: q2Choices,
         correctChoiceIndex: q2CorrectIndex,
-        explanation: "CareerForge treats finished work as an inspectable result plus a check result or explicit review note.",
+        explanation: "ProofPath treats finished work as an inspectable result plus a check result or explicit review note.",
         conceptIds
       },
       {

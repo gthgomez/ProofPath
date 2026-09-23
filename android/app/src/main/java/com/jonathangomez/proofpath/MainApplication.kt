@@ -1,4 +1,4 @@
-package com.jonathangomez.careerforge
+package com.jonathangomez.proofpath
 
 import android.app.Application
 import android.content.res.Configuration

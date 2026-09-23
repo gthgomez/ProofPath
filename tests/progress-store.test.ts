@@ -732,7 +732,7 @@ describe("progress-store", () => {
     expect(fakeDb.reviewItems).toHaveLength(3);
     expect(fakeDb.reviewEvents).toHaveLength(1);
     expect(fakeDb.weeklyReports).toHaveLength(1);
-    expect(fakeDb.weeklyReports[0]?.report.portfolioMarkdown).toContain("CareerForge Portfolio Report");
+    expect(fakeDb.weeklyReports[0]?.report.portfolioMarkdown).toContain("ProofPath Portfolio Report");
     expect(loadedProgress).toEqual(ensureProgressProfile(richProgress));
   });
 

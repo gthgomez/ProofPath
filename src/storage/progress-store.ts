@@ -1395,10 +1395,7 @@ async function loadNormalizedProgress(db: SQLiteDatabase): Promise<UserProgress 
   }));
 }
 
-export async function migrateProgressDb(db: SQLiteDatabase): Promise<void> {
-  const versionRow = await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version");
-  const currentVersion = versionRow?.user_version ?? 0;
-
+export async function prepareProgressDbSchema(db: SQLiteDatabase): Promise<void> {
   await createLegacyProgressTable(db);
   await createNormalizedSchema(db);
   await ensureProjectMissionDepthColumns(db);
@@ -1408,6 +1405,11 @@ export async function migrateProgressDb(db: SQLiteDatabase): Promise<void> {
   await ensureCodeRunAttemptColumns(db);
   await ensureEvidenceProofColumn(db);
   await seedContentTables(db);
+}
+
+export async function finalizeProgressMigration(db: SQLiteDatabase): Promise<void> {
+  const versionRow = await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version");
+  const currentVersion = versionRow?.user_version ?? 0;
 
   if (currentVersion < DATABASE_VERSION) {
     const normalizedProgressExists = await hasNormalizedProgress(db);
@@ -1419,6 +1421,11 @@ export async function migrateProgressDb(db: SQLiteDatabase): Promise<void> {
 
     await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
   }
+}
+
+export async function migrateProgressDb(db: SQLiteDatabase): Promise<void> {
+  await prepareProgressDbSchema(db);
+  await finalizeProgressMigration(db);
 }
 
 export async function loadProgress(db: SQLiteDatabase): Promise<UserProgress> {

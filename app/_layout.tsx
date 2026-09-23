@@ -30,7 +30,7 @@ export default function RootLayout(): ReactElement {
 function LoadingState(): ReactElement {
   return (
     <View style={{ alignItems: "center", backgroundColor: colors.background, flex: 1, justifyContent: "center" }}>
-      <Text style={{ color: colors.text, fontSize: 16, fontWeight: "800" }}>Loading CareerForge</Text>
+      <Text style={{ color: colors.text, fontSize: 16, fontWeight: "800" }}>Loading ProofPath</Text>
     </View>
   );
 }

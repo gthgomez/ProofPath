@@ -16,11 +16,11 @@ function diagnosticIds(result: { diagnostics: Array<{ id: string }> }): string[]
 
 describe("Python web/native runner parity", () => {
   beforeAll(() => {
-    globalThis.__careerforgeImportRuntimeModuleForTests = (specifier: string) => import(specifier);
+    globalThis.__proofpathImportRuntimeModuleForTests = (specifier: string) => import(specifier);
   });
 
   afterAll(() => {
-    globalThis.__careerforgeImportRuntimeModuleForTests = undefined;
+    globalThis.__proofpathImportRuntimeModuleForTests = undefined;
   });
 
   it("passes the first Python proof through both execution paths", async () => {

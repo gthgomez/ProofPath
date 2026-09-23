@@ -407,7 +407,7 @@ export const codeRunAttemptSchema = z.object({
   lessonId: nonEmptyString,
   language: z.enum(["python", "sql", "javascript", "typescript"]),
   runMode: z.enum(["run_file", "run_checks"]).default("run_checks"),
-  command: z.string().default("careerforge checks"),
+  command: z.string().default("proofpath checks"),
   codeSnapshot: nonEmptyString,
   stdout: z.string(),
   stderr: z.string(),

@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.jonathangomez.careerforge'
+    namespace 'com.jonathangomez.proofpath'
     defaultConfig {
-        applicationId 'com.jonathangomez.careerforge'
+        applicationId 'com.jonathangomez.proofpath'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -105,10 +105,10 @@ android {
             keyPassword 'android'
         }
         release {
-            def releaseStoreFile = findProperty('CAREERFORGE_UPLOAD_STORE_FILE')
-            def releaseStorePassword = findProperty('CAREERFORGE_UPLOAD_STORE_PASSWORD')
-            def releaseKeyAlias = findProperty('CAREERFORGE_UPLOAD_KEY_ALIAS')
-            def releaseKeyPassword = findProperty('CAREERFORGE_UPLOAD_KEY_PASSWORD')
+            def releaseStoreFile = findProperty('PROOFPATH_UPLOAD_STORE_FILE')
+            def releaseStorePassword = findProperty('PROOFPATH_UPLOAD_STORE_PASSWORD')
+            def releaseKeyAlias = findProperty('PROOFPATH_UPLOAD_KEY_ALIAS')
+            def releaseKeyPassword = findProperty('PROOFPATH_UPLOAD_KEY_PASSWORD')
 
             if (releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
                 storeFile file(releaseStoreFile)

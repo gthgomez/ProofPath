@@ -50,11 +50,11 @@ export function createNativeWebViewRunnerHtml(): string {
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CareerForge Sandbox Runner</title>
+  <title>ProofPath Sandbox Runner</title>
 </head>
 <body>
   <script>
-    window.CAREERFORGE_SANDBOX_ASSETS = ${JSON.stringify(SANDBOX_ASSET_PATHS)};
+    window.PROOFPATH_SANDBOX_ASSETS = ${JSON.stringify(SANDBOX_ASSET_PATHS)};
     // Shared with the web runner (src/sandbox/runner.ts) so the two runners
     // cannot drift on Python run-mode fidelity or SQL harness gating.
     const PYTHON_DIRECT_RUN_NAME = ${JSON.stringify(PYTHON_DIRECT_RUN_NAME)};
@@ -309,7 +309,7 @@ export function createNativeWebViewRunnerHtml(): string {
 
     function loadScript(src) {
       return new Promise((resolve, reject) => {
-        const existing = document.querySelector('script[data-careerforge-src="' + src + '"]');
+        const existing = document.querySelector('script[data-proofpath-src="' + src + '"]');
         if (existing) {
           resolve();
           return;
@@ -317,7 +317,7 @@ export function createNativeWebViewRunnerHtml(): string {
 
         const script = document.createElement("script");
         script.async = true;
-        script.dataset.careerforgeSrc = src;
+        script.dataset.proofpathSrc = src;
         script.src = src;
         script.onload = () => resolve();
         script.onerror = () => reject(new Error("Unable to load bundled sandbox asset: " + src));
@@ -330,7 +330,7 @@ export function createNativeWebViewRunnerHtml(): string {
       if (pyodideRuntime) return pyodideRuntime;
 
       if (!window.loadPyodide) {
-        await loadScript(window.CAREERFORGE_SANDBOX_ASSETS.pyodide + "pyodide.js");
+        await loadScript(window.PROOFPATH_SANDBOX_ASSETS.pyodide + "pyodide.js");
       }
 
       if (!window.loadPyodide) {
@@ -338,7 +338,7 @@ export function createNativeWebViewRunnerHtml(): string {
       }
 
       pyodideRuntime = await window.loadPyodide({
-        indexURL: window.CAREERFORGE_SANDBOX_ASSETS.pyodide
+        indexURL: window.PROOFPATH_SANDBOX_ASSETS.pyodide
       });
       return pyodideRuntime;
     }
@@ -376,9 +376,9 @@ export function createNativeWebViewRunnerHtml(): string {
 
         try {
           const wrappedCode = [
-            "_careerforge_globals = {'__builtins__': __builtins__, '__name__': " + JSON.stringify(moduleName) + "}",
-            "exec(" + JSON.stringify(request.code) + ", _careerforge_globals)",
-            "exec(" + JSON.stringify(test.code) + ", _careerforge_globals)"
+            "_proofpath_globals = {'__builtins__': __builtins__, '__name__': " + JSON.stringify(moduleName) + "}",
+            "exec(" + JSON.stringify(request.code) + ", _proofpath_globals)",
+            "exec(" + JSON.stringify(test.code) + ", _proofpath_globals)"
           ].join("\\n");
 
           await pyodide.runPythonAsync(wrappedCode);
@@ -413,7 +413,7 @@ export function createNativeWebViewRunnerHtml(): string {
       if (sqlRuntime) return sqlRuntime;
 
       if (!window.initSqlJs) {
-        await loadScript(window.CAREERFORGE_SANDBOX_ASSETS.sqlJs + "sql-wasm.js");
+        await loadScript(window.PROOFPATH_SANDBOX_ASSETS.sqlJs + "sql-wasm.js");
       }
 
       if (!window.initSqlJs) {
@@ -421,7 +421,7 @@ export function createNativeWebViewRunnerHtml(): string {
       }
 
       sqlRuntime = await window.initSqlJs({
-        locateFile: (file) => window.CAREERFORGE_SANDBOX_ASSETS.sqlJs + file
+        locateFile: (file) => window.PROOFPATH_SANDBOX_ASSETS.sqlJs + file
       });
       return sqlRuntime;
     }
@@ -545,7 +545,7 @@ export function createNativeWebViewRunnerHtml(): string {
       }
     }
 
-    window.CareerForgeSandbox = {
+    window.ProofPathSandbox = {
       run: function(payload) {
         handleMessage({ data: payload });
       }
@@ -556,7 +556,7 @@ export function createNativeWebViewRunnerHtml(): string {
 
     post({
       type: "sandbox-ready",
-      assets: window.CAREERFORGE_SANDBOX_ASSETS
+      assets: window.PROOFPATH_SANDBOX_ASSETS
     });
   </script>
 </body>

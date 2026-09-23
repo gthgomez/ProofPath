@@ -21,7 +21,7 @@ export default function SettingsScreen(): ReactElement {
   }
 
   return (
-    <Screen eyebrow="CareerForge Mobile" title="Settings">
+    <Screen eyebrow="ProofPath" title="Settings">
       <Panel>
         <Row>
           <Badge tone="green">offline</Badge>

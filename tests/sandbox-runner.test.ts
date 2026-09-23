@@ -144,7 +144,7 @@ describe("lesson sandbox runner", () => {
     beforeAll(() => {
       const require = createRequire(import.meta.url);
       const wasmPath = require.resolve("sql.js/dist/sql-wasm.wasm");
-      globalThis.__careerforgeImportRuntimeModuleForTests = async (specifier: string) => {
+      globalThis.__proofpathImportRuntimeModuleForTests = async (specifier: string) => {
         const loaded = await import(specifier);
         if (specifier !== "sql.js") {
           return loaded;
@@ -162,7 +162,7 @@ describe("lesson sandbox runner", () => {
     });
 
     afterAll(() => {
-      globalThis.__careerforgeImportRuntimeModuleForTests = undefined;
+      globalThis.__proofpathImportRuntimeModuleForTests = undefined;
     });
 
     // Mirrors the SQLite persistence lesson: a read-only learner aggregate over
@@ -400,11 +400,11 @@ describe("lesson sandbox runner", () => {
 
   describe("Python __name__ run-mode fidelity", () => {
     beforeAll(() => {
-      globalThis.__careerforgeImportRuntimeModuleForTests = (specifier: string) => import(specifier);
+      globalThis.__proofpathImportRuntimeModuleForTests = (specifier: string) => import(specifier);
     });
 
     afterAll(() => {
-      globalThis.__careerforgeImportRuntimeModuleForTests = undefined;
+      globalThis.__proofpathImportRuntimeModuleForTests = undefined;
     });
 
     const lesson = contentPack.lessons.find((candidate) => candidate.id === "lesson-python-module-guard")!;

@@ -22,17 +22,17 @@ export function codeRunCommand(language: RunnerLanguage, runMode: CodeRunMode): 
     }
 
     if (language === "sql") {
-      return `sqlite3 careerforge.db < ${fileName}`;
+      return `sqlite3 proofpath.db < ${fileName}`;
     }
 
     if (language === "typescript") {
-      return `careerforge run ${fileName}`;
+      return `proofpath run ${fileName}`;
     }
 
     return `node ${fileName}`;
   }
 
-  return `careerforge checks ${fileName}`;
+  return `proofpath checks ${fileName}`;
 }
 
 export function runtimeCapabilitiesFor(language: RunnerLanguage): SandboxRuntimeCapabilities {
@@ -365,7 +365,7 @@ export function formatLegacyProofArtifactVerifierOutput(proof: ProofArtifact): s
 function buildTerminalContextEvent(language: RunnerLanguage): TerminalEvent {
   return {
     type: "context",
-    cwd: "careerforge://lesson-sandbox",
+    cwd: "proofpath://lesson-sandbox",
     file: defaultFileName(language),
     language
   };

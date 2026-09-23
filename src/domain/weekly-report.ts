@@ -120,7 +120,7 @@ export function createWeeklyReportSnapshot(content: ContentPack, progress: UserP
   return {
     ...snapshot,
     portfolioMarkdown: [
-      `# CareerForge Portfolio Report - ${snapshot.weekStart}`,
+      `# ProofPath Portfolio Report - ${snapshot.weekStart}`,
       "",
       `## Summary`,
       snapshot.portfolioSummary ?? snapshot.summary,
