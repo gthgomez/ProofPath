@@ -245,15 +245,15 @@ export default function DashboardScreen(): ReactElement {
 
       <Panel accessibilityLabel="Browse all areas">
         <SectionTitle>Browse all areas</SectionTitle>
-        <BodyText>The Today plan is the main path. Expand below to jump to lessons, missions, portfolio, or settings.</BodyText>
+        <BodyText>The Today plan is the main path. Expand below to jump to lessons, missions, portfolio, the concept reference, search, or settings.</BodyText>
         <ButtonShell
-          accessibilityHint={showBrowseAreas ? "Hides Learn, Build, Portfolio, and Settings shortcuts." : "Shows shortcuts to Learn, Build, Portfolio, and Settings."}
+          accessibilityHint={showBrowseAreas ? "Hides all area shortcuts." : "Shows shortcuts to Learn, Build, Portfolio, Reference, Search, and Settings."}
           accessibilityState={{ expanded: showBrowseAreas }}
           onPress={() => setShowBrowseAreas((current) => !current)}
           tone="ink"
           variant="secondary"
         >
-          {showBrowseAreas ? "Hide areas" : "Show Learn, Build, Portfolio, Settings"}
+          {showBrowseAreas ? "Hide areas" : "Show all areas"}
         </ButtonShell>
         {showBrowseAreas ? (
           <>
@@ -263,6 +263,20 @@ export default function DashboardScreen(): ReactElement {
               href="/path"
               label="Learn"
               tone="blue"
+            />
+            <RouteCard
+              actionLabel="Browse"
+              detail="Look up any concept: mental model, syntax shape, and the lesson that teaches it."
+              href="/concepts"
+              label="Reference"
+              tone="teal"
+            />
+            <RouteCard
+              actionLabel="Find"
+              detail="Search every concept, lesson, and mission by name."
+              href="/search"
+              label="Search"
+              tone="ink"
             />
             <RouteCard
               actionLabel="Open"
