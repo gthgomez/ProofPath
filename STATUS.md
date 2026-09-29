@@ -27,7 +27,7 @@ Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite lo
 
 - `npm run verify` run on 2026-09-23: integrity validation SUCCESS, sandbox redaction scan passed, `tsc --noEmit` clean, 334/334 tests green.
 - `QA_CHECKLIST.md` documents the 9-section automated verification pipeline (`npm run verify`).
-- `PROJECT_CONTEXT.md` details TypeScript/RN/Expo stack invariants and content integrity rules.
+- `docs/agent/PROJECT_CONTEXT.md` details TypeScript/RN/Expo stack invariants and content integrity rules.
 
 ## In Progress
 
