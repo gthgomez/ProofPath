@@ -3322,8 +3322,31 @@ export const contentPack: ContentPack = {
       rubric: ["Input validation is explicit", "Core grouping logic is testable without terminal output", "CLI help and defaults are reviewer-friendly", "README states known limits"],
       commonFailureModes: ["Mixing parsing, printing, and storage in one function", "Only testing the happy path", "Leaving CLI defaults undocumented", "Claiming passing tests without command output"],
       portfolioSummaryPrompt: "Explain how this project proves Python functions, file input, and test/debug discipline.",
-      evidenceRequirements: foundationEvidence,
-      skillIds: ["skill-python-functions", "skill-testing-debugging", "skill-portfolio-evidence"]
+      // Beginner missions must not require Git/GitHub evidence before any
+      // lesson teaches it (content-integrity Rule Group D). Learners can still
+      // attach repo evidence voluntarily; it is not required to complete.
+      evidenceRequirements: { ...foundationEvidence, repoUrl: false },
+      skillIds: ["skill-python-functions", "skill-testing-debugging", "skill-portfolio-evidence"],
+      curriculum: {
+        level: 0,
+        missionType: "cli",
+        requires: [],
+        supportedLessonIds: [
+          "lesson-python-zero-files-folders",
+          "lesson-python-zero-terminal",
+          "lesson-python-zero-first-script",
+          "lesson-python-zero-change-rerun",
+          "lesson-python-zero-first-error",
+          "lesson-python-literals",
+          "lesson-python-assignment",
+          "lesson-python-fstrings",
+          "lesson-python-print-values",
+          "lesson-python-numbers",
+          "lesson-python-strings",
+          "lesson-python-values"
+        ],
+        proofOutputs: ["terminal_stdout", "test_output", "readme"]
+      }
     },
     {
       id: "mission-python-data-cleaner",
@@ -3340,8 +3363,26 @@ export const contentPack: ContentPack = {
       rubric: ["Bad data does not crash the app", "Rejected rows include row numbers, raw rows, and reasons", "Tests prove both accepted and rejected rows", "Reflection names the edge case that took longest"],
       commonFailureModes: ["Silently dropping bad rows", "Reporting bad rows without enough context to fix them", "Hardcoding sample data into code", "Printing results that tests cannot inspect"],
       portfolioSummaryPrompt: "Summarize the data-quality problem, the parser contract, and the failure cases you handled.",
-      evidenceRequirements: foundationEvidence,
-      skillIds: ["skill-python-functions", "skill-testing-debugging", "skill-portfolio-evidence"]
+      evidenceRequirements: { ...foundationEvidence, repoUrl: false },
+      skillIds: ["skill-python-functions", "skill-testing-debugging", "skill-portfolio-evidence"],
+      curriculum: {
+        level: 1,
+        missionType: "file_processing",
+        requires: [],
+        supportedLessonIds: [
+          "lesson-python-literals",
+          "lesson-python-assignment",
+          "lesson-python-fstrings",
+          "lesson-python-print-values",
+          "lesson-python-numbers",
+          "lesson-python-strings",
+          "lesson-python-values",
+          "lesson-python-lists",
+          "lesson-python-dicts",
+          "lesson-python-list-of-dicts"
+        ],
+        proofOutputs: ["csv_sample", "test_output", "readme"]
+      }
     },
     {
       id: "mission-professional-python-utility",

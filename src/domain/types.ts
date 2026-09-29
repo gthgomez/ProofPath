@@ -405,7 +405,9 @@ export interface UserProgress {
   profile: UserProfile;
   completedLessonIds: string[];
   completedLessonMiniProjectIds: string[];
+  durableLessonMiniProjectIds?: string[];
   completedQuizIds: string[];
+  durableQuizIds?: string[];
   placedOutLessonIds: string[];
   placedOutQuizIds: string[];
   completedProjectMissionIds: string[];

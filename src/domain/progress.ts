@@ -63,6 +63,22 @@ export function getProofCompletedLessonIds(progress: UserProgress): string[] {
   return progress.completedLessonIds || [];
 }
 
+// Durable achievements are earned once and never removed by history compaction.
+// Bounded attempt history (see withTimestamp) is for recent activity only; a pass
+// promotes into the durable set so later attempts, restarts, or role switches
+// cannot erase earned completion.
+function withDurableAchievement(targetId: string, durableIds: string[] | undefined): string[] {
+  return uniqueValues([...(durableIds ?? []), targetId]);
+}
+
+function getDurableLessonMiniProjectIds(progress: UserProgress): string[] {
+  return progress.durableLessonMiniProjectIds ?? [];
+}
+
+function getDurableQuizIds(progress: UserProgress): string[] {
+  return progress.durableQuizIds ?? [];
+}
+
 function withTimestamp(progress: Omit<UserProgress, "updatedAt">, now: string): UserProgress {
   return {
     ...progress,
@@ -78,6 +94,8 @@ function withTimestamp(progress: Omit<UserProgress, "updatedAt">, now: string): 
     completedProjectMissionIds: uniqueValues(progress.completedProjectMissionIds),
     completedProjectMissionDeliverableIds: uniqueValues(progress.completedProjectMissionDeliverableIds),
     completedProjectMissionPhaseIds: uniqueValues(progress.completedProjectMissionPhaseIds),
+    durableLessonMiniProjectIds: uniqueValues(progress.durableLessonMiniProjectIds ?? []),
+    durableQuizIds: uniqueValues(progress.durableQuizIds ?? []),
     weeklyPlanTaskIds: uniqueValues(progress.weeklyPlanTaskIds),
     codeRunAttempts: progress.codeRunAttempts.map(normalizeCodeRunAttempt).slice(0, 250),
     updatedAt: now
@@ -207,9 +225,9 @@ function normalizeCareerPathId(roleTargetId?: string): string {
   return legacyCareerPathIdMap[roleTargetId] ?? roleTargetId;
 }
 
-type StoredProgress = Omit<UserProgress, "profile" | "evidenceItems" | "quizAttempts" | "codeRunAttempts" | "completedLessonMiniProjectIds" | "completedProjectMissionDeliverableIds" | "completedProjectMissionPhaseIds" | "reviewItems" | "reviewEvents" | "weeklyReports" | "placedOutLessonIds" | "placedOutQuizIds">
+type StoredProgress = Omit<UserProgress, "profile" | "evidenceItems" | "quizAttempts" | "codeRunAttempts" | "completedLessonMiniProjectIds" | "completedProjectMissionDeliverableIds" | "completedProjectMissionPhaseIds" | "reviewItems" | "reviewEvents" | "weeklyReports" | "placedOutLessonIds" | "placedOutQuizIds" | "durableLessonMiniProjectIds" | "durableQuizIds">
   & { evidenceItems: StoredEvidenceItem[] }
-  & Partial<Pick<UserProgress, "profile" | "quizAttempts" | "codeRunAttempts" | "completedLessonMiniProjectIds" | "completedProjectMissionDeliverableIds" | "completedProjectMissionPhaseIds" | "reviewItems" | "reviewEvents" | "weeklyReports" | "placedOutLessonIds" | "placedOutQuizIds">>;
+  & Partial<Pick<UserProgress, "profile" | "quizAttempts" | "codeRunAttempts" | "completedLessonMiniProjectIds" | "completedProjectMissionDeliverableIds" | "completedProjectMissionPhaseIds" | "reviewItems" | "reviewEvents" | "weeklyReports" | "placedOutLessonIds" | "placedOutQuizIds" | "durableLessonMiniProjectIds" | "durableQuizIds">>;
 
 export function ensureProgressProfile(progress: StoredProgress, now = new Date().toISOString()): UserProgress {
   const fallbackProfile = createInitialProfile(now);
@@ -299,9 +317,30 @@ export function ensureProgressProfile(progress: StoredProgress, now = new Date()
     placedOutQuizIds = uniqueValues([...placedOutQuizIds, ...level4MicroQuizIds]);
   }
 
+  // Migration: promote every pass still visible in bounded history, plus any
+  // recorded completion, into the durable achievement sets. This recovers
+  // achievements that history compaction could otherwise erase; it never
+  // fabricates an achievement that has no pass or recorded completion.
+  const durableLessonMiniProjectIds = uniqueValues([
+    ...(progress.durableLessonMiniProjectIds ?? []),
+    ...(progress.completedLessonMiniProjectIds ?? []),
+    ...(progress.codeRunAttempts ?? [])
+      .filter((attempt) => (attempt.runMode ?? "run_checks") === "run_checks" && attempt.passed)
+      .map((attempt) => attempt.lessonId)
+  ]);
+  const durableQuizIds = uniqueValues([
+    ...(progress.durableQuizIds ?? []),
+    ...(progress.completedQuizIds ?? []),
+    ...(progress.quizAttempts ?? [])
+      .filter((attempt) => attempt.passed)
+      .map((attempt) => attempt.quizId)
+  ]);
+
   return {
     ...progress,
     completedLessonIds,
+    durableLessonMiniProjectIds,
+    durableQuizIds,
     profile: {
       ...fallbackProfile,
       ...progress.profile,
@@ -328,7 +367,9 @@ export function createInitialProgress(now = new Date().toISOString()): UserProgr
     profile: createInitialProfile(now),
     completedLessonIds: [],
     completedLessonMiniProjectIds: [],
+    durableLessonMiniProjectIds: [],
     completedQuizIds: [],
+    durableQuizIds: [],
     placedOutLessonIds: [],
     placedOutQuizIds: [],
     completedProjectMissionIds: [],
@@ -385,6 +426,9 @@ export function recordCodeRunAttempt(progress: UserProgress, attempt: CodeRunAtt
     ...progress,
     codeRunAttempts: [normalizedAttempt, ...progress.codeRunAttempts].slice(0, 250),
     evidenceItems: proofEvidence ? [proofEvidence, ...progress.evidenceItems] : progress.evidenceItems,
+    durableLessonMiniProjectIds: normalizedAttempt.runMode === "run_checks" && normalizedAttempt.passed
+      ? withDurableAchievement(normalizedAttempt.lessonId, progress.durableLessonMiniProjectIds)
+      : progress.durableLessonMiniProjectIds,
     completedLessonMiniProjectIds: setMembership(
       progress.completedLessonMiniProjectIds,
       normalizedAttempt.lessonId,
@@ -497,12 +541,15 @@ export function canCompleteMission(progress: UserProgress, mission: ProjectMissi
 }
 
 export function getMissionSupportedLessonIds(mission: ProjectMission, lessons: Lesson[], content?: ContentPack): string[] {
-  if (mission.id === "mission-cli-study-tracker") {
-    return lessons.slice(0, 12).map((lesson) => lesson.id);
-  }
+  // Explicit mission curriculum references are the stable contract: adding or
+  // reordering unrelated lessons must not change a mission's prerequisites.
+  if (mission.curriculum && mission.curriculum.supportedLessonIds.length > 0) {
+    const lessonIdSet = new Set(lessons.map((lesson) => lesson.id));
+    const referencedLessonIds = mission.curriculum.supportedLessonIds.filter((lessonId) => lessonIdSet.has(lessonId));
 
-  if (mission.id === "mission-python-data-cleaner") {
-    return lessons.slice(5, 15).map((lesson) => lesson.id);
+    if (referencedLessonIds.length > 0) {
+      return referencedLessonIds;
+    }
   }
 
   const skillRelatedLessons = lessons.filter((lesson) => lesson.skillIds.some((skillId) => mission.skillIds.includes(skillId)));
@@ -539,15 +586,17 @@ export function isWeeklyTaskComplete(task: WeeklyPlanTask, progress: UserProgres
 }
 
 function deriveCompletedLessonMiniProjectIds(progress: UserProgress): string[] {
-  return uniqueValues(progress.codeRunAttempts
+  const fromHistory = progress.codeRunAttempts
     .filter((attempt) => (attempt.runMode ?? "run_checks") === "run_checks" && attempt.passed)
-    .map((attempt) => attempt.lessonId));
+    .map((attempt) => attempt.lessonId);
+  return uniqueValues([...getDurableLessonMiniProjectIds(progress), ...fromHistory]);
 }
 
 function deriveCompletedQuizIds(progress: UserProgress): string[] {
-  return uniqueValues(progress.quizAttempts
+  const fromHistory = progress.quizAttempts
     .filter((attempt) => attempt.passed)
-    .map((attempt) => attempt.quizId));
+    .map((attempt) => attempt.quizId);
+  return uniqueValues([...getDurableQuizIds(progress), ...fromHistory]);
 }
 
 function deriveCompletedLessonIds(content: ContentPack, progress: UserProgress): string[] {
@@ -731,6 +780,9 @@ export function submitQuizAttempt(progress: UserProgress, quiz: Quiz, selectedCh
   return withTimestamp({
     ...progress,
     completedQuizIds: setMembership(progress.completedQuizIds, quiz.id, passed),
+    durableQuizIds: passed
+      ? withDurableAchievement(quiz.id, progress.durableQuizIds)
+      : progress.durableQuizIds,
     quizAttempts: [attempt, ...progress.quizAttempts].slice(0, 250),
     reviewItems: passed
       ? upsertReviewItem(progress.reviewItems, "quiz", quiz.id, now)
