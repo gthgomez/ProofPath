@@ -1079,7 +1079,7 @@ for (const lesson of contentPack.lessons) {
   // Scope (Issue #8): enforced for depth-bearing lessons only. This loop already
   // skips lessons without a `depth` block above, so the 36 inline non-Python
   // quizzes assembled in seed.ts are intentionally out of scope: they have no
-  // depth metadata and no authored concept taxonomy. See CLAUDE.md Content
+  // depth metadata and no authored concept taxonomy. See docs/agent/CLAUDE.md Content
   // Integrity Rule 5.
   const quiz = contentPack.quizzes.find((q) => q.id === lesson.quizId);
   if (quiz) {
