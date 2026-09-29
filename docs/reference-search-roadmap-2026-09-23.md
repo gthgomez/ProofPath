@@ -15,7 +15,7 @@ Build the **Concepts reference + global search surface** as the next major imple
 Rationale:
 
 1. **Highest-value gap, per the repo's own audit.** The W3Schools comparison scores ProofPath ☆☆☆☆☆ on reference/lookup — the only zero on the scorecard — while the 160-concept registry and the per-lesson concept capsules (definition, mental model, syntax shape, tiny example, common mistake, repair hint) already contain richer reference content than W3Schools' free reference pages. The content exists; it is just locked inside the lesson stepper.
-2. **Almost purely additive.** New domain module + new routes. No storage schema change, no `DATABASE_VERSION` bump, no sandbox policy change, no `seed.ts` restructure — every HIGH-blast-radius area in `CLAUDE.md` stays untouched.
+2. **Almost purely additive.** New domain module + new routes. No storage schema change, no `DATABASE_VERSION` bump, no sandbox policy change, no `seed.ts` restructure — every HIGH-blast-radius area in `docs/agent/CLAUDE.md` stays untouched.
 3. **The other majors are sequenced behind it.** The depth wave (SQL/TypeScript to the Python standard) is a large authoring effort best done after `seed.ts` is modularized, and the modularization is mechanical with no user-visible value. Reference + search ships learner value first.
 
 ## Candidates Considered
@@ -72,7 +72,7 @@ Single-stack expo-router pattern, reusing `src/ui/theme.ts` + `primitives.tsx`; 
 
 ## Explicitly Out of Scope
 
-Supabase sync, AI mentor features, store publishing, and release signing remain approval-gated per `CLAUDE.md` and are not part of this roadmap. Dark mode and notifications are table-stakes polish, not majors.
+Supabase sync, AI mentor features, store publishing, and release signing remain approval-gated per `docs/agent/CLAUDE.md` and are not part of this roadmap. Dark mode and notifications are table-stakes polish, not majors.
 
 ## Verification Gate
 
