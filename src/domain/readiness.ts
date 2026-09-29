@@ -127,7 +127,20 @@ export function calculateReadinessScore(content: ContentPack, progress: UserProg
   const quizPerformance = percentage(countKnownCompleted(completedOrPlacedOutQuizzes, quizIds), content.quizzes.length);
   const projectCompletion = percentage(countKnownCompleted(progress.completedProjectMissionIds, missionIds), content.projectMissions.length);
 
-  const evidenceHygiene = clampScore(relevantEvidence.reduce((total, item) => total + evidenceQuality(item), 0));
+  // Evidence hygiene rewards coverage of distinct objectives, not accumulation.
+  // Repeated evidence for the same lesson or mission demonstrates practice, but
+  // only that target's strongest evidence contributes to capability coverage.
+  const bestQualityByTarget = new Map<string, number>();
+  for (const item of relevantEvidence) {
+    const targetId = item.linkedProjectMissionId ?? item.linkedLessonId;
+    if (!targetId) {
+      continue;
+    }
+
+    const quality = evidenceQuality(item);
+    bestQualityByTarget.set(targetId, Math.max(bestQualityByTarget.get(targetId) ?? 0, quality));
+  }
+  const evidenceHygiene = clampScore(Array.from(bestQualityByTarget.values()).reduce((total, quality) => total + quality, 0));
   const reviewCadence = calculateReviewCadence(content, progress, now);
 
   const rawScore = clampScore(

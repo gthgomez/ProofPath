@@ -139,8 +139,12 @@ describe("learning path state model", () => {
     const readiness = getMissionReadiness(cliMission, pythonLessons, createInitialProgress());
 
     expect(readiness.status).toBe("locked");
-    expect(readiness.dependencyText).toContain("Lessons 1-12");
-    expect(readiness.supportedLessonIds).toHaveLength(12);
+    // The mission's explicit supportedLessonIds are resolved against the
+    // provided lesson list. This synthetic module list contains only the six
+    // referenced lessons it names, so prerequisites stay stable when lessons
+    // are added or reordered elsewhere in the catalog.
+    expect(readiness.dependencyText).toContain("Lessons 1-6");
+    expect(readiness.supportedLessonIds).toHaveLength(6);
   });
 
   it("marks placed-out lessons with status 'placed-out' in getPathNodes and doesn't block progression", () => {
