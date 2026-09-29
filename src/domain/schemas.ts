@@ -512,7 +512,8 @@ export const reviewEventSchema = z.object({
   rating: z.enum(["again", "hard", "good", "easy"]),
   reviewedAt: nonEmptyString,
   nextDueAt: nonEmptyString,
-  intervalDays: z.number().int().positive()
+  intervalDays: z.number().int().positive(),
+  assisted: z.boolean().optional()
 });
 
 export const weeklyReportSnapshotSchema = z.object({

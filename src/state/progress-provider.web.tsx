@@ -59,7 +59,7 @@ interface ProgressContextValue {
   isSaving: boolean;
   error: string | null;
   selectRoleTarget: (roleTargetId: string, completeOnboarding?: boolean) => void;
-  recordRecallReview: (targetType: ReviewTargetType, targetId: string, rating: ReviewRating) => void;
+  recordRecallReview: (targetType: ReviewTargetType, targetId: string, rating: ReviewRating, options?: { assisted?: boolean }) => void;
   recordCodeRun: (attempt: CodeRunAttempt) => void;
   submitQuiz: (quiz: Quiz, selectedChoiceIndexes: number[]) => void;
   addEvidence: (input: EvidenceInput) => boolean;
@@ -185,8 +185,8 @@ export function ProgressProvider({ children }: PropsWithChildren): ReactElement 
       selectRoleTarget: (roleTargetId, completeOnboarding = true) => {
         updateProgress((currentProgress) => setRoleTarget(currentProgress, roleTargetId, completeOnboarding));
       },
-      recordRecallReview: (targetType, targetId, rating) => {
-        updateProgress((currentProgress) => recordReview(currentProgress, targetType, targetId, rating));
+      recordRecallReview: (targetType, targetId, rating, options) => {
+        updateProgress((currentProgress) => recordReview(currentProgress, targetType, targetId, rating, undefined, options));
       },
       recordCodeRun: (attempt) => {
         updateProgress((currentProgress) => recordCodeRunAttempt(currentProgress, attempt));
