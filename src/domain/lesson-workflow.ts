@@ -40,8 +40,12 @@ export function deriveLessonWorkflow(input: {
   hasQuiz: boolean;
   nextLessonId: string | undefined;
   allQuestionsAnswered?: boolean;
+  /** Steps the learner has actually opened this session. Unvisited steps stay available but are never labeled completed. */
+  visitedSteps?: LessonWorkflowStep[];
+  /** True when the learner ran practice code at least once (the Experiment activity, not just a visit). */
+  experimentAttempted?: boolean;
 }): LessonWorkflowResult {
-  const { currentStep, miniProjectDone, quizDone, lessonDone, hasQuiz, nextLessonId, allQuestionsAnswered = false } = input;
+  const { currentStep, miniProjectDone, quizDone, lessonDone, hasQuiz, nextLessonId, allQuestionsAnswered = false, visitedSteps = [], experimentAttempted = false } = input;
   const stepIndex = STEPS.indexOf(currentStep);
 
   // Determine unlocked steps
@@ -53,8 +57,16 @@ export function deriveLessonWorkflow(input: {
     unlockedSteps.push("evidence");
   }
 
-  // Determine completed steps
-  const completedSteps: LessonWorkflowStep[] = ["understand", "experiment"];
+  // Determine completed steps. Visiting a step is the minimum evidence that
+  // the activity happened; apply/checkpoint/evidence keep their checked
+  // completion signals so an unattempted activity is never shown as completed.
+  const completedSteps: LessonWorkflowStep[] = [];
+  if (visitedSteps.includes("understand") || currentStep !== "understand") {
+    completedSteps.push("understand");
+  }
+  if (experimentAttempted || miniProjectDone) {
+    completedSteps.push("experiment");
+  }
   if (miniProjectDone) {
     completedSteps.push("apply");
   }

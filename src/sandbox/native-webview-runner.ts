@@ -157,6 +157,19 @@ export function createNativeWebViewRunnerHtml(): string {
       return (needles || []).every((needle) => normalizedOutput.includes(String(needle).toLowerCase()));
     }
 
+    function outputHasExactLines(output, expectedLines) {
+      const lines = new Set(
+        output.split("\\n").map(function (line) { return line.trim().toLowerCase(); }).filter(Boolean)
+      );
+      return (expectedLines || []).every(function (expected) { return lines.has(String(expected).trim().toLowerCase()); });
+    }
+
+    function passesOutputCheck(output, test) {
+      return test.expectedOutputExactLines && test.expectedOutputExactLines.length > 0
+        ? outputHasExactLines(output, test.expectedOutputExactLines)
+        : includesAll(output, test.expectedOutputIncludes);
+    }
+
     function classifySandboxError(error) {
       const message = error instanceof Error ? error.message : String(error || "");
       if (/output missing/i.test(message)) return "missing-output";
@@ -284,7 +297,7 @@ export function createNativeWebViewRunnerHtml(): string {
           const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code);
           runner(sandboxConsole);
           const output = stdout.slice(stdoutStart).join("\\n");
-          if (!includesAll(output, test.expectedOutputIncludes)) {
+          if (!passesOutputCheck(output, test)) {
             throw new Error("Output missing");
           }
           testResults.push({ id: test.id, name: test.name, passed: true, visible, message: "Passed" });
@@ -383,7 +396,7 @@ export function createNativeWebViewRunnerHtml(): string {
 
           await pyodide.runPythonAsync(wrappedCode);
           const output = stdout.slice(stdoutStart).join("\\n");
-          if (!includesAll(output, test.expectedOutputIncludes)) {
+          if (!passesOutputCheck(output, test)) {
             throw new Error("Output missing");
           }
           testResults.push({ id: test.id, name: test.name, passed: true, visible, message: "Passed" });
@@ -481,7 +494,7 @@ export function createNativeWebViewRunnerHtml(): string {
             stdout.push(output);
           }
 
-          if (!includesAll(output, test.expectedOutputIncludes)) {
+          if (!passesOutputCheck(output, test)) {
             throw new Error("Output missing");
           }
           testResults.push({ id: test.id, name: test.name, passed: true, visible, message: output || "Query ran" });

@@ -302,7 +302,9 @@ function runTest(test: LessonRunnerTest, visible: boolean, scope: PythonScope, s
   try {
     for (const rawLine of test.code.split(/\r?\n/)) {
       const line = rawLine.trim();
-      if (!line) {
+      if (!line || line.startsWith("#")) {
+        // Comment-only checkers are legitimate: the verifier grades the
+        // learner's captured stdout, so the checker itself may print nothing.
         continue;
       }
 
@@ -322,7 +324,19 @@ function runTest(test: LessonRunnerTest, visible: boolean, scope: PythonScope, s
 
     const output = stdout.slice(stdoutStart).join("\n");
     const completeOutput = stdout.join("\n");
-    if (!includesAll(output, test.expectedOutputIncludes) && !includesAll(completeOutput, test.expectedOutputIncludes)) {
+    if (test.expectedOutputExactLines && test.expectedOutputExactLines.length > 0) {
+      // Exact-line checks identify the learner's answer as a whole line, so a
+      // taught misconception that merely contains the answer as a substring
+      // still fails. The combined output covers checks that run before or after
+      // the learner's captured prints.
+      const lines = new Set(
+        (output + "\n" + completeOutput).split("\n").map((line) => line.trim().toLowerCase()).filter(Boolean)
+      );
+      const matched = test.expectedOutputExactLines.every((expected) => lines.has(expected.trim().toLowerCase()));
+      if (!matched) {
+        throw new Error("Output missing");
+      }
+    } else if (!includesAll(output, test.expectedOutputIncludes) && !includesAll(completeOutput, test.expectedOutputIncludes)) {
       throw new Error("Output missing");
     }
 
