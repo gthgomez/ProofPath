@@ -22,7 +22,9 @@ Most course platforms award certificates of completion for merely clicking throu
 * **Portfolio Missions:** The core of the learning progression is the **Build Mission**. Each mission requires tangible deliverables (e.g., repository URLs, commit hashes, specific verifier outputs, and written reflections).
 * **Telemetry & Readiness:** The **Career Readiness Score** requires actual evidence hygiene. Bypassing lessons via placement tests (diagnostic mastery) unblocks navigation but does *not* inflate the portfolio readiness score until the student provides concrete evidence of completed missions.
 
-**Detailed docs:** [CLAUDE.md](CLAUDE.md) | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) | [STATUS.md](STATUS.md) | [QA_CHECKLIST.md](QA_CHECKLIST.md)
+**Project docs:** [docs/](docs/) | [STATUS.md](STATUS.md) | [QA_CHECKLIST.md](QA_CHECKLIST.md)
+
+Internal agent notes (not project documentation): [docs/agent/](docs/agent/)
 
 ---
 
