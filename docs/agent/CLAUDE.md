@@ -21,7 +21,7 @@ TypeScript 5.9 (strict) · React Native 0.83 / Expo SDK 55 · Expo Router (file-
 
 ## Project Layout
 
-- Full layout map: [docs/PROJECT_LAYOUT.md](../docs/PROJECT_LAYOUT.md)
+- Full layout map: [docs/PROJECT_LAYOUT.md](../PROJECT_LAYOUT.md)
 
 ## Workflow
 
