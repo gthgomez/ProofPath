@@ -52,6 +52,28 @@ export const level0Lessons: Lesson[] = [
     runnerStarterCode: "# This path holds a Python script: /workspace/project/main.py\n# Question: what is the EXTENSION of main.py?\n# Print just the extension letters on one line — no dot, no other text.\nprint(\"\")\n",
     runnerTestCode: "# Proof check: the verifier reads your script's own printed answer and\n# accepts only a line that is exactly the extension. This check prints\n# nothing itself, so the answer can only come from your code.",
     runnerExpectedExactLines: ["py"],
+    commonMistakes: [
+      "Including the dot when referencing the extension suffix.",
+      "Forgetting that directories (folders) are not files."
+    ],
+    customRepairs: {
+      "Including the dot when referencing the extension suffix.": "The extension is just the letters after the dot. If your printed line looks like .py, drop the dot so the line is exactly: py",
+      "Forgetting that directories (folders) are not files.": "A folder groups files; only the file at the end of the path has an extension. Print the extension of main.py itself, not of the workspace or project folders."
+    },
+    practiceReps: [
+      {
+        tier: "transfer",
+        starterCode: "# New context: your Study Tracker saves session data in /workspace/tracker/sessions.txt\n# Print just the extension of sessions.txt on one line.\nprint(\"\")",
+        expectedOutput: "One line reading exactly txt",
+        checkYourAnswer: "Same idea, different file type: the extension is the letters after the last dot, so the line should be exactly txt."
+      },
+      {
+        tier: "diagnose",
+        starterCode: "# A classmate printed this answer for the main.py extension question:\n# .py\n# The check failed. Print a corrected answer on one line.\nprint(\"\")",
+        expectedOutput: "One line reading exactly py",
+        checkYourAnswer: "The dot marks the boundary between the file name and the extension; the extension itself has no dot."
+      }
+    ],
     hiddenTests: [
       {
         id: "check-extension-hidden",
@@ -111,6 +133,28 @@ export const level0Lessons: Lesson[] = [
     runnerStarterCode: "# You want to run the script hello.py from the terminal.\n# Question: what command do you type (without the prompt symbol)?\n# Print the command on one line — the prompt symbol is not part of the command.\nprint(\"\")\n",
     runnerTestCode: "# Proof check: the verifier reads your script's own printed answer and\n# accepts only a line that is exactly the command. This check prints nothing\n# itself, so the answer can only come from your code.",
     runnerExpectedExactLines: ["python hello.py"],
+    commonMistakes: [
+      "Typing the prompt symbol ($) as part of the command text.",
+      "Misspelling command words or mixing up order of flags."
+    ],
+    customRepairs: {
+      "Typing the prompt symbol ($) as part of the command text.": "The prompt is printed by the terminal, not typed by you. If your line starts with $, remove it so the line is exactly: python hello.py",
+      "Misspelling command words or mixing up order of flags.": "The program name comes first, then a space, then the script path: python hello.py"
+    },
+    practiceReps: [
+      {
+        tier: "transfer",
+        starterCode: "# New context: your Study Tracker script is named tracker.py.\n# Print the command (without the prompt symbol) that runs it.\nprint(\"\")",
+        expectedOutput: "One line reading exactly python tracker.py",
+        checkYourAnswer: "Same command shape, different script: python first, then the script path, so the line should be exactly python tracker.py."
+      },
+      {
+        tier: "diagnose",
+        starterCode: "# A classmate typed this at the terminal and got an error:\n# $ python hello.py\n# Print the corrected command on one line.\nprint(\"\")",
+        expectedOutput: "One line reading exactly python hello.py",
+        checkYourAnswer: "The $ was already on screen as the prompt; typing it again makes the terminal look for a program named $."
+      }
+    ],
     hiddenTests: [
       {
         id: "check-command-hidden",
@@ -169,6 +213,14 @@ export const level0Lessons: Lesson[] = [
     runnerLanguage: "python",
     runnerStarterCode: "# Your first script: the print statement below is already written for you.\n# Fill in the missing text between the quotes so it prints: first run\nprint(\"\")\n",
     runnerTestCode: "# Proof check: the verifier reads your script's own printed output and\n# looks for the phrase 'first run'. This check prints nothing itself, so the\n# phrase can only come from your code.",
+    practiceReps: [
+      {
+        tier: "transfer",
+        starterCode: "# New context: the Study Tracker greets the learner when it starts.\n# Print the greeting welcome back on one line.\nprint(\"\")",
+        expectedOutput: "The terminal shows the phrase welcome back on its own line",
+        checkYourAnswer: "Same print-a-literal skill, different message: the text between the quotes is exactly what appears on screen."
+      }
+    ],
     hiddenTests: [
       {
         id: "check-first-run-hidden",
@@ -227,6 +279,14 @@ export const level0Lessons: Lesson[] = [
     runnerLanguage: "python",
     runnerStarterCode: "# Change the printed string to: rerun success\nprint(\"hello\")",
     runnerTestCode: "# Proof check: the verifier reads your script's own printed output and\n# looks for the phrase 'rerun success'. This check prints nothing itself, so\n# the phrase can only come from your edited code.",
+    practiceReps: [
+      {
+        tier: "transfer",
+        starterCode: "# The Study Tracker should confirm each save.\n# Edit the printed message to: sessions saved\n# Save, then run again and compare the output.\nprint(\"hello\")",
+        expectedOutput: "After saving, rerunning prints the new phrase sessions saved instead of hello",
+        checkYourAnswer: "The edit-save-run loop is the same in every project: the output only changes once the file is saved and rerun."
+      }
+    ],
     hiddenTests: [
       {
         id: "check-rerun-hidden",
@@ -286,6 +346,14 @@ export const level0Lessons: Lesson[] = [
     runnerLanguage: "python",
     runnerStarterCode: "# Fix error by closing the quotes\nprint(\"fixed syntax)",
     runnerTestCode: "# Proof check: the verifier reads your script's own printed output and\n# looks for the phrase 'fixed syntax'. This check prints nothing itself, and\n# it only runs once the syntax error is gone.",
+    practiceReps: [
+      {
+        tier: "transfer",
+        starterCode: "# New context: the Study Tracker prints a status line, but this one has\n# the same kind of syntax error you just fixed.\n# Read the error, fix the quote, and make it print: sessions saved\nprint(\"sessions saved)",
+        expectedOutput: "After closing the quote, the script runs and prints sessions saved with no traceback",
+        checkYourAnswer: "Same diagnosis in a new file: the traceback names the line; every opening quote needs a closing quote."
+      }
+    ],
     hiddenTests: [
       {
         id: "check-fixed-syntax-hidden",

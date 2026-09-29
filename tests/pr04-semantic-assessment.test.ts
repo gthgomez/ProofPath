@@ -107,3 +107,30 @@ describe("PR04/F05: workflow labels never mark unvisited steps completed", () =>
     expect(workflow.completedSteps).toEqual(["understand", "experiment", "apply", "checkpoint", "evidence"]);
   });
 });
+
+describe("PR05: level-0 conceptual starter contracts (native runner)", () => {
+  it.each([
+    ["lesson-python-zero-files-folders", 'print("py")', "py"],
+    ["lesson-python-zero-terminal", 'print("python hello.py")', "python hello.py"]
+  ])("%s: fails as shipped, passes with the one-line answer", (lessonId, answer) => {
+    const lesson = contentPack.lessons.find((candidate) => candidate.id === lessonId)!;
+    const spec = lesson.workshop.miniProject.runnerSpec;
+
+    const shipped = runNativePythonProof(spec, lesson.id, spec.starterCode, "2026-09-28T12:00:00.000Z");
+    expect(shipped.passed).toBe(false);
+
+    const solved = runNativePythonProof(spec, lesson.id, answer, "2026-09-28T12:00:00.000Z");
+    expect(solved.passed).toBe(true);
+  });
+
+  it("every level-0 lesson ships misconception-specific repairs and at least one transfer rep", () => {
+    for (const lesson of contentPack.lessons.filter((candidate) => candidate.curriculum?.level === 0 && !candidate.curriculum?.deprecated)) {
+      const checks = lesson.workshop.misconceptionChecks;
+      expect(checks.length, lesson.id).toBeGreaterThan(0);
+      expect(checks.every((check) => check.repair !== check.checkPrompt), lesson.id).toBe(true);
+
+      const reps = lesson.workshop.practiceReps ?? [];
+      expect(reps.some((rep) => rep.tier === "transfer" || rep.tier === "synthesize"), lesson.id).toBe(true);
+    }
+  });
+});

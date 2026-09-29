@@ -270,6 +270,8 @@ export interface ProofLessonInput {
   codeShape?: string;
   /** Optional map from mistake text to custom repair guidance for misconception checks */
   customRepairs?: Record<string, string>;
+  /** Lesson-specific misconceptions for the misconception checks (defaults to two generic proof-hygiene mistakes). */
+  commonMistakes?: string[];
 }
 
 export function proofLesson(input: ProofLessonInput): Lesson {
@@ -295,7 +297,7 @@ export function proofLesson(input: ProofLessonInput): Lesson {
       input.guidedExercise,
       input.missionConnection,
       input.reflectionPrompt,
-      ["Skipping the negative case", "Claiming completion without check output"],
+      input.commonMistakes ?? ["Skipping the negative case", "Claiming completion without check output"],
       input.customRepairs,
       {
         language: input.language,
