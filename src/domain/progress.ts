@@ -790,12 +790,12 @@ export function submitQuizAttempt(progress: UserProgress, quiz: Quiz, selectedCh
   }, now);
 }
 
-export function recordReview(progress: UserProgress, targetType: ReviewTargetType, targetId: string, rating: ReviewRating, now = new Date().toISOString()): UserProgress {
+export function recordReview(progress: UserProgress, targetType: ReviewTargetType, targetId: string, rating: ReviewRating, now = new Date().toISOString(), options: { assisted?: boolean } = {}): UserProgress {
   const key = reviewKey(targetType, targetId);
   const existingItem = progress.reviewItems.find((item) => reviewKey(item.targetType, item.targetId) === key)
     ?? createReviewItem(targetType, targetId, now);
   const advancedItem = advanceReviewItem(existingItem, rating, now);
-  const reviewEvent = recordReviewEvent(advancedItem, rating, now);
+  const reviewEvent = recordReviewEvent(advancedItem, rating, now, options.assisted ?? false);
 
   return withTimestamp({
     ...progress,

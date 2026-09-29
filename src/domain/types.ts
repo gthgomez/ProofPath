@@ -384,6 +384,8 @@ export interface ReviewEvent {
   reviewedAt: string;
   nextDueAt: string;
   intervalDays: number;
+  /** True when the learner revealed the answer hint before rating themselves. */
+  assisted?: boolean;
 }
 
 export interface WeeklyReportSnapshot {

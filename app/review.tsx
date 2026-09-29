@@ -1,5 +1,6 @@
 import { Redirect } from "expo-router";
 import type { ReactElement } from "react";
+import { useState } from "react";
 import { contentPack } from "@/content/seed";
 import { getContentForRole } from "@/domain/role-routing";
 import { getReviewCards } from "@/domain/review-queue";
@@ -18,10 +19,18 @@ const reviewRatings: Array<{ rating: ReviewRating; label: string }> = [
 export default function ReviewQueueScreen(): ReactElement {
   const { isSaving, progress, recordRecallReview, roleTarget } = useProgress();
   const { isCheckingOnboarding, needsOnboarding } = useOnboardingGate();
+  // Hints stay hidden until revealed. A revealed hint marks the review as
+  // assisted: the rating then records effort with help, not unassisted recall.
+  const [revealedHintKeys, setRevealedHintKeys] = useState<string[]>([]);
   const roleContent = getContentForRole(contentPack, roleTarget.id);
   const cards = getReviewCards(roleContent, progress);
   const dueCards = cards.filter((card) => card.isDue);
   const upcomingCards = cards.filter((card) => !card.isDue).slice(0, 5);
+
+  const revealHint = (targetType: string, targetId: string) => {
+    const key = `${targetType}:${targetId}`;
+    setRevealedHintKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
+  };
 
   if (isCheckingOnboarding) {
     return (
@@ -46,7 +55,7 @@ export default function ReviewQueueScreen(): ReactElement {
           <Badge tone="blue">{cards.length} scheduled</Badge>
           {isSaving ? <Badge tone="amber">saving</Badge> : null}
         </Row>
-        <BodyText>Recall first, then rate how much effort it took.</BodyText>
+        <BodyText>Recall first, then rate how much effort it took. Your rating schedules the next review — it is a self-report, not a measured check of what you retained.</BodyText>
       </Panel>
 
       {cards.length === 0 ? (
@@ -72,7 +81,22 @@ export default function ReviewQueueScreen(): ReactElement {
           </Row>
           <SectionTitle>{card.title}</SectionTitle>
           <BodyText>{card.recallPrompt}</BodyText>
-          {card.answerHint ? <MutedText>After recall, compare against: {card.answerHint}</MutedText> : null}
+          {card.answerHint ? (
+            revealedHintKeys.includes(`${card.item.targetType}:${card.item.targetId}`) ? (
+              <MutedText>Hint revealed (this review is marked as assisted): {card.answerHint}</MutedText>
+            ) : (
+              <ButtonShell
+                accessibilityLabel="Reveal answer hint"
+                accessibilityHint="Shows the comparison hint. The review will be recorded as assisted."
+                onPress={() => revealHint(card.item.targetType, card.item.targetId)}
+                size="compact"
+                tone="blue"
+                variant="secondary"
+              >
+                Reveal hint
+              </ButtonShell>
+            )
+          ) : null}
           <MutedText>{card.repairPrompt}</MutedText>
           <Row>
           {reviewRatings.map(({ rating, label }) => (
@@ -81,7 +105,7 @@ export default function ReviewQueueScreen(): ReactElement {
                 accessibilityLabel={`Rate recall ${label}`}
                 disabled={isSaving}
                 key={rating}
-                onPress={() => recordRecallReview(card.item.targetType, card.item.targetId, rating)}
+                onPress={() => recordRecallReview(card.item.targetType, card.item.targetId, rating, { assisted: revealedHintKeys.includes(`${card.item.targetType}:${card.item.targetId}`) })}
                 tone={rating === "again" ? "rose" : rating === "hard" ? "amber" : rating === "easy" ? "green" : "teal"}
               >
                 {label}

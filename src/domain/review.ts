@@ -92,7 +92,7 @@ export function isReviewDue(item: ReviewItem, now = new Date().toISOString()): b
   return Date.parse(item.dueAt) <= Date.parse(now);
 }
 
-export function recordReviewEvent(item: ReviewItem, rating: ReviewRating, now = new Date().toISOString()): ReviewEvent {
+export function recordReviewEvent(item: ReviewItem, rating: ReviewRating, now = new Date().toISOString(), assisted = false): ReviewEvent {
   return {
     id: `review-${now.replace(/[^0-9]/g, "")}-${reviewKey(item.targetType, item.targetId).replace(/[^a-z0-9]/gi, "-")}`,
     targetType: item.targetType,
@@ -100,8 +100,21 @@ export function recordReviewEvent(item: ReviewItem, rating: ReviewRating, now = 
     rating,
     reviewedAt: now,
     nextDueAt: item.dueAt,
-    intervalDays: item.intervalDays
+    intervalDays: item.intervalDays,
+    // Only present when true so persistence layers that don't know the column
+    // can round-trip unassisted events without changing them.
+    ...(assisted ? { assisted: true } : {})
   };
+}
+
+/**
+ * Deterministic variant key for a review: the same review state always selects
+ * the same prompt variant, and advancing repetitions rotates to the next
+ * variant without randomness. A lapsed item is pinned to the repair variant.
+ */
+export function reviewVariantKey(item: ReviewItem): string {
+  const suffix = item.lapses > 0 ? "repair" : `v${item.repetitions}`;
+  return `${item.targetType}:${item.targetId}:${suffix}`;
 }
 
 export function getRelevantReviewEvents(content: ContentPack, progress: UserProgress): ReviewEvent[] {

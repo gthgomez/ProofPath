@@ -1,5 +1,5 @@
 import { findLesson, findMission } from "./content";
-import { isReviewDue } from "./review";
+import { isReviewDue, reviewVariantKey } from "./review";
 import type { ContentPack, ReviewItem, UserProgress } from "./types";
 import { getProofCompletedLessonIds } from "./progress";
 
@@ -45,11 +45,19 @@ function lessonRecallForItem(content: ContentPack, item: ReviewItem): Pick<Revie
     return { recallPrompt: "Recall the core idea and one desktop action before rereading the lesson." };
   }
 
+  // Variant selection is deterministic from reviewVariantKey: lapsed items get
+  // the debug/repair card; otherwise the repetition count rotates through the
+  // cards so a delayed review presents a fresh variant, not always the first.
   const debugCardIndex = recallCards.findIndex((card) => card.type === "debug");
-  const fallbackIndex = item.repetitions % recallCards.length;
-  const selectedCard = item.lapses > 0 && debugCardIndex >= 0
-    ? recallCards[debugCardIndex]
-    : recallCards[fallbackIndex] ?? recallCards[0];
+  if (reviewVariantKey(item).endsWith(":repair") && debugCardIndex >= 0) {
+    return {
+      recallPrompt: recallCards[debugCardIndex]!.prompt,
+      answerHint: recallCards[debugCardIndex]!.answerHint
+    };
+  }
+
+  const rotation = Number(reviewVariantKey(item).split(":v")[1] ?? "0");
+  const selectedCard = recallCards[rotation % recallCards.length] ?? recallCards[0];
 
   return {
     recallPrompt: selectedCard.prompt,
