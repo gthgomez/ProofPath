@@ -216,6 +216,13 @@ export interface LessonRunnerTest {
   name: string;
   code: string;
   expectedOutputIncludes?: string[];
+  /**
+   * Exact-line matching for conceptual identification activities: each entry
+   * must appear as a whole trimmed output line. Unlike substring matching, this
+   * rejects taught misconceptions that contain the answer ("extension: python"
+   * fails the exact line "py"; "$ python hello.py" fails "python hello.py").
+   */
+  expectedOutputExactLines?: string[];
 }
 
 export interface CodeRunAttempt {

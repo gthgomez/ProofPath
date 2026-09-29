@@ -207,6 +207,21 @@ function includesAll(output: string, needles: string[] = []): boolean {
   return needles.every((needle) => normalizedOutput.includes(needle.toLowerCase()));
 }
 
+function outputHasExactLines(output: string, expectedLines: string[]): boolean {
+  const lines = new Set(
+    output.split("\n").map((line) => line.trim().toLowerCase()).filter(Boolean)
+  );
+  return expectedLines.every((expected) => lines.has(expected.trim().toLowerCase()));
+}
+
+// Exact-line checks identify the learner's answer as a whole line, so taught
+// misconceptions that merely contain the answer as a substring still fail.
+function passesOutputCheck(output: string, test: LessonRunnerTest): boolean {
+  return test.expectedOutputExactLines && test.expectedOutputExactLines.length > 0
+    ? outputHasExactLines(output, test.expectedOutputExactLines)
+    : includesAll(output, test.expectedOutputIncludes);
+}
+
 function sameOriginAssetUrl(path: string): string {
   if (typeof window !== "undefined" && window.location?.origin) {
     return `${window.location.origin}${path}`;
@@ -306,6 +321,19 @@ function includesAll(output, needles) {
   return (needles || []).every((needle) => normalizedOutput.includes(String(needle).toLowerCase()));
 }
 
+function outputHasExactLines(output, expectedLines) {
+  const lines = new Set(
+    output.split("\\n").map(function (line) { return line.trim().toLowerCase(); }).filter(Boolean)
+  );
+  return (expectedLines || []).every(function (expected) { return lines.has(String(expected).trim().toLowerCase()); });
+}
+
+function passesOutputCheck(output, test) {
+  return test.expectedOutputExactLines && test.expectedOutputExactLines.length > 0
+    ? outputHasExactLines(output, test.expectedOutputExactLines)
+    : includesAll(output, test.expectedOutputIncludes);
+}
+
 self.onmessage = (event) => {
   const { language, runMode, runtimeCode, tests, visibleCount } = event.data;
   const stdout = [];
@@ -344,7 +372,7 @@ self.onmessage = (event) => {
       const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code);
       runner(sandboxConsole);
       const output = stdout.slice(stdoutStart).join("\\n");
-      if (!includesAll(output, test.expectedOutputIncludes)) {
+      if (!passesOutputCheck(output, test)) {
         throw new Error("Output missing");
       }
       testResults.push({ id: test.id, name: test.name, passed: true, visible, message: "Passed" });
@@ -441,7 +469,7 @@ async function runJavaScriptInProcess(spec: LessonRunnerSpec, runtimeCode: strin
       const runner = new Function("console", `"use strict";\n${runtimeCode}\n${test.code}`);
       runner(sandboxConsole);
       const output = captured.stdout.slice(stdoutStart).join("\n");
-      if (!includesAll(output, test.expectedOutputIncludes)) {
+      if (!passesOutputCheck(output, test)) {
         throw new Error("Output missing");
       }
       testResults.push(passResult(test, visible));
@@ -529,7 +557,7 @@ async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<Cod
 
       await pyodide.runPythonAsync(wrappedCode);
       const output = stdout.slice(stdoutStart).join("\n");
-      if (!includesAll(output, test.expectedOutputIncludes)) {
+      if (!passesOutputCheck(output, test)) {
         throw new Error("Output missing");
       }
       testResults.push(passResult(test, visible));
@@ -655,7 +683,7 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
         stdout.push(output);
       }
 
-      if (!includesAll(output, test.expectedOutputIncludes)) {
+      if (!passesOutputCheck(output, test)) {
         throw new Error("Output missing");
       }
       testResults.push(passResult(test, visible, output || "Query ran"));

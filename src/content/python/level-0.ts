@@ -36,22 +36,30 @@ export const level0Lessons: Lesson[] = [
     guidedExercise: "Identify the extension from the path '/workspace/project/main.py'.",
     missionConnection: "This helps you locate script files before executing them.",
     reflectionPrompt: "Why is it important to use the correct file extension?",
-    practiceStarter: "# Concept: Identify the file and directory in this path:\n# /workspace/project/main.py\n# Filename is 'main.py' and directory path is '/workspace/project'\n# Suffix extension is 'py'",
+    practiceStarter: "# Concept: Identify the extension in '/workspace/project/main.py'\n# Question: what is the EXTENSION of main.py?\n# Print just the extension letters on one line — no dot, no other text.",
     practiceExpected: "py",
-    practiceCheck: "Verify path elements: file name is main.py, extension is py, and directory is /workspace/project.",
+    practiceCheck: "Run the check. It passes only when your printed line is exactly the extension, like: py",
     miniTitle: "Extract extension",
     miniGoal: "Identify path parts.",
-    miniSteps: ["Open the files panel to view available files", "Identify the extension suffix of python scripts", "Confirm extension is py"],
+    miniSteps: ["Open the files panel to view available files", "Identify the extension suffix of python scripts", "Print the extension as your answer and run the check"],
     miniDeliverables: ["Path components identified", "Review path separator concepts", "Understand extension suffixes"],
-    verifierCommand: "echo 'passed'",
-    expectedEvidence: "Extension concept understood as verified by the local path review.",
+    verifierCommand: "Run checks (the verifier compares your printed answer to the extension)",
+    expectedEvidence: "A passing check where your own printed line identifies the extension.",
     projectConnection: "Sets the foundation for organizing files.",
     requiredCodeIncludes: [],
     requiredOutputIncludes: ["passed"],
     runnerLanguage: "python",
-    runnerStarterCode: "# Concept: Identify the extension in '/workspace/project/main.py'\n# Suffix extension is: py",
-    runnerTestCode: "print('passed')",
-    hiddenTests: []
+    runnerStarterCode: "# This path holds a Python script: /workspace/project/main.py\n# Question: what is the EXTENSION of main.py?\n# Print just the extension letters on one line — no dot, no other text.\nprint(\"\")\n",
+    runnerTestCode: "# Proof check: the verifier reads your script's own printed answer and\n# accepts only a line that is exactly the extension. This check prints\n# nothing itself, so the answer can only come from your code.",
+    runnerExpectedExactLines: ["py"],
+    hiddenTests: [
+      {
+        id: "check-extension-hidden",
+        name: "Check the printed extension",
+        code: "# The learner's script is exec'd like an import before this check runs, so its\n# print output is already captured by the verifier. This hidden check prints\n# nothing itself; the learner's printed line must be exactly the extension.",
+        expectedOutputExactLines: ["py"]
+      }
+    ]
   }),
   proofLesson({
     id: "lesson-python-zero-terminal",
@@ -89,20 +97,28 @@ export const level0Lessons: Lesson[] = [
     reflectionPrompt: "How do you tell a prompt symbol apart from the command itself?",
     practiceStarter: "# Concept: In a terminal, the prompt waits for a command.\n# Command input: python hello.py\n# Standard output: hello",
     practiceExpected: "python hello.py",
-    practiceCheck: "Verify command line elements: prompt character, command python hello.py, and stdout output.",
+    practiceCheck: "Run the check. It passes only when your printed line is exactly the command, like: python hello.py",
     miniTitle: "Set command string",
     miniGoal: "Distinguish commands from output.",
-    miniSteps: ["Identify the command from prompt instruction", "Identify stdout return values", "Understand prompt symbols"],
+    miniSteps: ["Identify the command from prompt instruction", "Identify stdout return values", "Print the command as your answer and run the check"],
     miniDeliverables: ["Command string identified", "Terminal components review", "Understand difference between prompt symbol and command"],
-    verifierCommand: "echo 'passed'",
-    expectedEvidence: "Terminal concepts reviewed and command successfully identified.",
+    verifierCommand: "Run checks (the verifier compares your printed answer to the command)",
+    expectedEvidence: "A passing check where your own printed line identifies the command.",
     projectConnection: "Prepares for terminal literacy.",
     requiredCodeIncludes: [],
     requiredOutputIncludes: ["passed"],
     runnerLanguage: "python",
-    runnerStarterCode: "# Command input: python hello.py\n# Standard output: hello",
-    runnerTestCode: "print('passed')",
-    hiddenTests: []
+    runnerStarterCode: "# You want to run the script hello.py from the terminal.\n# Question: what command do you type (without the prompt symbol)?\n# Print the command on one line — the prompt symbol is not part of the command.\nprint(\"\")\n",
+    runnerTestCode: "# Proof check: the verifier reads your script's own printed answer and\n# accepts only a line that is exactly the command. This check prints nothing\n# itself, so the answer can only come from your code.",
+    runnerExpectedExactLines: ["python hello.py"],
+    hiddenTests: [
+      {
+        id: "check-command-hidden",
+        name: "Check the printed command",
+        code: "# The learner's script is exec'd like an import before this check runs, so its\n# print output is already captured by the verifier. This hidden check prints\n# nothing itself; the learner's printed line must be exactly the command.",
+        expectedOutputExactLines: ["python hello.py"]
+      }
+    ]
   }),
   proofLesson({
     id: "lesson-python-zero-first-script",

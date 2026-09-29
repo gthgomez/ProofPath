@@ -263,6 +263,8 @@ export interface ProofLessonInput {
   runnerLanguage?: RunnerLanguage;
   runnerStarterCode: string;
   runnerTestCode: string;
+  /** Exact whole-line expectations for the visible check (conceptual identification activities). */
+  runnerExpectedExactLines?: string[];
   hiddenTests?: any[]; // optional hidden tests override
   curriculum?: CurriculumMetadata;
   codeShape?: string;
@@ -333,7 +335,8 @@ export function proofLesson(input: ProofLessonInput): Lesson {
               id: `${input.slug}-visible-check`,
               name: `${input.title} visible check`,
               code: input.runnerTestCode,
-              expectedOutputIncludes: input.requiredOutputIncludes
+              expectedOutputIncludes: input.requiredOutputIncludes,
+              expectedOutputExactLines: input.runnerExpectedExactLines
             }
           ],
           hiddenTests: input.hiddenTests ?? [],

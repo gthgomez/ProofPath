@@ -40,6 +40,7 @@ export default function LessonDetailScreen(): ReactElement {
   const [showCommonMistakes, setShowCommonMistakes] = useState(false);
   const [showFluencyReps, setShowFluencyReps] = useState(opensBeginnerPythonSupport);
   const [currentStep, setCurrentStep] = useState<LessonWorkflowStep>("understand");
+  const [visitedSteps, setVisitedSteps] = useState<LessonWorkflowStep[]>(["understand"]);
   const [practiceOutputs, setPracticeOutputs] = useState<Record<string, { output: string; running: boolean }>>({});
   const [practiceCodes, setPracticeCodes] = useState<Record<string, string>>({});
 
@@ -80,6 +81,7 @@ export default function LessonDetailScreen(): ReactElement {
   useEffect(() => {
     setShowConceptNotes(opensBeginnerPythonSupport);
     setShowFluencyReps(opensBeginnerPythonSupport);
+    setVisitedSteps(["understand"]);
     if (lesson?.workshop.miniProject.runnerSpec.language) {
       preloadSandbox(lesson.workshop.miniProject.runnerSpec.language);
     }
@@ -145,8 +147,14 @@ export default function LessonDetailScreen(): ReactElement {
   const fluencyRepTone = opensBeginnerPythonSupport ? "green" : "teal";
   const fluencyRepLabel = opensBeginnerPythonSupport ? "guided reps" : "optional reps";
   
+  useEffect(() => {
+    setVisitedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
+  }, [currentStep]);
+
   const workflow = deriveLessonWorkflow({
     currentStep,
+    visitedSteps,
+    experimentAttempted: Object.keys(practiceOutputs).length > 0,
     miniProjectDone,
     quizDone,
     lessonDone,
