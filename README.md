@@ -59,12 +59,15 @@ Each lesson utilizes a 5-step wizard flow that enforces a standard pedagogical p
 Maintains a verifiable log of student outcomes. The evidence logger validates repository links, commit hashes, and test outputs. When code runs in the Code Lab pass successfully, the output can be auto-prefilled into the evidence form via search query parameters.
 
 ### Career Readiness Score
-A bounded metric (0 to 100) that models candidate readiness for technical roles:
-* **Lesson & Quiz Coverage (20%):** Satisfied by completing lessons or passing placement diagnostics.
+A bounded 0–100 **practice-progress heuristic**: it transparently measures how much verifiable, evidence-backed practice a learner has logged inside ProofPath. It is **not a validated hiring or employability prediction** — it has not been externally calibrated against hiring outcomes, and no such claim is made. It is designed to reward real proof over paper completion, not to rank candidates for employers.
+* **Lesson & Quiz Coverage (10% + 10%):** Satisfied by completing lessons or passing placement diagnostics.
 * **Project Completion (40%):** Direct evidence of completing core portfolio-grade Build Missions.
-* **Evidence Hygiene (30%):** The structural quality of saved logs (e.g. including repos, commit hashes, clean verifier output, and complete READMEs).
+* **Evidence Hygiene (30%):** The structural quality of saved logs (e.g. including repos, commit hashes, clean verifier output, and complete READMEs). Evidence items without passing test results are additionally capped at 45/100 within this dimension.
 * **Review Cadence (10%):** The spacing and consistency of active recall review sessions.
-* **Proof Caps:** If a student lacks project completions or evidence hygiene, their readiness score is strictly capped at **59%** or **69%** respectively, preventing paper-only certifications.
+* **Proof Caps:** If a student has no project completions, the total score is capped at **59**; if evidence hygiene is zero, it is capped at **69** — preventing paper-only certifications.
+* **Labels:** `starting` / `building` / `portfolio-ready` describe progress through ProofPath's own curriculum and evidence requirements, not job-market readiness.
+
+The full scoring model, caps and known limits are documented in [docs/engineering/readiness-model.md](docs/engineering/readiness-model.md).
 
 ### SQLite Persistence
 An offline-first data layer. All attempts, progress state, evidence items, and weekly report snapshots are stored locally on-device using the `expo-sqlite` driver, resolving sequentially through a robust promise queue to maintain state synchronization.
@@ -73,9 +76,18 @@ An offline-first data layer. All attempts, progress state, evidence items, and w
 
 ## 5. Sandbox Boundaries & Defensive Guardrails
 
-ProofPath includes a **Learner Sandbox with Defensive Guardrails** for run-testing code snippets and Code Labs. It is designed to guide beginners and catch syntax or logical bugs offline; **it is not an adversarial secure runtime.**
+ProofPath includes a **Learner Sandbox with Defensive Guardrails** for run-testing code snippets and Code Labs. It is designed to guide beginners and catch syntax or logical bugs offline; **it is not an adversarial secure runtime, and it must not be treated as a sandbox for running hostile code.**
 
-* **Native Python Runner:** A lightweight, regex-based offline verifier. It parses basic assignments and assertions. Standard control structures (like `if`, `for`, `def`) are intentionally unsupported in this offline fallback. If written, they fail gracefully with clean diagnostic errors instead of throwing crashes. Intermediate lessons requiring full control flow require the browser's webview Pyodide sandbox environment.
+### Two execution surfaces
+
+* **Mobile (native restricted runner):** A lightweight, regex-based offline Python verifier that parses basic assignments and assertions. Standard control structures (like `if`, `for`, `def`) are intentionally unsupported in this offline fallback. If written, they fail gracefully with clean diagnostic errors instead of throwing crashes.
+* **Web (WebView + Pyodide WASM):** The full Python execution path. Intermediate lessons requiring complete control flow require this browser-based Pyodide environment, so lesson depth differs between mobile and web by design.
+* **SQL:** Runs through the sql.js WASM sandbox on both surfaces.
+
+Track depth is intentionally uneven: the Python track is the deepest, while the **SQL and TypeScript tracks are still thin** (see `npm run report:content` and [STATUS.md](STATUS.md)). Lesson and sandbox breadth are being expanded before new feature surface is added.
+
+* **TypeScript Execution:** Relies on lightweight JS transformation to strip types at runtime before running inside the local JavaScript runtime engine, rather than invoking a full, heavy TypeScript compiler.
+* **API Redaction & Policies:** Explicitly blocks standard browser network calls (like `fetch`), DOM mutations, and malicious filesystem/database operations before execution, providing beginner-focused diagnostic hints instead of generic failures.
 * **TypeScript Execution:** Relies on lightweight JS transformation to strip types at runtime before running inside the local JavaScript runtime engine, rather than invoking a full, heavy TypeScript compiler.
 * **API Redaction & Policies:** Explicitly blocks standard browser network calls (like `fetch`), DOM mutations, and malicious filesystem/database operations before execution, providing beginner-focused diagnostic hints instead of generic failures.
 
@@ -83,7 +95,7 @@ ProofPath includes a **Learner Sandbox with Defensive Guardrails** for run-testi
 
 ## 6. Verification Commands
 
-All curriculum modules, code sandboxes, and domain logic are fully covered by automated checks. You can execute these from your terminal:
+Automated checks cover content integrity, sandbox policy, type safety, and the unit/integration test suite. Coverage is not complete across every surface: some areas (for example the thin SQL and TypeScript tracks and native/web runtime edge cases) have thinner automated verification than the Python track. Current test totals live in CI rather than in prose — see the latest hosted [Actions runs](https://github.com/gthgomez/ProofPath/actions) for per-run results. You can execute these checks from your terminal:
 
 * **Validate Content Integrity:** Compares the curriculum seed files against Zod schemas and reference locks.
   ```bash

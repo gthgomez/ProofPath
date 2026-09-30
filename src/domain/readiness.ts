@@ -1,3 +1,12 @@
+/**
+ * Career Readiness Score — a transparent practice-progress heuristic.
+ *
+ * This is NOT a validated hiring or employability prediction. It has not been
+ * externally calibrated against hiring outcomes; it measures how much
+ * verifiable, evidence-backed practice a learner has logged inside ProofPath.
+ * Weights and caps below are design choices, documented for learners in
+ * docs/engineering/readiness-model.md.
+ */
 import { getRelevantReviewEvents } from "./review";
 import type { ContentPack, EvidenceItem, ReadinessBreakdown, ReadinessScore, UserProgress } from "./types";
 import { getSatisfiedLessonIds, getSatisfiedQuizIds } from "./progress";

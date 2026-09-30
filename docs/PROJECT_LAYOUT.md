@@ -110,7 +110,7 @@ Screen-level building blocks; no curriculum definitions live here.
 
 ## tests/ — Vitest Suite
 
-21 test files / 292 tests mirroring domain, sandbox, storage, and content rules. `npm run test` runs them; `npm run verify` is the full gate (validate:content + report:content + scan:redaction + typecheck + test).
+Vitest suite mirroring domain, sandbox, storage, and content rules. File/test counts change with every commit, so they live in CI per run rather than here (`npm run test`; `npm run verify` is the full gate: validate:content + report:content + scan:redaction + typecheck + test).
 
 ## android/app/src/main/assets/sandbox-assets/ — Bundled WASM
 
