@@ -2,7 +2,7 @@
 
 ## Model & Trust Configuration
 
-- **Primary model:** Sonnet 4.6
+- **Model/tool selection:** use the actual active harness; this project does not pin a model
 - **Trust level:** High autonomy — act decisively on clear tasks, pause only for genuine risk
 - **Apply the right tools for the stack:** this is TypeScript/React Native, not Kotlin/Android
 
@@ -10,14 +10,17 @@
 
 TypeScript 5.9 (strict) · React Native 0.83 / Expo SDK 55 · Expo Router (file-based) · React Context (`src/state/progress-provider.tsx`) · SQLite via `expo-sqlite` (local-first, offline) · Zod 4.4 · Pyodide / sql.js / native regex runners · Vitest 4.1 · EAS + `tsc --noEmit` · package `com.jonathangomez.proofpath`
 
-**No Gradle, Kotlin, Jetpack Compose, or Google Play Billing.** Disregard inherited Android/Kotlin patterns (FileProvider, Play Billing, Gradle, Jetpack Compose) from root workspace docs — they do not apply here.
+App-source verification uses npm/TypeScript/Expo, not Kotlin or Compose. Generated
+native Android builds may use Gradle only when an `android/` tree is actually
+present and the task requires native packaging. Do not apply parent Kotlin app
+patterns or Google Play Billing assumptions to this React Native project.
 
 ## Startup Sequence
 
-1. Read this file
-2. Read `PROJECT_CONTEXT.md` (project context + content rules)
-3. Read root `PROJECT_CONTEXT.md` for workspace-wide context
-4. Read `tasks/lessons.md` if it exists — apply learned patterns
+1. Follow repository-root `../../AGENTS.md`; skip already loaded guidance.
+2. Read this file and adjacent `PROJECT_CONTEXT.md` for domain facts.
+3. From the repository root, read relevant `tasks/lessons.md` entries.
+4. Parent workspace and runtime adapters are optional, never absent prerequisites.
 
 ## Project Layout
 
@@ -27,9 +30,9 @@ TypeScript 5.9 (strict) · React Native 0.83 / Expo SDK 55 · Expo Router (file-
 
 ### Plan vs Act
 
-- **Act directly:** single-file content fixes, UI/Composable changes, processing logic fixes, quiz/lesson data corrections
+- **Act directly:** single-file content fixes, UI/component changes, processing logic fixes, quiz/lesson data corrections
 - **Plan first:** multi-file content restructuring, sandbox/runner changes, schema changes, new curriculum levels, storage migrations
-- **If something breaks:** STOP → identify what failed → re-plan. Don't push through.
+- **If something breaks:** Pause the failing dependent action, identify the cause, and revise its plan; continue safe independent work.
 
 ### Autonomous Execution
 
@@ -43,7 +46,12 @@ TypeScript 5.9 (strict) · React Native 0.83 / Expo SDK 55 · Expo Router (file-
 
 ### Verification (Non-Negotiable)
 
-Never mark work complete without evidence. Run: `npx tsc --noEmit`, `npm run validate:content`, `npm run report:content`, `npm run scan:redaction`, `npm run test`, `npm run verify`. Ask: *"Would a senior React Native engineer approve this?"*
+Never mark work complete without evidence. For new typed source, run
+`npm run typecheck` before focused tests. `npm run verify` owns aggregate content,
+type, and test verification; inspect package scripts and do not rerun every
+constituent without a diagnostic reason. Rendering, native packaging, and device
+claims need their own evidence. Instruction-only edits require path/link and
+conflict inspection rather than an unrelated product rebuild.
 
 ## Security Invariants (Non-Negotiable)
 
@@ -76,7 +84,11 @@ For lessons under `src/content/python/`:
 
 ## Shell Tool Usage
 
-npm/Node tooling, not Gradle. PowerShell for: `npx tsc --noEmit`, `npm run test`, `npm run validate:content`, `git status`/`git diff`, `npx expo start`, `./gradlew assembleDebug` (android/ only). File ops via dedicated tools only — Grep (not `findstr`), Glob (not `ls`/`dir`), Read (not `cat`/`Get-Content`). Bash for POSIX scripts; prefer PowerShell.
+Use available tools in the active harness. Commands run from the repository root;
+scoped `rg` / `rg --files`, dedicated search, and direct file reads are valid.
+Do not require another host's Grep/Glob/Read APIs. Native Gradle commands are only
+for an existing generated `android/` tree when required; routine app-source
+verification uses the package scripts. Match shell syntax to the current shell.
 
 ## Debugging Protocol
 
@@ -94,7 +106,7 @@ npm/Node tooling, not Gradle. PowerShell for: `npx tsc --noEmit`, `npm run test`
 
 ## Self-Learning
 
-After corrections or repeated mistakes: update `tasks/lessons.md` with a generalizable rule (what went wrong → why → how to prevent it); review lessons at session start; only log meaningful patterns — skip trivial one-off corrections
+After corrections or repeated mistakes: update `tasks/lessons.md` with a generalizable rule (what went wrong → why → how to prevent it); review the relevant subset of lessons at session start; only log meaningful patterns — skip trivial one-off corrections
 
 ## Core Principles
 

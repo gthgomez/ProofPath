@@ -1,11 +1,11 @@
-# AGENTS.md — ProofPath (Gemini 3 Flash Override)
+# AGENTS.md — ProofPath documentation scope
 
-> Inherits from [root AGENTS.md](file:///C:/Workspace/Project_Android/AGENTS.md). See [CLAUDE.md](./CLAUDE.md).
+The [repository-root router](../../AGENTS.md) owns shared startup and execution
+guidance. For domain invariants use [CLAUDE.md](CLAUDE.md) and
+[PROJECT_CONTEXT.md](PROJECT_CONTEXT.md); this file does not create a model override.
 
-## Gemini-Specific Risks
-- Applying Kotlin/Compose/Gradle patterns to this TypeScript/React Native/Expo project
-- Hallucinated React Native or Expo APIs, or confusing npm with `./gradlew assembleDebug`
-- Hallucinated lesson content copied from SoloLearn/freeCodeCamp — prohibited
-- Incorrect Python curriculum imports (e.g., `py.argparse` before formally taught)
-
-**Verification gate:** `npm run verify`
+- This app uses TypeScript / React Native / Expo; Kotlin/Compose patterns are not
+  applicable to its app-source workflow.
+- Verify React Native/Expo APIs against installed packages. Keep authored learning
+  content original and preserve the existing prerequisite/content taxonomy.
+- Run commands from the repository root. Aggregate verification is `npm run verify`.
