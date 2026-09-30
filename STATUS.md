@@ -10,7 +10,7 @@ Offline-first technical career-readiness and learning app for software engineeri
 
 ## Current State
 
-Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite local-first persistence, Zod schemas, Pyodide/sql.js WASM sandbox execution, and a 21-file Vitest suite (292 tests). The content pack ships 104 lessons (101 active plus 3 deprecated) across 11 tracks — 71 of the active lessons are Python — with 104 quizzes (380 questions), 15 modules, and 20 portfolio missions, all validated by the `npm run verify` pipeline.
+Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite local-first persistence, Zod schemas, and Pyodide/sql.js WASM sandbox execution. The content pack ships 104 lessons (101 active plus 3 deprecated) across 11 tracks — 71 of the active lessons are Python — with 104 quizzes (380 questions), 15 modules, and 20 portfolio missions, all validated by the `npm run verify` pipeline.
 
 ## Verified Capabilities
 
@@ -19,13 +19,13 @@ Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite lo
 - Proof-First 5-step lesson stepper (`Understand` -> `Experiment` -> `Apply` -> `Checkpoint` -> `Evidence`).
 - Sandboxes: Pyodide WASM for full Python (WebView), native regex Python fallback for levels 0-1, sql.js WASM for SQL; policy engine blocks fetch, DOM mutations, and filesystem access.
 - Content integrity validation suite (`npm run validate:content`, `npm run scan:redaction`).
-- Career Readiness Scoring model (0-100) with proof-cap enforcement.
+- Career Readiness Scoring model (0-100) with proof-cap enforcement — a transparent practice-progress heuristic (see [docs/engineering/readiness-model.md](./docs/engineering/readiness-model.md)), not a validated hiring or employability prediction.
 - Concepts reference + global search (`/concepts`, `/concepts/[conceptId]`, `/search` plus dashboard shortcuts), backed by `src/domain/reference.ts` (concept index with alias normalization and ranked search).
-- Vitest suite green: 24 test files, 334 tests (verified 2026-09-23).
+- Vitest suite green — current totals live in CI, not in prose. Latest observed hosted `main` run: [Actions run 36518059784](https://github.com/gthgomez/ProofPath/actions/runs/36518059784) (2026-09-29 snapshot, HEAD `055c57f`, 361 tests in 27 files). Test counts change with every commit; do not copy them here.
 
 ## Recent Evidence
 
-- `npm run verify` run on 2026-09-23: integrity validation SUCCESS, sandbox redaction scan passed, `tsc --noEmit` clean, 334/334 tests green.
+- `npm run verify` run on 2026-09-23: integrity validation SUCCESS, sandbox redaction scan passed, `tsc --noEmit` clean, Vitest suite green (exact test totals for that dated run are recorded in its CI artifact, not duplicated here).
 - `QA_CHECKLIST.md` documents the 9-section automated verification pipeline (`npm run verify`).
 - `docs/agent/PROJECT_CONTEXT.md` details TypeScript/RN/Expo stack invariants and content integrity rules.
 
