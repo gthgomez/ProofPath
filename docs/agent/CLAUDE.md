@@ -117,3 +117,18 @@ After corrections or repeated mistakes: update `tasks/lessons.md` with a general
 5. Root cause over symptoms — fix underlying issues, not just validation warnings
 6. Evidence over assertion — back claims with `npm run verify` output
 7. Never fake certainty — surface unknowns early
+
+## Domain ownership and assessment
+
+- Extend the relevant contracts in `src/domain/` for assessment, lesson workflow,
+  and progression. Inspect `lesson-workflow.ts`, `code-run.ts`, and `progress.ts`
+  and their callers before adding another completion decision.
+- `src/content/` declares activities; `src/sandbox/` owns runner execution and
+  evidence; `src/storage/progress-store.ts` owns persistence. UI/state providers
+  consume these contracts rather than inventing parallel grading rules.
+- Runner adapters must agree on the meaning of evidence and rejection cases.
+  Preserve sandbox limits and explicit expected-output semantics; a canned success
+  message or substring match is not sufficient when the activity requires a
+  specific answer or exact-line evidence.
+- Assessment changes need meaningful wrong-answer, misleading-output, and
+  completion/persistence cases. Instruction edits do not claim those tests exist.

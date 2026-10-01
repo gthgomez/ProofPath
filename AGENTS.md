@@ -22,6 +22,23 @@ Read relevant entries in [tasks/lessons.md](tasks/lessons.md). Keep meaningful
 patterns with cause, prevention, scope, and evidence; do not log every correction.
 Detailed content invariants remain in `docs/agent/CLAUDE.md`.
 
+## Architecture and change discipline
+
+For substantive code changes, identify the owning domain, contract, and callers;
+search for existing rules before adding another formula, threshold, or schema fact.
+Keep domain decisions out of presentation/transport and use narrow contracts.
+An owner can contain several cohesive modules; prefer simple functions/composition
+and avoid speculative abstraction or sharing coincidentally similar code.
+
+If a feature requires substantial consolidation or boundary repair, first make
+the smallest behavior-preserving refactor in a separate PR. Otherwise implement
+directly; contained fixes and instruction edits need no preliminary refactor.
+Preserve outputs, errors, rounding, ordering, cancellation, and side effects;
+use representative characterization/differential checks where coverage is weak.
+Fix discovered bugs as explicit behavior changes. Add focused executable prevention
+for demonstrated failures, without weakening existing gates. Audit painful domains
+with paths/counts and compare the same measures after repair; avoid unrelated cleanup.
+
 ## Execution, learning, and evidence
 
 - For non-trivial work, state the outcome, acceptance criteria, affected invariants,
