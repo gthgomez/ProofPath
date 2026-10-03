@@ -8,36 +8,30 @@ An offline-first technical career-readiness and technical learning application d
 
 ## Startup Sequence
 
-1. Read `ProofPath/CLAUDE.md` — this project's agent guidance (TypeScript/React Native/Expo stack, verification commands, content rules).
-2. Read this file (`ProofPath/PROJECT_CONTEXT.md`) — directory map and content integrity rules.
-3. Read root `PROJECT_CONTEXT.md` ([PROJECT_CONTEXT.md](file:///c:/Workspace/Project_Android/PROJECT_CONTEXT.md)) for workspace-wide context (note: ProofPath is the Expo/RN entry; the Kotlin/Compose "Shared Tech Stack" does not apply).
-4. Skip root `AGENTS.md` and root `CLAUDE.md` — they target Kotlin/Compose/Gradle Android apps and their patterns (FileProvider, Play Billing, Gradle verification) do not apply to this TypeScript/React Native project.
+1. Follow [repository-root AGENTS.md](../../AGENTS.md), skipping already loaded files.
+   It is the sole instruction authority and owns all domain invariants for this
+   repository.
+2. Read relevant [lessons](../../tasks/lessons.md); parent workspace guidance is optional.
+   Kotlin/Compose conventions do not apply to app-source work in this Expo project.
 
 ---
 
 ## Directory Map
 
-See `docs/PROJECT_LAYOUT.md` for the canonical directory map (tree is relative to `ProofPath/`).
+See [docs/PROJECT_LAYOUT.md](../PROJECT_LAYOUT.md) for the canonical directory map (tree is relative to `ProofPath/`).
 
 ---
 
 ## Verification Pipeline
 
-Always verify content modifications using the following command suite inside `ProofPath/`:
-
-* **Validate Content Integrity:**
-  `npm run validate:content`
-* **Generate Curriculum Audit Report:**
-  `npm run report:content`
-* **Scan Sandbox Policies:**
-  `npm run scan:redaction`
-* **Run Unit/Integration Tests:**
-  `npm run test`
-* **Full verification pipeline:**
-  `npm run verify`
+Run from the repository root. `npm run verify` is the aggregate content/type/test
+gate; `npm run typecheck` is the first focused check for new typed modules.
+Use individual content/report/redaction/test scripts for diagnosis rather than
+duplicating the aggregate run. Rendering, export, and device claims need separate
+evidence. For instruction-only edits, inspect paths, consistency, and final diff.
 
 ---
 
 ## Content Integrity & Curricular Rules
 
-Canonical rules live in `CLAUDE.md` → "Content Integrity Rules".
+Canonical rules live in the repository-root `AGENTS.md` → "Content integrity rules".

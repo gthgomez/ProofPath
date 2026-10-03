@@ -279,7 +279,7 @@ describe("structural invariants", () => {
 
     expect(dangling).toEqual([]);
 
-    // Rule Group L scope (Issue #8, docs/agent/CLAUDE.md Content Integrity Rule 5):
+    // Rule Group L scope (Issue #8, root AGENTS.md Content Integrity Rule 5):
     // conceptIds are required for exactly the quizzes of depth-bearing lessons.
     // scripts/validate-content.ts enforces this inside its `if (!lesson.depth)
     // continue` loop, so depth-less quizzes -- notably the 36 inline non-Python
