@@ -9,8 +9,9 @@ An offline-first technical career-readiness and technical learning application d
 ## Startup Sequence
 
 1. Follow [repository-root AGENTS.md](../../AGENTS.md), skipping already loaded files.
-2. Read adjacent [CLAUDE.md](CLAUDE.md) for local domain invariants and this context.
-3. Read relevant [lessons](../../tasks/lessons.md); parent workspace guidance is optional.
+   It is the sole instruction authority and owns all domain invariants for this
+   repository.
+2. Read relevant [lessons](../../tasks/lessons.md); parent workspace guidance is optional.
    Kotlin/Compose conventions do not apply to app-source work in this Expo project.
 
 ---
@@ -33,4 +34,4 @@ evidence. For instruction-only edits, inspect paths, consistency, and final diff
 
 ## Content Integrity & Curricular Rules
 
-Canonical rules live in `CLAUDE.md` → "Content Integrity Rules".
+Canonical rules live in the repository-root `AGENTS.md` → "Content integrity rules".
