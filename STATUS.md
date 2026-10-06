@@ -35,7 +35,6 @@ The CareerForge -> ProofPath rename is complete. Package `proofpath`, `app.json`
 
 ## In Progress
 
-- Modularizing `src/content/seed.ts` (3747 lines; curriculum data still lives in one large file).
 - Enriching SQL and TypeScript sandbox exercises — `report:content` shows `track-typescript` at 3 lessons and `track-sql` at 2, against 71 for `track-python`.
 
 ## Blockers
@@ -55,8 +54,12 @@ The CareerForge -> ProofPath rename is complete. Package `proofpath`, `app.json`
 ## Next Actions
 
 1. Keep `npm run verify` green as content changes land.
-2. Modularize `src/content/seed.ts` without breaking validation.
-3. Enrich SQL and TypeScript sandbox depth toward the Python lesson standard.
+2. Enrich SQL and TypeScript sandbox depth toward the Python lesson standard.
+3. Decide whether `canCompleteLesson` (removed from `app/lesson/[lessonId].tsx` as dead code) was an intended lesson-completion gate that was never wired up. `noUnusedLocals` is now on, so dead code fails the gate instead of hiding.
+
+## Content Layout
+
+`src/content/seed.ts` assembles the content pack (skills, tracks, modules, missions) and splices in each track's lessons and quizzes. Lesson bodies live per track: `python/level-0.ts` … `level-9.ts` for the 71 Python lessons, and `src/content/<track>/lessons.ts` for the other 30. All builders — `proofLesson`, `workshop`, `checkpointQuiz`, `miniProjectWithTester` — live in `src/content/python/shared.ts`, which despite its directory name serves every track. See [docs/PROJECT_LAYOUT.md](./docs/PROJECT_LAYOUT.md).
 
 ## Evidence Sources
 
