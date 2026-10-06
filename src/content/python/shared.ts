@@ -1,4 +1,4 @@
-import type { CurriculumMetadata, Difficulty, Lesson, LessonMiniProject, LessonMiniProjectTester, LessonMisconceptionCheck, LessonPracticeBlock, LessonRecallCard, LessonRunnerSpec, LessonWorkshop, MissionEvidenceRequirements, Quiz, RunnerLanguage } from "@/domain/types";
+import type { CurriculumMetadata, Difficulty, Lesson, LessonMiniProject, LessonMiniProjectTester, LessonMisconceptionCheck, LessonPracticeBlock, LessonRecallCard, LessonRunnerSpec, LessonWorkshop, MissionEvidenceRequirements, Quiz, QuizQuestion, RunnerLanguage } from "@/domain/types";
 
 export const foundationEvidence: MissionEvidenceRequirements = {
   repoUrl: false,
@@ -672,5 +672,21 @@ export function checkpointQuiz(
         conceptIds
       }
     ]
+  };
+}
+
+/**
+ * Deterministically spreads the correct answer position for inline quiz
+ * questions (Rule Group L). The question id seeds the same shuffle used by the
+ * shared quiz builders, so the stored correctChoiceIndex always matches the
+ * shuffled choices and no quiz depends on a single answer position.
+ */
+export function shuffleQuizChoices(question: QuizQuestion): QuizQuestion {
+  const indexed = question.choices.map((choice, index) => ({ choice, index }));
+  const shuffled = deterministicShuffle(indexed, question.id);
+  return {
+    ...question,
+    choices: shuffled.map((entry) => entry.choice),
+    correctChoiceIndex: shuffled.findIndex((entry) => entry.index === question.correctChoiceIndex)
   };
 }
