@@ -7,6 +7,18 @@ import { checkpointQuiz, proofLesson, shuffleQuizChoices, workshop } from "../py
 
 const typescriptContractPracticeReps: LessonPracticeBlock[] = [
   {
+    tier: "transfer",
+    starterCode: "type EvidenceRow = { title: string; verified: boolean; checkedAt: string };\n\nconst row: EvidenceRow = { title: 'CLI tests', verified: true, checkedAt: '2026-10-06' };\nconsole.log(row.verified);",
+    expectedOutput: "true, and checkedAt stays a string rather than being coerced to a Date.",
+    checkYourAnswer: "Swap verified to the string 'yes'. The contract should reject it, because later logic branches on a real boolean. This is the same rule as the lesson, applied to a different field."
+  },
+  {
+    tier: "diagnose",
+    starterCode: "// The UI crashes here because the contract was too loose.\ntype Card = { title: string };\nconst card: Card = { title: 'Portfolio', score: 42 };\nconsole.log(card.score);",
+    expectedOutput: "A type error, not a runtime value: score is not part of Card.",
+    checkYourAnswer: "The object carries a field the type never declared, so the compiler rejects it at build time. Naming the field in the type is what turns a runtime surprise into a compile-time error."
+  },
+  {
     starterCode: "type ReadinessCard = {\n  label: string;\n  score: number;\n};\n\nconst card: ReadinessCard = { label: 'Portfolio', score: 42 };\nconsole.log(card.score);",
     expectedOutput: "The readiness score prints 42 and the object keeps score as a number.",
     checkYourAnswer: "Add a status field to the type, then watch the example object fail until you provide it. The lesson is the contract catching drift before the UI renders."
@@ -44,6 +56,18 @@ const typescriptRuntimeValidationPracticeReps: LessonPracticeBlock[] = [
 export const typescriptLessons: Lesson[] = [
     {
       id: "lesson-typescript-contracts",
+      curriculum: {
+        level: 0,
+        sequence: 1,
+        version: "1.0.0",
+        lessonKind: "run_file",
+        teaches: ["ts.type.contract"],
+        requires: [],
+        visibleCodeConcepts: ["ts.type.contract"],
+        quizConcepts: ["ts.type.contract"],
+        usesButDoesNotTeach: [],
+        proofOutputs: ["terminal_stdout"]
+      },
       moduleId: "module-typescript-core",
       slug: "typescript-contracts",
       title: "Types Before Screens",
@@ -71,12 +95,12 @@ export const typescriptLessons: Lesson[] = [
           synopsis: "You are learning to describe app data before building screens, so the UI has a clear contract instead of scattered hardcoded values.",
           prerequisites: ["Know that TypeScript adds types to JavaScript.", "Have one simple card or object in mind, such as a mission progress card."],
           testingFocus: "You will test the contract by creating an example object that typechecks and would fail if a required field is missing."
-        },
+      },
         {
           starterCode: "type MissionCard = {\n  title: string;\n  proofCount: number;\n  nextAction: string;\n};\n\nconst card: MissionCard = {\n  title: \"CLI Study Tracker\",\n  proofCount: 2,\n  nextAction: \"Add check output\"\n};",
           expectedOutput: "TypeScript accepts the object because every required field has the expected type.",
           checkYourAnswer: "Temporarily remove proofCount or make it a string. The typecheck should fail, which proves the UI contract is doing real work."
-        },
+      },
         {
           title: "Create a typed mission card contract",
           goal: "Define one TypeScript contract and one example object that a future progress card can render.",
@@ -107,12 +131,24 @@ export const typescriptLessons: Lesson[] = [
             hiddenTests: [],
             expectedOutput: ["typecheck", "proofCount", "passed"]
           }
-        },
+      },
         typescriptContractPracticeReps
       )
     },
     proofLesson({
       id: "lesson-typescript-runtime-validation",
+      curriculum: {
+        level: 1,
+        sequence: 1,
+        version: "1.0.0",
+        lessonKind: "run_file",
+        teaches: ["ts.runtime.guard"],
+        requires: ["ts.type.contract"],
+        visibleCodeConcepts: ["ts.runtime.guard"],
+        quizConcepts: ["ts.runtime.guard"],
+        usesButDoesNotTeach: [],
+        proofOutputs: ["terminal_stdout"]
+      },
       moduleId: "module-typescript-core",
       slug: "typescript-runtime-validation",
       title: "Runtime Validation for External Data",
@@ -155,6 +191,18 @@ export const typescriptLessons: Lesson[] = [
     }),
     {
       id: "lesson-typescript-events-state",
+      curriculum: {
+        level: 1,
+        sequence: 2,
+        version: "1.0.0",
+        lessonKind: "run_file",
+        teaches: ["ts.state.event"],
+        requires: ["ts.type.contract"],
+        visibleCodeConcepts: ["ts.state.event"],
+        quizConcepts: ["ts.state.event"],
+        usesButDoesNotTeach: [],
+        proofOutputs: ["terminal_stdout"]
+      },
       moduleId: "module-typescript-core",
       slug: "typescript-events-state",
       title: "Typed Events Change State",
@@ -182,12 +230,12 @@ export const typescriptLessons: Lesson[] = [
           synopsis: "You are learning how a typed UI turns button actions into testable state changes instead of burying logic inside components.",
           prerequisites: ["Know how to define a TypeScript object type.", "Understand that UI state can be represented as plain data."],
           testingFocus: "You will test the reducer by sending a complete event and checking that only the matching task changes."
-        },
+      },
         {
           starterCode: "type Task = { id: string; title: string; done: boolean };\ntype Event = { type: \"complete\"; id: string };\n\nconst state: Task[] = [{ id: \"t1\", title: \"Run typecheck\", done: false }];\nconst next = reducer(state, { type: \"complete\", id: \"t1\" });\nconsole.log(next);",
           expectedOutput: "The task with id t1 has done: true, and the original state can still be inspected separately.",
           checkYourAnswer: "If state[0].done changed before you assigned next, you mutated the original array. Return a new array so tests and UI updates stay predictable."
-        },
+      },
         {
           title: "Build a typed task reducer",
           goal: "Create a reducer that completes one task from a typed event without mutating the original state.",
@@ -236,14 +284,14 @@ export const typescriptQuizzes: Quiz[] = [
           choices: ["It replaces UI design", "It clarifies what the UI can safely read", "It removes the need for tests"],
           correctChoiceIndex: 1,
           explanation: "The type creates a reliable contract between content, logic, and display."
-        },
+      },
         {
           id: "question-typescript-2",
           prompt: "What happens when a screen reads a field the type does not define?",
           choices: ["TypeScript reports the mismatch before the app runs", "The field silently appears at runtime", "The screen stops needing data"],
           correctChoiceIndex: 0,
           explanation: "A type contract catches unknown or misspelled fields before the app runs instead of inside a finished screen."
-        },
+      },
         {
           id: "question-typescript-3",
           prompt: "Which change keeps a type contract trustworthy?",
@@ -265,14 +313,14 @@ export const typescriptQuizzes: Quiz[] = [
           choices: ["So state changes can be tested with known shapes", "So reducers can mutate every object", "So screens no longer need data"],
           correctChoiceIndex: 0,
           explanation: "Typed events make each action explicit and let tests call state logic without rendering the UI."
-        },
+      },
         {
           id: "question-typescript-events-2",
           prompt: "What should a reducer return after handling an event?",
           choices: ["A next state value", "A hidden global variable", "Only console output"],
           correctChoiceIndex: 0,
           explanation: "Reducers are easiest to test when they return the next state as data."
-        },
+      },
         {
           id: "question-typescript-events-3",
           prompt: "Why avoid mutating the original state array?",

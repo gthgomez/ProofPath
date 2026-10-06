@@ -7,6 +7,18 @@ import { shuffleQuizChoices, workshop } from "../python/shared";
 
 const sqlJoinPracticeReps: LessonPracticeBlock[] = [
   {
+    tier: "transfer",
+    starterCode: "-- New context: an `evidence` table gained a `reviewer` column, and some rows have NULL reviewer.\n-- Print the title of every mission whose evidence is missing OR unreviewed.\nSELECT m.title\nFROM missions m\nLEFT JOIN evidence e ON e.mission_id = m.id\nWHERE e.id IS NULL;",
+    expectedOutput: "Unreviewed rows are still shown, which is the bug this transfer rep exists to expose.",
+    checkYourAnswer: "A LEFT JOIN keeps the mission row when nothing matches, but a row that matches with reviewer NULL is not caught by e.id IS NULL. Add the reviewer condition and check whether you also drop the truly-missing rows."
+  },
+  {
+    tier: "diagnose",
+    starterCode: "-- This query returns zero rows even though missions without evidence exist.\n-- Find the one clause that is wrong.\nSELECT m.title\nFROM missions m\nINNER JOIN evidence e ON e.mission_id = m.id\nWHERE e.id IS NULL;",
+    expectedOutput: "Zero rows, because INNER JOIN already removed every mission that lacks evidence.",
+    checkYourAnswer: "The bug is the join type, not the WHERE clause. INNER JOIN drops the unmatched mission rows before the filter can select them, so the question 'which missions have no evidence' can never be answered with an inner join."
+  },
+  {
     starterCode: "SELECT m.title\nFROM missions m\nLEFT JOIN evidence e ON e.mission_id = m.id\nWHERE e.id IS NULL;",
     expectedOutput: "Only the mission with no linked evidence appears, and its title is 'no evidence'.",
     checkYourAnswer: "Start from the table where missing rows matter. If you start from evidence, missions with no evidence cannot appear."
@@ -26,6 +38,18 @@ const sqlJoinPracticeReps: LessonPracticeBlock[] = [
 export const sqlLessons: Lesson[] = [
     {
       id: "lesson-sql-joins",
+      curriculum: {
+        level: 0,
+        sequence: 1,
+        version: "1.0.0",
+        lessonKind: "run_file",
+        teaches: ["sql.join", "sql.join.direction"],
+        requires: [],
+        visibleCodeConcepts: ["sql.join", "sql.join.direction"],
+        quizConcepts: ["sql.join", "sql.join.direction"],
+        usesButDoesNotTeach: [],
+        proofOutputs: ["terminal_stdout"]
+      },
       moduleId: "module-sql-core",
       slug: "sql-joins",
       title: "Joins That Answer Product Questions",
@@ -53,12 +77,12 @@ export const sqlLessons: Lesson[] = [
           synopsis: "You are learning how joins connect separate tables so you can answer a product question, especially which records are missing proof.",
           prerequisites: ["Know that tables store rows and columns.", "Have two sample tables in mind, such as missions and evidence."],
           testingFocus: "You will test the query against sample rows where one mission has evidence and one mission has none."
-        },
+      },
         {
           starterCode: "SELECT m.title\nFROM missions m\nLEFT JOIN evidence e ON e.mission_id = m.id\nWHERE e.id IS NULL;",
           expectedOutput: "Only missions with no matching evidence rows should appear.",
           checkYourAnswer: "If missions with evidence still appear, your join condition is wrong. If missing missions disappear, you probably used INNER JOIN."
-        },
+      },
         {
           title: "Find missions with missing proof",
           goal: "Create sample SQL tables and write a query that reveals which missions have no evidence.",
@@ -97,6 +121,18 @@ export const sqlLessons: Lesson[] = [
     },
     {
       id: "lesson-sql-constraints",
+      curriculum: {
+        level: 1,
+        sequence: 1,
+        version: "1.0.0",
+        lessonKind: "run_file",
+        teaches: ["sql.schema.constraints"],
+        requires: ["sql.join"],
+        visibleCodeConcepts: ["sql.schema.constraints"],
+        quizConcepts: ["sql.schema.constraints"],
+        usesButDoesNotTeach: [],
+        proofOutputs: ["terminal_stdout"]
+      },
       moduleId: "module-sql-core",
       slug: "sql-constraints",
       title: "Constraints Protect App Data",
@@ -124,12 +160,12 @@ export const sqlLessons: Lesson[] = [
           synopsis: "You are learning how database constraints protect app state so reports about evidence and readiness are based on valid rows.",
           prerequisites: ["Know that tables can reference other tables.", "Understand that app data can become misleading when invalid rows are allowed."],
           testingFocus: "You will test the schema by inserting one valid row and showing one invalid status or missing parent row is rejected."
-        },
+      },
         {
           starterCode: "CREATE TABLE missions (id TEXT PRIMARY KEY, title TEXT NOT NULL);\nCREATE TABLE evidence (\n  id TEXT PRIMARY KEY,\n  mission_id TEXT NOT NULL REFERENCES missions(id),\n  status TEXT NOT NULL CHECK (status IN ('draft', 'verified', 'stale'))\n);",
           expectedOutput: "A valid evidence row can join back to its mission, while an invalid status such as verifed is rejected.",
           checkYourAnswer: "If every status inserts successfully, the constraint is not protecting the table. If evidence can point to no mission, the relationship is only implied."
-        },
+      },
         {
           title: "Constrain an evidence table",
           goal: "Create a small evidence schema that accepts valid rows and rejects invalid status values.",
@@ -179,14 +215,14 @@ export const sqlQuizzes: Quiz[] = [
           choices: ["What color should the button be?", "Which missions have no evidence?", "What is the app name?"],
           correctChoiceIndex: 1,
           explanation: "That answer needs mission rows connected to evidence rows."
-        },
+      },
         {
           id: "question-sql-2",
           prompt: "What does an inner join drop from the results?",
           choices: ["Rows without a matching row on the other side", "Columns with repeated names", "Tables with more than two columns"],
           correctChoiceIndex: 0,
           explanation: "An inner join keeps only paired rows, so unmatched records disappear from the output."
-        },
+      },
         {
           id: "question-sql-3",
           prompt: "Why match rows on IDs instead of display names?",
@@ -208,14 +244,14 @@ export const sqlQuizzes: Quiz[] = [
           choices: ["A child row pointing to a missing parent", "The button color", "The order of README sections"],
           correctChoiceIndex: 0,
           explanation: "A foreign key keeps relationships tied to rows that actually exist."
-        },
+      },
         {
           id: "question-sql-constraints-2",
           prompt: "Why use a CHECK constraint for status?",
           choices: ["To reject values outside the allowed set", "To make every value text", "To avoid all queries"],
           correctChoiceIndex: 0,
           explanation: "A CHECK constraint can prevent misspelled or unsupported states from entering the table."
-        },
+      },
         {
           id: "question-sql-constraints-3",
           prompt: "Why test a rejected row?",

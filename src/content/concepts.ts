@@ -1172,5 +1172,52 @@ export const conceptRegistry: ConceptDefinition[] = [
     category: "evidence",
     description: "Map each layer to evidence, risk, and improvement decision.",
     introducedLevel: 6
-  }
+  },
+
+  // SQL track (src/content/sql/lessons.ts)
+  {
+    id: "sql.join",
+    label: "Joins",
+    category: "data",
+    description: "Connect related tables with INNER, LEFT, and other join types.",
+    introducedLevel: 0
+  },
+  {
+    id: "sql.join.direction",
+    label: "Join Direction",
+    category: "data",
+    description: "Choose which table to start from so unmatched rows are not silently dropped.",
+    introducedLevel: 0,
+    aliases: ["left join vs inner join"]
+  },
+  {
+    id: "sql.schema.constraints",
+    label: "Schema Constraints",
+    category: "data",
+    description: "Use primary keys, foreign keys, and CHECK constraints to reject invalid rows.",
+    introducedLevel: 1
+  },
+
+  // TypeScript track (src/content/typescript/lessons.ts)
+  {
+    id: "ts.type.contract",
+    label: "Type Contracts",
+    category: "typing",
+    description: "Model screen and API data as a named type before writing UI code.",
+    introducedLevel: 0
+  },
+  {
+    id: "ts.runtime.guard",
+    label: "Runtime Validation",
+    category: "typing",
+    description: "Validate unknown external payloads at the boundary before treating them as typed data.",
+    introducedLevel: 0
+  },
+  {
+    id: "ts.state.event",
+    label: "Events and State",
+    category: "typing",
+    description: "Represent state transitions as explicit event types instead of scattered flags.",
+    introducedLevel: 1
+  },
 ];
