@@ -4,7 +4,6 @@ import { Link, Redirect } from "expo-router";
 import { contentPack } from "@/content/seed";
 import { getLessonsForModule, getModulesForTrack } from "@/domain/content";
 import { evaluatePathProofGate, getFutureUnlocksForRole, getTracksForRole, getPathNodes, type FutureUnlockLabel } from "@/domain/role-routing";
-import type { ProjectMission } from "@/domain/types";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { colors, radius, semanticColors, spacing } from "@/ui/theme";

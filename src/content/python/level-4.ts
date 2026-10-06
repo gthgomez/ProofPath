@@ -1,4 +1,4 @@
-import type { Lesson, Quiz, LessonPracticeBlock } from "@/domain/types";
+import type { Lesson, Quiz } from "@/domain/types";
 import { proofLesson, checkpointQuiz, codeReadingQuiz } from "./shared";
 
 // ---------------------------------------------------------------------------

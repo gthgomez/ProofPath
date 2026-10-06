@@ -3,7 +3,7 @@ import type { ComponentProps, ReactElement } from "react";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { contentPack } from "@/content/seed";
-import { getReviewCards, type ReviewCard } from "@/domain/review-queue";
+import { getReviewCards } from "@/domain/review-queue";
 import type { UserProgress } from "@/domain/types";
 import { getContentForRole, getNextLessonForRole, getNextMissionForRole, getTracksForRole, getPathNodes } from "@/domain/role-routing";
 import { getModulesForTrack, getLessonsForModule } from "@/domain/content";

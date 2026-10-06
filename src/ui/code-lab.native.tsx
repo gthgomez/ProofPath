@@ -6,7 +6,7 @@ import { buildRunningTerminalEvents, buildTerminalTranscript, codeRunCommand, em
 import { isScaffoldStarter, scaffoldStarterNotice, type ScaffoldStarterNotice } from "@/domain/starter-expectation";
 import type { CodeRunAttempt, CodeRunMode, TerminalEvent } from "@/domain/types";
 import { buildProblemDiagnostics } from "@/sandbox/diagnostics";
-import { formatPolicyViolationFeedback, formatSandboxFailureFeedback } from "@/sandbox/feedback";
+import { formatPolicyViolationFeedback } from "@/sandbox/feedback";
 import {
   createNativeWebViewRunnerHtml,
   NATIVE_ANDROID_SANDBOX_BASE_URL,

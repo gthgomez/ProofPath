@@ -973,7 +973,6 @@ for (const lesson of contentPack.lessons) {
   const depth = lesson.depth;
 
   // Rule H: Concept Budget
-  const numNew = depth.conceptCapsules.length;
   const numSecondary = depth.secondaryConceptIds.length;
   if (lesson.difficulty === "foundation") {
     if (numSecondary > 2) {
@@ -1413,7 +1412,6 @@ for (const lesson of contentPack.lessons) {
       // no variables/f-strings/lists/dicts/if/loops/functions/assertions/file input/CLI args/Git/GitHub
       const checkRestricted = (snippet: string, surfaceName: string) => {
         const stripped = stripComments(snippet);
-        const strippedFull = stripCommentsAndStrings(snippet);
 
         if (/\b[a-zA-Z_][a-zA-Z0-9_]*\s*=(?!=)/.test(stripped)) {
           errors.push(`Level 0 Lesson '${lesson.id}' contains variable assignment in surface '${surfaceName}': '${stripped.trim()}'`);
