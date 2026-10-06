@@ -1,6 +1,6 @@
 # Career Paths Future Roadmap (2026+)
 
-**Purpose:** Research-led roadmap for the current CareerForge Mobile `path-*` model and its next curriculum additions while lessons are still movable.
+**Purpose:** Research-led roadmap for the current ProofPath `path-*` model and its next curriculum additions while lessons are still movable.
 
 **Status:** Implemented as active path taxonomy on 2026-05-31. See [career-paths-current-curriculum-2026.md](./career-paths-current-curriculum-2026.md) for the current summary.
 
@@ -17,7 +17,7 @@ Older local `role-*` values are compatibility inputs only and are normalized int
 
 ## Executive Decision
 
-CareerForge has evolved from three job-title-like paths into a **shared core plus four primary career path families**, with two advanced unlock lanes.
+ProofPath has evolved from three job-title-like paths into a **shared core plus four primary career path families**, with two advanced unlock lanes.
 
 ### Recommended Primary Path Families
 
@@ -110,7 +110,7 @@ The future roadmap should optimize for **durable proof artifacts**, not the curr
 - Git evidence and README quality
 - Intro cloud/deploy vocabulary without promising cloud mastery
 
-**Why it matters:** GPT and Meta both converge on backend/API/data proof as a durable career bridge. It also gives CareerForge a practical spine for future AI, data, and platform work.
+**Why it matters:** GPT and Meta both converge on backend/API/data proof as a durable career bridge. It also gives ProofPath a practical spine for future AI, data, and platform work.
 
 **Avoid:** Over-branding this as "full-stack" before the learner has API and persistence proof.
 
@@ -139,7 +139,7 @@ The future roadmap should optimize for **durable proof artifacts**, not the curr
 
 **Implementation shape:** Start with cross-path secure-default modules, then promote to top-level once there are at least two missions and one gated capstone.
 
-**Avoid:** Certification-first copy. A CareerForge security path should produce practical secure-building evidence, not imply that Security+ alone gets a job.
+**Avoid:** Certification-first copy. A ProofPath security path should produce practical secure-building evidence, not imply that Security+ alone gets a job.
 
 ---
 
@@ -212,7 +212,7 @@ Use these:
 3. **Secure Software & AppSec**
 4. **AI Features & Product Engineering**
 
-This is the best product shape if CareerForge wants to visibly reflect 2026 AI demand while still being honest about fundamentals.
+This is the best product shape if ProofPath wants to visibly reflect 2026 AI demand while still being honest about fundamentals.
 
 ### Do Not Use As Day-One Cards
 
@@ -338,7 +338,7 @@ The active migration has happened in code. Progress loading and path selection n
 
 ## Recommendation
 
-Because lessons are not finalized, CareerForge should **add Secure Software & AppSec and expand Backend/Data before locking the curriculum**.
+Because lessons are not finalized, ProofPath should **add Secure Software & AppSec and expand Backend/Data before locking the curriculum**.
 
 The strongest future-facing structure is:
 

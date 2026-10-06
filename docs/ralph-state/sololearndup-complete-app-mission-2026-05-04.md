@@ -2,7 +2,7 @@
 
 Status: archived historical record.
 
-This file was written when CareerForge Mobile still used the `SoloLearnDup` working name and path. It is retained only for provenance and should not be used as current routing, execution state, or approval authority. Current work belongs in `C:\Workspace\Project_Android\CareerForgeMobile`; use [../README.md](../README.md) for current documentation routing.
+This file was written when CareerForge Mobile still used the `SoloLearnDup` working name and path. It is retained only for provenance and should not be used as current routing, execution state, or approval authority. Current work belongs in the `ProofPath/` repo root; use [../README.md](../README.md) for current documentation routing.
 
 GOAL ID: sololearndup-complete-app-mission-2026-05-04
 GOAL HASH: user-request-2026-05-04-complete-app-phase-gated-research-hardened

@@ -1,10 +1,10 @@
-# CareerForge Sandbox QA Baseline
+# ProofPath Sandbox QA Baseline
 
 Status: web and Android screenshot baseline captured; manual device notes still partial.
 
 ## Local Baseline
 
-- Workspace: `C:\Workspace\Project_Android\CareerForgeMobile`
+- Workspace: the `ProofPath/` repo root
 - App stack: Expo, React Native, TypeScript, Expo SQLite
 - Verification command: `npm run verify`
 - Baseline result before roadmap implementation: pass, 16 test files, 75 tests

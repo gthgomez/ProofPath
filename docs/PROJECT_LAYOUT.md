@@ -106,11 +106,13 @@ Screen-level building blocks; no curriculum definitions live here.
 - `scan-sandbox-redaction.ts` — scans sandbox templates for policy violations (`npm run scan:redaction`).
 - `python-depth-audit.ts` — Python depth-coverage audit.
 - `copy-sandbox-assets.js` — copies Pyodide/sql.js WASM bundles into `android/` and `public/` (runs on postinstall).
-- `generate-careerforge-icon.ps1` — icon generation helper (legacy file name).
+- `generate-proofpath-icon.ps1` — icon generation helper. Also writes `docs/careerforge-icon-512.png` (legacy file name) plus the app-facing `assets/proofpath-icon.png` and Android drawable.
 
 ## tests/ — Vitest Suite
 
 Vitest suite mirroring domain, sandbox, storage, and content rules. File/test counts change with every commit, so they live in CI per run rather than here (`npm run test`; `npm run verify` is the full gate: validate:content + report:content + scan:redaction + typecheck + test).
+
+Journey tests (`journey-*.test.tsx`) render React components through `react-native-web` under jsdom and share `journey-helpers.tsx`. They set testing-library's `asyncUtilTimeout` to 20000 in `tests/setup.ts` because the Code Lab pads each run with real `waitForRunPhase` timers; the default 1000ms makes those tests fail intermittently under parallel load.
 
 ## android/app/src/main/assets/sandbox-assets/ — Bundled WASM
 

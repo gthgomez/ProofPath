@@ -1,6 +1,6 @@
-# CareerForge Sandbox Runtime Limits
+# ProofPath Sandbox Runtime Limits
 
-CareerForge Code Lab is a production-style workflow trainer, not a full IDE and not a deployed production environment. The MVP teaches a focused loop:
+ProofPath Code Lab is a production-style workflow trainer, not a full IDE and not a deployed production environment. The MVP teaches a focused loop:
 
 1. Edit one file.
 2. Run file to inspect output.

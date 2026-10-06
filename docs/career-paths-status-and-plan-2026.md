@@ -1,10 +1,10 @@
 # Career Paths Status And Plan, 2026
 
 **Last updated:** 2026-06-01
-**Purpose:** Maintainer view of the active CareerForge path taxonomy, current track coverage, and next curriculum work.  
+**Purpose:** Maintainer view of the active ProofPath path taxonomy, current track coverage, and next curriculum work.  
 **Code anchors:** `src/content/roles.ts`, `src/content/seed.ts`, `app/onboarding.tsx`, `app/settings.tsx`.
 
-CareerForge now uses active `path-*` career IDs. Older `role-*` strings are no longer the product taxonomy; they are compatibility inputs only and are normalized into the new paths by progress loading/selection code.
+ProofPath now uses active `path-*` career IDs. Older `role-*` strings are no longer the product taxonomy; they are compatibility inputs only and are normalized into the new paths by progress loading/selection code.
 
 See [career-paths-current-curriculum-2026.md](./career-paths-current-curriculum-2026.md) for the concise curriculum and unlock summary.
 

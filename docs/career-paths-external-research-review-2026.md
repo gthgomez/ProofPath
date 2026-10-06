@@ -1,6 +1,6 @@
 # External CS career research review (2026)
 
-**Purpose:** Critique four external research exports against CareerForge Mobile’s authoritative direction.  
+**Purpose:** Critique four external research exports against ProofPath’s authoritative direction.  
 **Authority:** [career-paths-status-and-plan-2026.md](./career-paths-status-and-plan-2026.md) (primary), [career-paths-future-roadmap-2026.md](./career-paths-future-roadmap-2026.md), [career-paths-2026.md](./career-paths-2026.md), [career-paths-research-2026.md](./career-paths-research-2026.md).  
 **Reviewed:** 2026-05-30. External files read from user Downloads; not committed to this repo.
 
@@ -26,7 +26,7 @@
 | --- | ---: |
 | Alignment with authoritative direction | **6** |
 | Methodology (evidence, citations, reproducibility) | **8** |
-| Actionability for CareerForge | **5** |
+| Actionability for ProofPath | **5** |
 
 **Strengths**
 
@@ -76,7 +76,7 @@
 - Ranked shortlist puts **Cloud/Platform #2** and **Data Engineering #4** above nuanced treatment of **generalist junior** and our **Python-backend** story.
 - **BLS “22–26% growth” and “300,000+ annual openings”** for software developers are **inconsistent** with OOH wording used elsewhere (GPT uses 16% / 129,200 — closer to standard OOH tables). Treat Copilot growth figures as **unverified**.
 - Heavy reliance on **LinkedIn articles, Dice, Coursera, codewave.com, elearningfaculty.org** — weak for frequency claims.
-- Recommends **certification pathways** (CompTIA, AWS) as product integration — out of scope for current CareerForge spine.
+- Recommends **certification pathways** (CompTIA, AWS) as product integration — out of scope for current ProofPath spine.
 
 **Cherry-pick / hallucination risk**
 
@@ -215,7 +215,7 @@
 
 ### Suggested appendix paragraph (`career-paths-status-and-plan-2026.md`)
 
-> **External research review (updated 2026-05-31):** Four third-party CS career exports were compared to CareerForge planning. All supported proof-first learning, AI verification over prompt-only skills, and deferring ML engineering as an outcome. Because lessons are not finalized, the research now justifies roadmap changes: promote **Secure Software & AppSec**, expand **Backend, APIs & Data Systems**, keep **AI Features & Product Engineering** visible but bounded, and keep cloud/platform plus ML as advanced unlocks. Only the GPT export met the strongest evidence standard; the Gemini export contained unverified growth multipliers (e.g. “346%” cyber) and should not drive ranking. Full future synthesis: [career-paths-future-roadmap-2026.md](./career-paths-future-roadmap-2026.md).
+> **External research review (updated 2026-05-31):** Four third-party CS career exports were compared to ProofPath planning. All supported proof-first learning, AI verification over prompt-only skills, and deferring ML engineering as an outcome. Because lessons are not finalized, the research now justifies roadmap changes: promote **Secure Software & AppSec**, expand **Backend, APIs & Data Systems**, keep **AI Features & Product Engineering** visible but bounded, and keep cloud/platform plus ML as advanced unlocks. Only the GPT export met the strongest evidence standard; the Gemini export contained unverified growth multipliers (e.g. “346%” cyber) and should not drive ranking. Full future synthesis: [career-paths-future-roadmap-2026.md](./career-paths-future-roadmap-2026.md).
 
 ---
 

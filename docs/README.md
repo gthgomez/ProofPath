@@ -30,9 +30,9 @@ These documents inform product decisions but are not themselves implementation a
 
 ## Generated Preview Assets
 
-- [careerforge-web-preview/](./careerforge-web-preview/) (legacy directory name) is generated locally for web-preview runtime assets, including Pyodide and sql.js bundles. It is not committed, so it may be absent from a fresh checkout — generate it locally rather than expecting it on disk.
+- Web-preview runtime assets (Pyodide and sql.js bundles) are generated into `public/sandbox-assets/` and `android/app/src/main/assets/sandbox-assets/` by `scripts/copy-sandbox-assets.js` on `postinstall`. They are not committed.
 - `expo-web*.log` files are local preview logs and may be empty or absent between runs.
-- [careerforge-icon-512.png](./careerforge-icon-512.png) (legacy file name) is the icon image artifact.
+- [careerforge-icon-512.png](./careerforge-icon-512.png) is the icon artifact, still written under its legacy file name by `scripts/generate-proofpath-icon.ps1`. The app-facing copies are `assets/proofpath-icon.png` and `android/app/src/main/res/drawable/proofpath_icon_foreground.xml`.
 
 Generated assets are evidence or preview support, not policy or source-of-truth documentation.
 

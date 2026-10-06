@@ -97,7 +97,10 @@ export async function answerQuiz(quiz: Quiz, mode: "correct" | "wrong" = "correc
     const choiceIndex = mode === "correct"
       ? question.correctChoiceIndex
       : (question.correctChoiceIndex + 1) % question.choices.length;
-    const badge = screen.getByText(`Question ${index + 1}/${quiz.questions.length}`);
+    // Async query: the Checkpoint step renders its quiz after the step
+    // transition, so a synchronous `getByText` here can run before the
+    // question block exists and fail spuriously.
+    const badge = await screen.findByText(`Question ${index + 1}/${quiz.questions.length}`);
     // Text → Badge View → Row → question block View
     const questionBlock = badge.parentElement?.parentElement?.parentElement;
     if (!questionBlock) {

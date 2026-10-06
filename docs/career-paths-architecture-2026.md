@@ -8,7 +8,7 @@
 
 ## Executive summary
 
-CareerForge Mobile should expose **exactly three parallel learner paths** for new CS students—chosen at onboarding, not climbed as a single “junior → senior” ladder. Depth comes from **skill prerequisites and verifier-backed evidence**, not job-title vanity.
+ProofPath should expose **exactly three parallel learner paths** for new CS students—chosen at onboarding, not climbed as a single “junior → senior” ladder. Depth comes from **skill prerequisites and verifier-backed evidence**, not job-title vanity.
 
 | Recommended learner-facing name | Stable role ID | Primary hiring story |
 | --- | --- | --- |
