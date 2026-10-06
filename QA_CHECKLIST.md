@@ -47,7 +47,7 @@
 ## 5. Tests
 
 - [ ] npm run test passes
-- [ ] All 21 test suites green (21 test files, 292 test cases)
+- [ ] Full suite green (exact file/test totals are recorded per CI run, not listed here — see [GitHub Actions](https://github.com/gthgomez/ProofPath/actions))
 
 **Pass criteria: 2/2**
 
