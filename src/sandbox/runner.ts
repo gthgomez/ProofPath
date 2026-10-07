@@ -1,6 +1,7 @@
 import {
   buildTerminalTranscript,
   codeRunCommand,
+  defaultFileName,
   emptyHiddenCheckSummary,
   normalizeCodeRunAttempt,
   redactCheckResults
@@ -13,6 +14,13 @@ import {
   formatSandboxFailureFeedback
 } from "@/sandbox/feedback";
 import { validateSandboxSubmission } from "@/sandbox/policy";
+import {
+  assertTypeScriptSourceWithinLimit,
+  evaluateTypeScriptTypeCheck,
+  loadTypeScriptLibFiles,
+  type TypeScriptCompiler,
+  type TypeScriptTypeCheckResult
+} from "@/sandbox/typescript-typecheck";
 
 interface CapturedConsole {
   stdout: string[];
@@ -31,8 +39,11 @@ let pyodideRuntime: unknown | null = null;
 let sqlRuntime: SqlJsModule | null = null;
 let pyodidePromise: Promise<any> | null = null;
 let sqlPromise: Promise<SqlJsModule> | null = null;
+let typeScriptRuntime: TypeScriptCompiler | null = null;
+let typeScriptPromise: Promise<TypeScriptCompiler> | null = null;
 const PYODIDE_INDEX_URL = "/sandbox-assets/pyodide/";
 const SQLJS_DIST_URL = "/sandbox-assets/sql.js/";
+const TYPESCRIPT_DIST_URL = "/sandbox-assets/typescript/";
 
 // Python's `__name__` for a file run directly is "__main__"; imported modules use
 // their own name. The sandbox has no real module name for checks, so it uses a
@@ -168,6 +179,8 @@ declare global {
   interface Window {
     loadPyodide?: (options?: { indexURL?: string }) => Promise<unknown>;
     initSqlJs?: (config?: { locateFile?: (file: string) => string }) => Promise<SqlJsModule>;
+    ts?: TypeScriptCompiler;
+    PROOFPATH_TYPESCRIPT_LIBS?: Record<string, string>;
   }
 }
 
@@ -524,7 +537,113 @@ async function runJavaScriptInProcess(spec: LessonRunnerSpec, runtimeCode: strin
   };
 }
 
+function loadScriptAsset(src: string, label: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Unable to load ${label}.`));
+    document.head.appendChild(script);
+  });
+}
+
+async function getTypeScript(): Promise<TypeScriptCompiler> {
+  if (typeScriptRuntime) {
+    return typeScriptRuntime;
+  }
+
+  if (typeScriptPromise) {
+    return typeScriptPromise;
+  }
+
+  typeScriptPromise = (async () => {
+    if (typeof window !== "undefined" && typeof document !== "undefined") {
+      if (!window.ts) {
+        await loadScriptAsset(sameOriginAssetUrl(`${TYPESCRIPT_DIST_URL}typescript.js`), "TypeScript compiler runtime");
+      }
+
+      if (!window.ts) {
+        throw new Error("TypeScript compiler runtime loaded without ts.");
+      }
+
+      if (!window.PROOFPATH_TYPESCRIPT_LIBS) {
+        await loadScriptAsset(sameOriginAssetUrl(`${TYPESCRIPT_DIST_URL}typescript-libs.js`), "TypeScript library assets");
+      }
+
+      if (!window.PROOFPATH_TYPESCRIPT_LIBS) {
+        throw new Error("TypeScript library assets loaded without libs.");
+      }
+
+      typeScriptRuntime = window.ts;
+      return typeScriptRuntime;
+    }
+
+    const loaded = await importRuntimeModule("typescript");
+    typeScriptRuntime = ((loaded as { default?: TypeScriptCompiler }).default ?? loaded) as TypeScriptCompiler;
+    return typeScriptRuntime;
+  })().catch((error) => {
+    // Clear the rejected promise so a transient asset-load failure can be
+    // retried instead of poisoning every later type check.
+    typeScriptPromise = null;
+    throw error;
+  });
+
+  return typeScriptPromise;
+}
+
+function getTypeScriptLibFiles(ts: TypeScriptCompiler): Record<string, string> {
+  if (typeof window !== "undefined" && window.PROOFPATH_TYPESCRIPT_LIBS) {
+    return window.PROOFPATH_TYPESCRIPT_LIBS;
+  }
+
+  return loadTypeScriptLibFiles(ts);
+}
+
+async function typeCheckTypeScript(code: string): Promise<TypeScriptTypeCheckResult> {
+  const ts = await getTypeScript();
+  return evaluateTypeScriptTypeCheck(ts, getTypeScriptLibFiles(ts), defaultFileName("typescript"), code);
+}
+
+function typeCheckFailureResult(
+  spec: LessonRunnerSpec,
+  runMode: CodeRunMode,
+  typeCheck: TypeScriptTypeCheckResult
+): Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults"> {
+  if (runMode === "run_file") {
+    return { stdout: "", stderr: typeCheck.stderr, testResults: [] };
+  }
+
+  const tests = [...spec.visibleTests, ...spec.hiddenTests];
+  return {
+    stdout: "",
+    stderr: typeCheck.stderr,
+    testResults: tests.map((test, index) => ({
+      id: test.id,
+      name: test.name,
+      passed: false,
+      visible: index < spec.visibleTests.length,
+      message: typeCheck.learnerMessage
+    }))
+  };
+}
+
 async function runJavaScriptLike(spec: LessonRunnerSpec, code: string, runMode: CodeRunMode): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
+  // TypeScript lessons must fail on type errors, which stripping and running the
+  // code can never detect. `stripTypeScript` is still used below, but only to
+  // erase annotations before execution: it is no longer the verification step.
+  if (spec.language === "typescript") {
+    // Fail fast before loading the ~9 MB compiler for a pathologically large
+    // submission. The type check itself runs `ts.createProgram` synchronously on
+    // the main thread, so the lesson `Promise.race` timeout cannot preempt it;
+    // this input cap is the only bound on that work.
+    assertTypeScriptSourceWithinLimit(code);
+    const typeCheck = await typeCheckTypeScript(code);
+    if (typeCheck.diagnostics.length > 0) {
+      return typeCheckFailureResult(spec, runMode, typeCheck);
+    }
+  }
+
   const runtimeCode = spec.language === "typescript" ? stripTypeScript(code) : code;
   return runJavaScriptInWorker(spec, runtimeCode, runMode);
 }
@@ -562,7 +681,11 @@ async function getPyodide(): Promise<any> {
     const pyodide = await importRuntimeModule("pyodide") as { loadPyodide: () => Promise<unknown> };
     pyodideRuntime = await pyodide.loadPyodide();
     return pyodideRuntime;
-  })();
+  })().catch((error) => {
+    // Clear the rejected promise so a transient boot failure can be retried.
+    pyodidePromise = null;
+    throw error;
+  });
 
   return pyodidePromise;
 }
@@ -676,7 +799,11 @@ async function getSqlJs(): Promise<SqlJsModule> {
       locateFile: (file) => sameOriginAssetUrl(`${SQLJS_DIST_URL}${file}`)
     });
     return sqlRuntime;
-  })();
+  })().catch((error) => {
+    // Clear the rejected promise so a transient boot failure can be retried.
+    sqlPromise = null;
+    throw error;
+  });
 
   return sqlPromise;
 }
@@ -952,6 +1079,12 @@ export function preloadSandbox(language: string): void {
     void getSqlJs().catch((err) => {
       console.warn("Failed to preload sql.js sandbox:", err);
     });
+  } else if (language === "typescript") {
+    // Warm the compiler asset before the timed check so the first type check
+    // on a low-end device does not race the lesson's 4s timeout.
+    void getTypeScript().catch((err) => {
+      console.warn("Failed to preload TypeScript sandbox:", err);
+    });
   }
 }
 
@@ -971,8 +1104,8 @@ export function getSandboxCapabilityLabel(language: string): {
 
   if (language === "typescript") {
     return {
-      label: "TypeScript: V8 sandbox",
-      note: "Types stripped at runtime."
+      label: "TypeScript: typecheck + V8 sandbox",
+      note: "Types are checked by the bundled TypeScript compiler before the file runs, then stripped for execution. One file, ES2015 lib, strict off."
     };
   }
 

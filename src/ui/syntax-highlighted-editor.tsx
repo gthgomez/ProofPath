@@ -210,7 +210,7 @@ function runtimeLabel(language: RunnerLanguage): string {
   }
 
   if (language === "typescript") {
-    return "TypeScript transform runtime";
+    return "TypeScript typecheck runtime";
   }
 
   return "JavaScript runtime";

@@ -1,5 +1,5 @@
 import { normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
-import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec } from "@/domain/types";
+import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec, RunnerLanguage } from "@/domain/types";
 import {
   PYTHON_DIRECT_RUN_NAME,
   PYTHON_IMPORT_RUN_NAME,
@@ -7,6 +7,7 @@ import {
   SQL_HARNESS_PATTERN,
   isTrustedSqlHarness
 } from "./runner";
+import { TYPESCRIPT_MAX_SOURCE_CHARS, TYPESCRIPT_TYPE_CHECK_SOURCE } from "./typescript-typecheck";
 
 export interface NativeWebViewRunnerRequest {
   lessonId: string;
@@ -18,10 +19,48 @@ export interface NativeWebViewRunnerRequest {
 
 export const SANDBOX_ASSET_PATHS = {
   pyodide: "file:///android_asset/sandbox-assets/pyodide/",
-  sqlJs: "file:///android_asset/sandbox-assets/sql.js/"
+  sqlJs: "file:///android_asset/sandbox-assets/sql.js/",
+  typescript: "file:///android_asset/sandbox-assets/typescript/"
 } as const;
 
 export const NATIVE_ANDROID_SANDBOX_BASE_URL = "file:///android_asset/";
+
+const NATIVE_RUNTIME_ASSET_LANGUAGES = ["python", "sql", "typescript"] as const;
+
+/**
+ * Extra wall-clock time granted on top of a lesson's `timeoutMs` for the first
+ * run in a session, covering the cost of loading a large sandbox runtime into
+ * the WebView. Python (Pyodide), SQL (sql.js), and TypeScript all load a bundled
+ * asset, so all three need the allowance: TypeScript loads an ~9 MB compiler,
+ * heavier than sql.js and comparable to Pyodide. A learner should not see a
+ * spurious timeout because the runtime was still parsing.
+ *
+ * Status: this is a flat, deliberately generous ceiling. The ~4250 ms device
+ * cold-start figure often quoted for the TypeScript asset has not been measured
+ * on a physical device, so treat 20 s as an unvalidated upper bound rather than
+ * a measured budget. Do not lower it without device timing evidence.
+ */
+export const NATIVE_RUNTIME_STARTUP_ALLOWANCE_MS = 20000;
+export const NATIVE_DEFAULT_STARTUP_ALLOWANCE_MS = 250;
+
+/** Resolve the startup allowance a native run gets for its language runtime. */
+export function nativeStartupAllowanceMs(language: RunnerLanguage): number {
+  return (NATIVE_RUNTIME_ASSET_LANGUAGES as readonly string[]).includes(language)
+    ? NATIVE_RUNTIME_STARTUP_ALLOWANCE_MS
+    : NATIVE_DEFAULT_STARTUP_ALLOWANCE_MS;
+}
+
+/**
+ * Resolve the wall-clock timeout for a native run. The startup allowance is
+ * granted only while the language runtime is still cold: once the WebView has
+ * reported (via the `sandbox-warm` preload handshake) that the runtime is
+ * loaded, later runs get the lesson's plain `timeoutMs`. Without this gate a
+ * session that preloaded `typescript` would keep 20 s of slack on every run,
+ * masking a genuinely runaway submission.
+ */
+export function nativeRunTimeoutMs(timeoutMs: number, language: RunnerLanguage, isRuntimeWarm: boolean): number {
+  return isRuntimeWarm ? timeoutMs : timeoutMs + nativeStartupAllowanceMs(language);
+}
 
 /**
  * Exported test seam. The native runtime path does not call this wrapper: the
@@ -43,7 +82,15 @@ export interface NativeWebViewRunnerResultMessage {
   attempt: CodeRunAttempt;
 }
 
-export type NativeWebViewRunnerMessage = NativeWebViewRunnerReadyMessage | NativeWebViewRunnerResultMessage;
+export interface NativeWebViewRunnerWarmMessage {
+  type: "sandbox-warm";
+  language: RunnerLanguage;
+}
+
+export type NativeWebViewRunnerMessage =
+  | NativeWebViewRunnerReadyMessage
+  | NativeWebViewRunnerResultMessage
+  | NativeWebViewRunnerWarmMessage;
 
 export function createNativeWebViewRunnerHtml(): string {
   return `<!doctype html>
@@ -55,6 +102,10 @@ export function createNativeWebViewRunnerHtml(): string {
 <body>
   <script>
     window.PROOFPATH_SANDBOX_ASSETS = ${JSON.stringify(SANDBOX_ASSET_PATHS)};
+    // Mirrors TYPESCRIPT_MAX_SOURCE_CHARS in src/sandbox/typescript-typecheck.ts.
+    // The type check runs synchronously on the main thread, so a huge submission
+    // is rejected before the compiler asset is loaded rather than freezing the UI.
+    const TYPESCRIPT_MAX_SOURCE_CHARS = ${TYPESCRIPT_MAX_SOURCE_CHARS};
     // Shared with the web runner (src/sandbox/runner.ts) so the two runners
     // cannot drift on Python run-mode fidelity or SQL harness gating.
     const PYTHON_DIRECT_RUN_NAME = ${JSON.stringify(PYTHON_DIRECT_RUN_NAME)};
@@ -135,6 +186,11 @@ export function createNativeWebViewRunnerHtml(): string {
       return true;
     }
     /* trusted-sql-harness-gate:end */
+    /* typescript-typecheck:start */
+    // Shared with the web runner (src/sandbox/typescript-typecheck.ts) so a type
+    // error fails a check identically in the browser and the native WebView.
+    ${TYPESCRIPT_TYPE_CHECK_SOURCE}
+    /* typescript-typecheck:end */
     function post(payload) {
       window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
     }
@@ -279,10 +335,38 @@ export function createNativeWebViewRunnerHtml(): string {
       };
     }
 
-    function runJavaScriptLike(request) {
+    let typeScriptRuntime = null;
+    async function getTypeScriptRuntime() {
+      if (typeScriptRuntime) return typeScriptRuntime;
+
+      if (!window.ts) {
+        await loadScript(window.PROOFPATH_SANDBOX_ASSETS.typescript + "typescript.js");
+      }
+
+      if (!window.ts) {
+        throw new Error("TypeScript compiler asset loaded without ts.");
+      }
+
+      if (!window.PROOFPATH_TYPESCRIPT_LIBS) {
+        await loadScript(window.PROOFPATH_SANDBOX_ASSETS.typescript + "typescript-libs.js");
+      }
+
+      if (!window.PROOFPATH_TYPESCRIPT_LIBS) {
+        throw new Error("TypeScript library assets loaded without libs.");
+      }
+
+      typeScriptRuntime = window.ts;
+      return typeScriptRuntime;
+    }
+
+    async function runTypeScriptTypeCheck(code) {
+      const ts = await getTypeScriptRuntime();
+      return proofPathTypeCheck(ts, window.PROOFPATH_TYPESCRIPT_LIBS, "lesson.ts", code);
+    }
+
+    async function runJavaScriptLike(request) {
       const startedAt = Date.now();
       const spec = request.spec;
-      const runtimeCode = spec.language === "typescript" ? stripTypeScript(request.code) : request.code;
       const stdout = [];
       const stderr = [];
       const testResults = [];
@@ -291,6 +375,37 @@ export function createNativeWebViewRunnerHtml(): string {
         log: (...values) => stdout.push(values.map(normalizeOutput).join(" ")),
         error: (...values) => stderr.push(values.map(normalizeOutput).join(" "))
       };
+
+      // TypeScript lessons must fail on type errors, which stripping and running
+      // the code can never detect. stripTypeScript is still used below, but only
+      // to erase annotations before execution.
+      if (spec.language === "typescript") {
+        // Fail fast before loading the ~9 MB compiler for a pathologically large
+        // submission: ts.createProgram is synchronous and cannot be preempted.
+        if (request.code.length > TYPESCRIPT_MAX_SOURCE_CHARS) {
+          throw new Error("TypeScript source is too large to type-check: " + request.code.length +
+            " characters exceeds the " + TYPESCRIPT_MAX_SOURCE_CHARS + "-character limit.");
+        }
+        const typeCheck = await runTypeScriptTypeCheck(request.code);
+        if (typeCheck.diagnostics.length > 0) {
+          stderr.push(typeCheck.stderr);
+          if (request.runMode === "run_file") {
+            return buildAttempt(request, startedAt, stdout, stderr, testResults);
+          }
+          for (let index = 0; index < tests.length; index += 1) {
+            testResults.push({
+              id: tests[index].id,
+              name: tests[index].name,
+              passed: false,
+              visible: index < spec.visibleTests.length,
+              message: typeCheck.learnerMessage
+            });
+          }
+          return buildAttempt(request, startedAt, stdout, stderr, testResults);
+        }
+      }
+
+      const runtimeCode = spec.language === "typescript" ? stripTypeScript(request.code) : request.code;
 
       if (request.runMode === "run_file") {
         try {
@@ -334,40 +449,66 @@ export function createNativeWebViewRunnerHtml(): string {
       return buildAttempt(request, startedAt, stdout, stderr, testResults);
     }
 
+    const scriptPromises = {};
     function loadScript(src) {
-      return new Promise((resolve, reject) => {
-        const existing = document.querySelector('script[data-proofpath-src="' + src + '"]');
-        if (existing) {
-          resolve();
-          return;
-        }
+      // Cache the in-flight promise so overlapping loads (a preload racing the
+      // first run) share one load instead of the second caller seeing the
+      // first's still-loading tag and resolving before the asset is usable.
+      if (scriptPromises[src]) {
+        return scriptPromises[src];
+      }
 
+      const promise = new Promise((resolve, reject) => {
         const script = document.createElement("script");
         script.async = true;
         script.dataset.proofpathSrc = src;
         script.src = src;
         script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Unable to load bundled sandbox asset: " + src));
+        script.onerror = () => {
+          script.remove();
+          reject(new Error("Unable to load bundled sandbox asset: " + src));
+        };
         document.head.appendChild(script);
+      }).catch((error) => {
+        // Allow a later attempt to retry after a transient load failure.
+        delete scriptPromises[src];
+        throw error;
       });
+
+      scriptPromises[src] = promise;
+      return promise;
     }
 
     let pyodideRuntime = null;
+    let pyodideRuntimePromise = null;
     async function getPyodideRuntime() {
       if (pyodideRuntime) return pyodideRuntime;
+      // Cache the in-flight promise, not just the resolved runtime: a run that
+      // races the preload must share the one Pyodide boot instead of starting a
+      // second instance.
+      if (pyodideRuntimePromise) return pyodideRuntimePromise;
 
-      if (!window.loadPyodide) {
-        await loadScript(window.PROOFPATH_SANDBOX_ASSETS.pyodide + "pyodide.js");
-      }
+      const promise = (async function() {
+        if (!window.loadPyodide) {
+          await loadScript(window.PROOFPATH_SANDBOX_ASSETS.pyodide + "pyodide.js");
+        }
 
-      if (!window.loadPyodide) {
-        throw new Error("Pyodide asset loaded without loadPyodide.");
-      }
+        if (!window.loadPyodide) {
+          throw new Error("Pyodide asset loaded without loadPyodide.");
+        }
 
-      pyodideRuntime = await window.loadPyodide({
-        indexURL: window.PROOFPATH_SANDBOX_ASSETS.pyodide
+        pyodideRuntime = await window.loadPyodide({
+          indexURL: window.PROOFPATH_SANDBOX_ASSETS.pyodide
+        });
+        return pyodideRuntime;
+      })().catch(function(error) {
+        // Allow a later attempt to retry after a transient boot failure.
+        pyodideRuntimePromise = null;
+        throw error;
       });
-      return pyodideRuntime;
+
+      pyodideRuntimePromise = promise;
+      return promise;
     }
 
     async function runPython(request) {
@@ -436,21 +577,34 @@ export function createNativeWebViewRunnerHtml(): string {
     }
 
     let sqlRuntime = null;
+    let sqlRuntimePromise = null;
     async function getSqlRuntime() {
       if (sqlRuntime) return sqlRuntime;
+      // See getPyodideRuntime: cache the in-flight promise so a run racing the
+      // preload shares one sql.js initialization.
+      if (sqlRuntimePromise) return sqlRuntimePromise;
 
-      if (!window.initSqlJs) {
-        await loadScript(window.PROOFPATH_SANDBOX_ASSETS.sqlJs + "sql-wasm.js");
-      }
+      const promise = (async function() {
+        if (!window.initSqlJs) {
+          await loadScript(window.PROOFPATH_SANDBOX_ASSETS.sqlJs + "sql-wasm.js");
+        }
 
-      if (!window.initSqlJs) {
-        throw new Error("sql.js asset loaded without initSqlJs.");
-      }
+        if (!window.initSqlJs) {
+          throw new Error("sql.js asset loaded without initSqlJs.");
+        }
 
-      sqlRuntime = await window.initSqlJs({
-        locateFile: (file) => window.PROOFPATH_SANDBOX_ASSETS.sqlJs + file
+        sqlRuntime = await window.initSqlJs({
+          locateFile: (file) => window.PROOFPATH_SANDBOX_ASSETS.sqlJs + file
+        });
+        return sqlRuntime;
+      })().catch(function(error) {
+        // Allow a later attempt to retry after a transient boot failure.
+        sqlRuntimePromise = null;
+        throw error;
       });
-      return sqlRuntime;
+
+      sqlRuntimePromise = promise;
+      return promise;
     }
 
     async function runSql(request) {
@@ -556,7 +710,7 @@ export function createNativeWebViewRunnerHtml(): string {
         } else if (request.spec.language === "sql") {
           attempt = await runSql(request);
         } else {
-          attempt = runJavaScriptLike(request);
+          attempt = await runJavaScriptLike(request);
         }
       } catch (error) {
         attempt = runnerErrorAttempt(request, error);
@@ -565,16 +719,45 @@ export function createNativeWebViewRunnerHtml(): string {
       post({ type: "sandbox-result", attempt });
     }
 
+    function preloadRuntime(language) {
+      // Warm the bundled asset before the first timed run so a cold 9 MB
+      // TypeScript parse does not race the per-run allowance.
+      var warmPromise = null;
+      if (language === "typescript") {
+        warmPromise = getTypeScriptRuntime();
+      } else if (language === "python") {
+        warmPromise = getPyodideRuntime();
+      } else if (language === "sql") {
+        warmPromise = getSqlRuntime();
+      }
+
+      if (!warmPromise) {
+        return;
+      }
+
+      // Report once the runtime is actually usable. The host drops the
+      // cold-start allowance only after this handshake, so a run racing a
+      // still-loading preload keeps its allowance while later runs do not.
+      warmPromise.then(function() {
+        post({ type: "sandbox-warm", language: language });
+      }).catch(function() {});
+    }
+
     function handleMessage(event) {
       const payload = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
       if (payload && payload.type === "run") {
         handleRun(payload.request);
+      } else if (payload && payload.type === "preload") {
+        preloadRuntime(payload.language);
       }
     }
 
     window.ProofPathSandbox = {
       run: function(payload) {
         handleMessage({ data: payload });
+      },
+      preload: function(payload) {
+        handleMessage({ data: { type: "preload", language: payload.language } });
       }
     };
 
@@ -596,10 +779,15 @@ export function parseNativeWebViewRunnerMessage(payload: string): NativeWebViewR
       type?: string;
       assets?: typeof SANDBOX_ASSET_PATHS;
       attempt?: CodeRunAttempt;
+      language?: RunnerLanguage;
     };
 
     if (parsed.type === "sandbox-ready" && parsed.assets) {
       return { type: "sandbox-ready", assets: parsed.assets };
+    }
+
+    if (parsed.type === "sandbox-warm" && typeof parsed.language === "string") {
+      return { type: "sandbox-warm", language: parsed.language };
     }
 
     if (parsed.type === "sandbox-result" && parsed.attempt) {

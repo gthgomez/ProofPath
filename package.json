@@ -13,8 +13,8 @@
     "scan:redaction": "tsx scripts/scan-sandbox-redaction.ts",
     "verify:content": "tsx scripts/verify-content.ts",
     "verify": "npm run verify:content && npm run typecheck && npm run test",
-    "prepare:sandbox-assets": "node scripts/copy-sandbox-assets.js",
-    "postinstall": "node scripts/copy-sandbox-assets.js",
+    "prepare:sandbox-assets": "node scripts/copy-sandbox-assets.js && node scripts/copy-typescript-assets.js",
+    "postinstall": "node scripts/copy-sandbox-assets.js && node scripts/copy-typescript-assets.js",
     "build:android:preview": "eas build --platform android --profile preview",
     "build:android:production": "eas build --platform android --profile production"
   },
@@ -34,6 +34,7 @@
     "react-native-web": "^0.21.0",
     "react-native-webview": "^13.16.1",
     "sql.js": "^1.14.1",
+    "typescript": "5.9.3",
     "zod": "4.4.3"
   },
   "devDependencies": {
@@ -42,7 +43,6 @@
     "@types/react": "19.2.14",
     "jsdom": "^30.1.2",
     "tsx": "4.21.0",
-    "typescript": "5.9.3",
     "vitest": "^4.1.11"
   },
   "overrides": {

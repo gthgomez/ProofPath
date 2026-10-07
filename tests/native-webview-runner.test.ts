@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as tsModule from "typescript";
 import { normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
 import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec } from "@/domain/types";
 import {
@@ -16,6 +17,12 @@ import {
   SQL_HARNESS_PATTERN,
   isTrustedSqlHarness
 } from "@/sandbox/runner";
+import {
+  loadTypeScriptLibFiles,
+  type TypeScriptCompiler
+} from "@/sandbox/typescript-typecheck";
+
+const typeScriptCompiler = ((tsModule as unknown as { default?: TypeScriptCompiler }).default ?? tsModule) as unknown as TypeScriptCompiler;
 
 describe("native WebView sandbox runner bridge", () => {
   it("exposes the bridge entrypoint and ready handshake in the generated HTML", () => {
@@ -25,9 +32,22 @@ describe("native WebView sandbox runner bridge", () => {
     expect(html).toContain("sandbox-ready");
     expect(html).toContain(SANDBOX_ASSET_PATHS.pyodide);
     expect(html).toContain(SANDBOX_ASSET_PATHS.sqlJs);
+    expect(html).toContain(SANDBOX_ASSET_PATHS.typescript);
     expect(html).toContain("loadPyodide");
     expect(html).toContain("initSqlJs");
+    expect(html).toContain('window.PROOFPATH_SANDBOX_ASSETS.typescript + "typescript.js"');
+    expect(html).toContain('window.PROOFPATH_SANDBOX_ASSETS.typescript + "typescript-libs.js"');
     expect(NATIVE_ANDROID_SANDBOX_BASE_URL).toBe("file:///android_asset/");
+  });
+
+  it("embeds the shared TypeScript type-check source", () => {
+    const html = createNativeWebViewRunnerHtml();
+
+    // The native runner must run the very same type check as the web runner.
+    expect(html).toContain("/* typescript-typecheck:start */");
+    expect(html).toContain("/* typescript-typecheck:end */");
+    expect(html).toContain("function proofPathTypeCheck(ts, libFiles, fileName, code)");
+    expect(html).toContain("proofPathFormatTypeCheckLearnerMessage");
   });
 
   it("embeds the shared Python run-mode sentinels used by the web runner", () => {
@@ -257,7 +277,18 @@ type EmbeddedAttempt = {
   hiddenCheckSummary: { total: number; passed: number; failed: number };
 };
 
-interface EmbeddedRunnerOptions {
+interface EmbeddedRunnerStubs {
+  initSqlJs?: (config?: { locateFile?: (file: string) => string }) => Promise<{ Database: new () => unknown }>;
+  loadPyodide?: (config: { indexURL: string }) => Promise<unknown>;
+  ts?: unknown;
+  typeScriptLibs?: Record<string, string>;
+  // When set, runtime globals are only assigned when their bundle script
+  // "loads" through the document stub, mirroring an asset that is fetched and
+  // parsed on demand instead of being pre-injected.
+  deferRuntimeStubs?: boolean;
+}
+
+interface EmbeddedRunnerOptions extends EmbeddedRunnerStubs {
   request: {
     lessonId: string;
     spec: LessonRunnerSpec;
@@ -265,44 +296,108 @@ interface EmbeddedRunnerOptions {
     now: string;
     runMode: CodeRunMode;
   };
-  initSqlJs?: () => Promise<{ Database: new () => unknown }>;
-  loadPyodide?: () => Promise<unknown>;
 }
 
-function runEmbeddedNativeRunner(options: EmbeddedRunnerOptions): Promise<EmbeddedAttempt> {
+interface EmbeddedRunnerWindow {
+  windowStub: Record<string, any>;
+  sandbox: {
+    run: (payload: unknown) => void;
+    preload: (payload: { language: string }) => void;
+  };
+  dispatchMessage: (data: string) => void;
+  loadedScriptSources: string[];
+}
+
+function createEmbeddedNativeRunnerWindow(options: EmbeddedRunnerStubs = {}): EmbeddedRunnerWindow {
   const html = createNativeWebViewRunnerHtml();
   const script = /<script>([\s\S]*)<\/script>/.exec(html)?.[1];
   if (!script) {
     throw new Error("embedded runner script not found");
   }
 
+  // The runner registers the same `message` handler on both window and document,
+  // mirroring the two bridges react-native-webview may use. Capture them so a
+  // test can deliver a raw bridge payload through the real handler.
+  const messageListeners: Array<(event: { data: unknown }) => void> = [];
+  const loadedScriptSources: string[] = [];
+  const windowStub: Record<string, any> = {
+    ReactNativeWebView: { postMessage: () => {} },
+    addEventListener: (type: string, listener: (event: { data: unknown }) => void) => {
+      if (type === "message") {
+        messageListeners.push(listener);
+      }
+    }
+  };
+
+  if (!options.deferRuntimeStubs) {
+    windowStub.initSqlJs = options.initSqlJs;
+    windowStub.loadPyodide = options.loadPyodide;
+    windowStub.ts = options.ts;
+    windowStub.PROOFPATH_TYPESCRIPT_LIBS = options.typeScriptLibs;
+  }
+
+  // Simulate the bundled asset loader: record the requested script and, once it
+  // is "loaded", expose the matching runtime global (an async load in the real
+  // WebView).
+  const applyLoadedScript = (src: string): void => {
+    if (src.endsWith("typescript.js")) {
+      windowStub.ts = options.ts;
+    } else if (src.endsWith("typescript-libs.js")) {
+      windowStub.PROOFPATH_TYPESCRIPT_LIBS = options.typeScriptLibs;
+    } else if (src.endsWith("pyodide.js")) {
+      windowStub.loadPyodide = options.loadPyodide;
+    } else if (src.endsWith("sql-wasm.js")) {
+      windowStub.initSqlJs = options.initSqlJs;
+    }
+  };
+
+  const documentStub = {
+    addEventListener: (type: string, listener: (event: { data: unknown }) => void) => {
+      if (type === "message") {
+        messageListeners.push(listener);
+      }
+    },
+    querySelector: () => null,
+    createElement: () => ({ dataset: {}, remove: () => {} }),
+    head: {
+      appendChild: (element: { src?: string; onload?: () => void }) => {
+        const src = element.src ?? "";
+        loadedScriptSources.push(src);
+        applyLoadedScript(src);
+        element.onload?.();
+      }
+    }
+  };
+
+  new Function("window", "document", script)(windowStub, documentStub);
+
+  return {
+    windowStub,
+    sandbox: windowStub.ProofPathSandbox,
+    loadedScriptSources,
+    dispatchMessage: (data: string) => {
+      // Both bridges hold the same handler; one delivery exercises the contract.
+      messageListeners[0]?.({ data });
+    }
+  };
+}
+
+function runEmbeddedNativeRunner(options: EmbeddedRunnerOptions): Promise<EmbeddedAttempt> {
+  const { windowStub, sandbox } = createEmbeddedNativeRunnerWindow(options);
+
   let resolveResult!: (attempt: EmbeddedAttempt) => void;
   const resultPromise = new Promise<EmbeddedAttempt>((resolve) => {
     resolveResult = resolve;
   });
 
-  const windowStub: Record<string, any> = {
-    ReactNativeWebView: {
-      postMessage: (payload: string) => {
-        const message = JSON.parse(payload) as { type?: string; attempt?: EmbeddedAttempt };
-        if (message.type === "sandbox-result" && message.attempt) {
-          resolveResult(message.attempt);
-        }
-      }
-    },
-    addEventListener: () => {},
-    initSqlJs: options.initSqlJs,
-    loadPyodide: options.loadPyodide
-  };
-  const documentStub = {
-    addEventListener: () => {},
-    querySelector: () => null,
-    createElement: () => ({}),
-    head: { appendChild: () => {} }
+  windowStub.ReactNativeWebView.postMessage = (payload: string) => {
+    const message = JSON.parse(payload) as { type?: string; attempt?: EmbeddedAttempt };
+    if (message.type === "sandbox-result" && message.attempt) {
+      resolveResult(message.attempt);
+    }
   };
 
-  new Function("window", "document", script)(windowStub, documentStub);
-  windowStub.ProofPathSandbox.run({ type: "run", request: options.request });
+  sandbox.run({ type: "run", request: options.request });
   return resultPromise;
 }
 
@@ -345,6 +440,60 @@ function createFakeSqlRuntime(): {
 }
 
 describe("native WebView runner behavior (embedded script executed with stubs)", () => {
+  it("exposes the preload bridge and routes a preload payload to the runtime loader", async () => {
+    const pyodideCalls: Array<{ indexURL: string }> = [];
+    const sqlInitCalls: Array<{ locateFile?: (file: string) => string }> = [];
+    const { sandbox, dispatchMessage } = createEmbeddedNativeRunnerWindow({
+      loadPyodide: async (config) => {
+        pyodideCalls.push(config);
+        return {};
+      },
+      initSqlJs: async (config) => {
+        sqlInitCalls.push(config ?? {});
+        return { Database: class {} };
+      }
+    });
+
+    // code-lab.native.tsx warms the runtime through this entrypoint on the
+    // sandbox-ready handshake, so it must survive in the generated HTML.
+    expect(typeof sandbox.preload).toBe("function");
+    const html = createNativeWebViewRunnerHtml();
+    expect(html).toContain("preload: function(payload)");
+    expect(html).toContain('payload.type === "preload"');
+    expect(html).toContain("preloadRuntime(payload.language)");
+
+    // The bridge method warms Pyodide with the bundled asset index URL.
+    sandbox.preload({ language: "python" });
+    await Promise.resolve();
+    expect(pyodideCalls).toEqual([{ indexURL: SANDBOX_ASSET_PATHS.pyodide }]);
+
+    // A raw bridge payload follows the same preload contract.
+    dispatchMessage(JSON.stringify({ type: "preload", language: "sql" }));
+    await Promise.resolve();
+    expect(sqlInitCalls).toHaveLength(1);
+    expect(typeof sqlInitCalls[0]?.locateFile).toBe("function");
+  });
+
+  it("preloads the TypeScript compiler and library assets through the script loader", async () => {
+    const fakeTs = { ScriptTarget: { ES2020: 1 }, createProgram: () => ({}) };
+    const typeScriptLibs = { "lib.es5.d.ts": "// lib" };
+    const { sandbox, loadedScriptSources } = createEmbeddedNativeRunnerWindow({
+      ts: fakeTs,
+      typeScriptLibs,
+      deferRuntimeStubs: true
+    });
+
+    sandbox.preload({ language: "typescript" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Preloading must actually invoke the TypeScript runtime loader (not only the
+    // python/sql loaders): both the compiler and the generated libs asset load.
+    expect(loadedScriptSources).toEqual([
+      SANDBOX_ASSET_PATHS.typescript + "typescript.js",
+      SANDBOX_ASSET_PATHS.typescript + "typescript-libs.js"
+    ]);
+  });
+
   it("creates and closes a fresh database per check, running the gated harness before the query", async () => {
     const setupCode = "CREATE TABLE sessions (topic TEXT, minutes INTEGER);";
     const hiddenHarness = "INSERT INTO sessions (topic, minutes) VALUES ('sql', 45);";
@@ -469,5 +618,68 @@ describe("native WebView runner behavior (embedded script executed with stubs)",
     });
 
     expect(direct.events[0]).toBe(`globals.set:__name__=${PYTHON_DIRECT_RUN_NAME}`);
+  });
+
+  it("fails a native TypeScript check with a learner-facing type error", async () => {
+    const code = 'const value: number = "hello";';
+    const typeScriptLibs = loadTypeScriptLibFiles(typeScriptCompiler);
+    const attempt = await runEmbeddedNativeRunner({
+      request: {
+        lessonId: "lesson-native-typescript",
+        code,
+        now: "2026-10-07T20:10:00.000Z",
+        runMode: "run_checks",
+        spec: {
+          language: "typescript",
+          instructions: "Declare a number and print it.",
+          starterCode: code,
+          visibleTests: [
+            { id: "visible", name: "Prints the number", code: "console.log(value);", expectedOutputIncludes: ["2"] }
+          ],
+          hiddenTests: [],
+          expectedOutput: ["2"],
+          timeoutMs: 4000,
+          allowNetwork: false
+        }
+      },
+      ts: typeScriptCompiler,
+      typeScriptLibs
+    });
+
+    expect(attempt.passed).toBe(false);
+    expect(attempt.testResults[0]?.passed).toBe(false);
+    expect(attempt.testResults[0]?.message).toMatch(/type error/i);
+    expect(attempt.testResults[0]?.message).toMatch(/not assignable to type 'number'/i);
+    expect(attempt.stderr).toMatch(/error TS2322/);
+  });
+
+  it("passes a type-correct native TypeScript check", async () => {
+    const code = "const value: number = 2;\nconsole.log(value);";
+    const typeScriptLibs = loadTypeScriptLibFiles(typeScriptCompiler);
+    const attempt = await runEmbeddedNativeRunner({
+      request: {
+        lessonId: "lesson-native-typescript",
+        code,
+        now: "2026-10-07T20:11:00.000Z",
+        runMode: "run_checks",
+        spec: {
+          language: "typescript",
+          instructions: "Declare a number and print it.",
+          starterCode: code,
+          visibleTests: [
+            { id: "visible", name: "Prints the number", code: "console.log(value);", expectedOutputIncludes: ["2"] }
+          ],
+          hiddenTests: [],
+          expectedOutput: ["2"],
+          timeoutMs: 4000,
+          allowNetwork: false
+        }
+      },
+      ts: typeScriptCompiler,
+      typeScriptLibs
+    });
+
+    expect(attempt.passed).toBe(true);
+    expect(attempt.stdout).toContain("2");
   });
 });

@@ -71,16 +71,16 @@ export function runtimeCapabilitiesFor(language: RunnerLanguage): SandboxRuntime
   if (language === "typescript") {
     return {
       language,
-      workflowLabel: "transform + run + verify",
+      workflowLabel: "typecheck + transform + run + verify",
       supportsRunFile: true,
       supportsRunChecks: true,
       supportsProofCapture: true,
-      supportsTypecheck: false,
-      beginnerNote: "This lab transforms and runs TypeScript for lesson checks. It does not run the full TypeScript compiler yet.",
+      supportsTypecheck: true,
+      beginnerNote: "This lab runs a real TypeScript type check before executing and verifying your code, so a type error fails the check.",
       limitations: [
-        "TypeScript is transformed for execution before checks run.",
-        "The sandbox does not perform full compiler validation yet.",
-        "Use external project commands when a lesson asks for full TypeScript validation evidence."
+        "Type errors are reported with the failing line and compiler message before any code runs.",
+        "The type check covers your single lesson file against the TypeScript standard library; it is not a full project build.",
+        "Imports and cross-file type resolution are not available in the lesson sandbox."
       ]
     };
   }
@@ -273,8 +273,8 @@ export function phaseLabelsFor(language: RunnerLanguage, runMode: CodeRunMode): 
 
   if (language === "typescript") {
     return runMode === "run_file"
-      ? ["[prepare] Reading TypeScript source...", "[transform] Preparing JavaScript runtime...", "[execute] Running lesson.ts..."]
-      : ["[prepare] Reading TypeScript source...", "[transform] Preparing JavaScript runtime...", "[execute] Running lesson.ts...", "[verify] Running lesson checks..."];
+      ? ["[prepare] Reading TypeScript source...", "[typecheck] Checking TypeScript types...", "[transform] Preparing JavaScript runtime...", "[execute] Running lesson.ts..."]
+      : ["[prepare] Reading TypeScript source...", "[typecheck] Checking TypeScript types...", "[transform] Preparing JavaScript runtime...", "[execute] Running lesson.ts...", "[verify] Running lesson checks..."];
   }
 
   return runMode === "run_file"
@@ -458,10 +458,17 @@ function phaseStatusForReason(
   }
 
   if (reason === "syntax_error") {
-    // Parsing is the first gate. Later phases were never attempted, so keep
-    // them pending instead of implying that the runner deliberately skipped
-    // their work.
-    return index === 0 ? "failed" : "pending";
+    // A parse/type-check failure is the first analysis gate. Later phases were
+    // never attempted, so keep them pending instead of implying that the runner
+    // deliberately skipped their work. TypeScript reports its type errors during
+    // [typecheck] (after a [prepare] that only read the source), so prefer
+    // [typecheck] over [parse]/[prepare]; Python/JavaScript report during
+    // [parse] and SQL during [prepare].
+    const analysisIndex = ["[typecheck]", "[parse]", "[prepare]"]
+      .map((marker) => phases.findIndex((phase) => phase.includes(marker)))
+      .find((index) => index >= 0);
+    const failureIndex = analysisIndex ?? 0;
+    return index < failureIndex ? "done" : index === failureIndex ? "failed" : "pending";
   }
 
   const verifyIndex = phases.findIndex((phase) => phase.includes("[verify]"));

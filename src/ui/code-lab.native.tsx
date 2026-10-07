@@ -10,11 +10,13 @@ import { formatPolicyViolationFeedback } from "@/sandbox/feedback";
 import {
   createNativeWebViewRunnerHtml,
   NATIVE_ANDROID_SANDBOX_BASE_URL,
+  nativeRunTimeoutMs,
   parseNativeWebViewRunnerMessage,
   type NativeWebViewRunnerRequest
 } from "@/sandbox/native-webview-runner";
 import { canRunNativePythonProof, runNativePythonFile, runNativePythonProof } from "@/sandbox/native-python-proof-runner";
 import { validateSandboxSubmission } from "@/sandbox/policy";
+import { runPhaseDelay } from "@/ui/run-phase-timing";
 import { Badge, BodyText, ButtonShell, MutedText, Row, SectionTitle } from "@/ui/primitives";
 import { runPhaseDelay } from "@/ui/run-phase-timing";
 import { colors, radius, semanticColors, spacing } from "@/ui/theme";
@@ -23,7 +25,8 @@ import { CodeTerminal } from "@/ui/code-terminal";
 import { SyntaxHighlightedEditor } from "@/ui/syntax-highlighted-editor";
 import type { CodeLabProps } from "@/ui/code-lab.shared";
 
-const NATIVE_RUNTIME_STARTUP_ALLOWANCE_MS = 20000;
+// The native run-time startup allowance (and the unmeasured-cold-start note)
+// lives in `nativeStartupAllowanceMs`, next to the asset paths it protects.
 
 function formatVisibleTestExpectation(expectedOutputIncludes?: string[]): string {
   if (!expectedOutputIncludes?.length) {
@@ -46,6 +49,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const phaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [code, setCode] = useState(runnerSpec.starterCode);
   const [isBridgeReady, setIsBridgeReady] = useState(false);
+  const [isRuntimeWarm, setIsRuntimeWarm] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [activeRunMode, setActiveRunMode] = useState<CodeRunMode>("run_checks");
   const [activePhaseIndex, setActivePhaseIndex] = useState(0);
@@ -129,9 +133,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const runCode = async (runMode: CodeRunMode): Promise<void> => {
     const now = new Date().toISOString();
     const policyViolations = validateSandboxSubmission(runnerSpec, code);
-    const nativeTimeoutMs = runnerSpec.timeoutMs + (
-      runnerSpec.language === "python" || runnerSpec.language === "sql" ? NATIVE_RUNTIME_STARTUP_ALLOWANCE_MS : 250
-    );
+    const nativeTimeoutMs = nativeRunTimeoutMs(runnerSpec.timeoutMs, runnerSpec.language, isRuntimeWarm);
 
     setRunError(null);
     setIsRunning(true);
@@ -226,6 +228,9 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
       clearPhaseTimeout();
       setIsRunning(false);
       setIsBridgeReady(false);
+      // The WebView is recreated below, so the runtime is cold again on the new
+      // bridge; re-grant the startup allowance for its first run.
+      setIsRuntimeWarm(false);
       setWebViewKey((current) => current + 1);
       onRunPassed(
         buildFailedAttempt(
@@ -247,6 +252,18 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
 
     if (message?.type === "sandbox-ready") {
       setIsBridgeReady(true);
+      // Warm the bundled runtime (the TypeScript compiler is ~9 MB) before the
+      // first timed run so the cold parse does not count against the allowance.
+      webViewRef.current?.injectJavaScript(
+        `window.ProofPathSandbox && window.ProofPathSandbox.preload(${JSON.stringify({ language: runnerSpec.language })}); true;`
+      );
+      return;
+    }
+
+    if (message?.type === "sandbox-warm") {
+      // The preload finished, so the runtime no longer needs the cold-start
+      // allowance on later runs.
+      setIsRuntimeWarm(true);
       return;
     }
 
@@ -325,6 +342,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
         mixedContentMode="never"
         onError={() => {
           setIsBridgeReady(false);
+          setIsRuntimeWarm(false);
           setRunError("Native sandbox WebView failed to load.");
         }}
         onMessage={handleRunnerMessage}
