@@ -103,6 +103,7 @@ Current status:
 Terminal phases:
 
 - `[prepare] Reading TypeScript source...`
+- `[typecheck] Checking TypeScript types...`
 - `[transform] Preparing JavaScript runtime...`
 - `[execute] Running lesson.ts...`
 - `[verify] Running lesson checks...`

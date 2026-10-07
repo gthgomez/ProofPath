@@ -233,7 +233,7 @@ TypeScript tasks:
 - Wording is now `typecheck + transform + run + verify`.
 - Tests prove `supportsTypecheck === true` **and** that a real type error fails a check (see `tests/typescript-typecheck.test.ts`). Do not weaken these back to asserting a boolean without the behavioural proof.
 - The real TypeScript compiler phase is implemented and emits:
-  - `[typecheck] Running TypeScript compiler...`
+  - `[typecheck] Checking TypeScript types...`
 
 Acceptance criteria:
 
