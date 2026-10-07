@@ -15,6 +15,7 @@ import {
 } from "@/sandbox/feedback";
 import { validateSandboxSubmission } from "@/sandbox/policy";
 import {
+  assertTypeScriptSourceWithinLimit,
   evaluateTypeScriptTypeCheck,
   loadTypeScriptLibFiles,
   type TypeScriptCompiler,
@@ -547,7 +548,12 @@ async function getTypeScript(): Promise<TypeScriptCompiler> {
     const loaded = await importRuntimeModule("typescript");
     typeScriptRuntime = ((loaded as { default?: TypeScriptCompiler }).default ?? loaded) as TypeScriptCompiler;
     return typeScriptRuntime;
-  })();
+  })().catch((error) => {
+    // Clear the rejected promise so a transient asset-load failure can be
+    // retried instead of poisoning every later type check.
+    typeScriptPromise = null;
+    throw error;
+  });
 
   return typeScriptPromise;
 }
@@ -593,6 +599,11 @@ async function runJavaScriptLike(spec: LessonRunnerSpec, code: string, runMode: 
   // code can never detect. `stripTypeScript` is still used below, but only to
   // erase annotations before execution: it is no longer the verification step.
   if (spec.language === "typescript") {
+    // Fail fast before loading the ~9 MB compiler for a pathologically large
+    // submission. The type check itself runs `ts.createProgram` synchronously on
+    // the main thread, so the lesson `Promise.race` timeout cannot preempt it;
+    // this input cap is the only bound on that work.
+    assertTypeScriptSourceWithinLimit(code);
     const typeCheck = await typeCheckTypeScript(code);
     if (typeCheck.diagnostics.length > 0) {
       return typeCheckFailureResult(spec, runMode, typeCheck);
@@ -636,7 +647,11 @@ async function getPyodide(): Promise<any> {
     const pyodide = await importRuntimeModule("pyodide") as { loadPyodide: () => Promise<unknown> };
     pyodideRuntime = await pyodide.loadPyodide();
     return pyodideRuntime;
-  })();
+  })().catch((error) => {
+    // Clear the rejected promise so a transient boot failure can be retried.
+    pyodidePromise = null;
+    throw error;
+  });
 
   return pyodidePromise;
 }
@@ -750,7 +765,11 @@ async function getSqlJs(): Promise<SqlJsModule> {
       locateFile: (file) => sameOriginAssetUrl(`${SQLJS_DIST_URL}${file}`)
     });
     return sqlRuntime;
-  })();
+  })().catch((error) => {
+    // Clear the rejected promise so a transient boot failure can be retried.
+    sqlPromise = null;
+    throw error;
+  });
 
   return sqlPromise;
 }

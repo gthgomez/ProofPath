@@ -282,6 +282,10 @@ interface EmbeddedRunnerStubs {
   loadPyodide?: (config: { indexURL: string }) => Promise<unknown>;
   ts?: unknown;
   typeScriptLibs?: Record<string, string>;
+  // When set, runtime globals are only assigned when their bundle script
+  // "loads" through the document stub, mirroring an asset that is fetched and
+  // parsed on demand instead of being pre-injected.
+  deferRuntimeStubs?: boolean;
 }
 
 interface EmbeddedRunnerOptions extends EmbeddedRunnerStubs {
@@ -301,6 +305,7 @@ interface EmbeddedRunnerWindow {
     preload: (payload: { language: string }) => void;
   };
   dispatchMessage: (data: string) => void;
+  loadedScriptSources: string[];
 }
 
 function createEmbeddedNativeRunnerWindow(options: EmbeddedRunnerStubs = {}): EmbeddedRunnerWindow {
@@ -314,18 +319,38 @@ function createEmbeddedNativeRunnerWindow(options: EmbeddedRunnerStubs = {}): Em
   // mirroring the two bridges react-native-webview may use. Capture them so a
   // test can deliver a raw bridge payload through the real handler.
   const messageListeners: Array<(event: { data: unknown }) => void> = [];
+  const loadedScriptSources: string[] = [];
   const windowStub: Record<string, any> = {
     ReactNativeWebView: { postMessage: () => {} },
     addEventListener: (type: string, listener: (event: { data: unknown }) => void) => {
       if (type === "message") {
         messageListeners.push(listener);
       }
-    },
-    initSqlJs: options.initSqlJs,
-    loadPyodide: options.loadPyodide,
-    ts: options.ts,
-    PROOFPATH_TYPESCRIPT_LIBS: options.typeScriptLibs
+    }
   };
+
+  if (!options.deferRuntimeStubs) {
+    windowStub.initSqlJs = options.initSqlJs;
+    windowStub.loadPyodide = options.loadPyodide;
+    windowStub.ts = options.ts;
+    windowStub.PROOFPATH_TYPESCRIPT_LIBS = options.typeScriptLibs;
+  }
+
+  // Simulate the bundled asset loader: record the requested script and, once it
+  // is "loaded", expose the matching runtime global (an async load in the real
+  // WebView).
+  const applyLoadedScript = (src: string): void => {
+    if (src.endsWith("typescript.js")) {
+      windowStub.ts = options.ts;
+    } else if (src.endsWith("typescript-libs.js")) {
+      windowStub.PROOFPATH_TYPESCRIPT_LIBS = options.typeScriptLibs;
+    } else if (src.endsWith("pyodide.js")) {
+      windowStub.loadPyodide = options.loadPyodide;
+    } else if (src.endsWith("sql-wasm.js")) {
+      windowStub.initSqlJs = options.initSqlJs;
+    }
+  };
+
   const documentStub = {
     addEventListener: (type: string, listener: (event: { data: unknown }) => void) => {
       if (type === "message") {
@@ -333,8 +358,15 @@ function createEmbeddedNativeRunnerWindow(options: EmbeddedRunnerStubs = {}): Em
       }
     },
     querySelector: () => null,
-    createElement: () => ({}),
-    head: { appendChild: () => {} }
+    createElement: () => ({ dataset: {}, remove: () => {} }),
+    head: {
+      appendChild: (element: { src?: string; onload?: () => void }) => {
+        const src = element.src ?? "";
+        loadedScriptSources.push(src);
+        applyLoadedScript(src);
+        element.onload?.();
+      }
+    }
   };
 
   new Function("window", "document", script)(windowStub, documentStub);
@@ -342,6 +374,7 @@ function createEmbeddedNativeRunnerWindow(options: EmbeddedRunnerStubs = {}): Em
   return {
     windowStub,
     sandbox: windowStub.ProofPathSandbox,
+    loadedScriptSources,
     dispatchMessage: (data: string) => {
       // Both bridges hold the same handler; one delivery exercises the contract.
       messageListeners[0]?.({ data });
@@ -439,6 +472,26 @@ describe("native WebView runner behavior (embedded script executed with stubs)",
     await Promise.resolve();
     expect(sqlInitCalls).toHaveLength(1);
     expect(typeof sqlInitCalls[0]?.locateFile).toBe("function");
+  });
+
+  it("preloads the TypeScript compiler and library assets through the script loader", async () => {
+    const fakeTs = { ScriptTarget: { ES2020: 1 }, createProgram: () => ({}) };
+    const typeScriptLibs = { "lib.es5.d.ts": "// lib" };
+    const { sandbox, loadedScriptSources } = createEmbeddedNativeRunnerWindow({
+      ts: fakeTs,
+      typeScriptLibs,
+      deferRuntimeStubs: true
+    });
+
+    sandbox.preload({ language: "typescript" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Preloading must actually invoke the TypeScript runtime loader (not only the
+    // python/sql loaders): both the compiler and the generated libs asset load.
+    expect(loadedScriptSources).toEqual([
+      SANDBOX_ASSET_PATHS.typescript + "typescript.js",
+      SANDBOX_ASSET_PATHS.typescript + "typescript-libs.js"
+    ]);
   });
 
   it("creates and closes a fresh database per check, running the gated harness before the query", async () => {

@@ -59,6 +59,27 @@ export interface TypeScriptCompiler {
   };
 }
 
+/**
+ * Hard ceiling on the learner source handed to the type checker.
+ *
+ * `ts.createProgram` runs synchronously on the main thread, so the lesson
+ * `Promise.race` timeout cannot preempt a pathological input: the JS event loop
+ * is blocked until the compiler returns. Lesson submissions are single-file and
+ * tiny (well under a kilobyte), so this cap exists only to convert an abuse or
+ * accident (a pasted bundle) into a fast, clear runner error instead of a frozen
+ * UI. It is deliberately far above any real submission.
+ */
+export const TYPESCRIPT_MAX_SOURCE_CHARS = 100_000;
+
+/** Throw a clear, fail-fast error before any compilation is attempted. */
+export function assertTypeScriptSourceWithinLimit(code: string): void {
+  if (code.length > TYPESCRIPT_MAX_SOURCE_CHARS) {
+    throw new Error(
+      `TypeScript source is too large to type-check: ${code.length} characters exceeds the ${TYPESCRIPT_MAX_SOURCE_CHARS}-character limit.`
+    );
+  }
+}
+
 export const TYPESCRIPT_TYPE_CHECK_SOURCE = String.raw`
 function proofPathFormatTypeCheckErrors(fileName, diagnostics) {
   var label = fileName.indexOf("/") === 0 ? fileName.slice(1) : fileName;
@@ -86,6 +107,10 @@ function proofPathFormatTypeCheckLearnerMessage(diagnostics) {
 }
 
 function proofPathTypeCheck(ts, libFiles, fileName, code) {
+  if (code.length > ${TYPESCRIPT_MAX_SOURCE_CHARS}) {
+    throw new Error("TypeScript source is too large to type-check: " + code.length +
+      " characters exceeds the ${TYPESCRIPT_MAX_SOURCE_CHARS}-character limit.");
+  }
   var files = {};
   for (var libName in libFiles) {
     if (Object.prototype.hasOwnProperty.call(libFiles, libName)) {
@@ -144,6 +169,11 @@ function proofPathTypeCheck(ts, libFiles, fileName, code) {
  * file. `libFiles` maps library base names (for example `lib.es5.d.ts`) to their
  * contents; the browser reads them from the bundled `typescript-libs.js` asset
  * while Node reads them from the compiler's own `sys`.
+ *
+ * Note: `proofPathTypeCheck` (and `ts.createProgram` inside it) is synchronous.
+ * The lesson runner races this call against a timeout, but that race cannot
+ * interrupt the synchronous compile — see `TYPESCRIPT_MAX_SOURCE_CHARS` for the
+ * input cap that keeps a normal submission quick and an abusive one bounded.
  */
 export function evaluateTypeScriptTypeCheck(
   ts: TypeScriptCompiler,
@@ -151,6 +181,8 @@ export function evaluateTypeScriptTypeCheck(
   fileName: string,
   code: string
 ): TypeScriptTypeCheckResult {
+  assertTypeScriptSourceWithinLimit(code);
+
   const run = new Function(
     "ts",
     "libFiles",
@@ -171,8 +203,18 @@ export function evaluateTypeScriptTypeCheck(
  * Loads the bundled-feeling standard library from the compiler's own filesystem.
  * Used by the Node/web runtime and by tests; the on-device WebView loads the
  * generated `typescript-libs.js` asset instead because its compiler has no `sys`.
+ *
+ * Memoized per compiler instance: the 13 `.d.ts` files total several hundred KB,
+ * so they are read once and reused rather than re-read on every type check.
  */
+const typeScriptLibFileCache = new WeakMap<TypeScriptCompiler, Record<string, string>>();
+
 export function loadTypeScriptLibFiles(ts: TypeScriptCompiler): Record<string, string> {
+  const cached = typeScriptLibFileCache.get(ts);
+  if (cached) {
+    return cached;
+  }
+
   const sys = ts.sys;
   if (!sys || typeof sys.readFile !== "function" || typeof sys.getExecutingFilePath !== "function") {
     throw new Error("TypeScript compiler did not expose a filesystem for its library files.");
@@ -194,5 +236,6 @@ export function loadTypeScriptLibFiles(ts: TypeScriptCompiler): Record<string, s
     libFiles[name] = content;
   }
 
+  typeScriptLibFileCache.set(ts, libFiles);
   return libFiles;
 }
