@@ -10,11 +10,11 @@ Offline-first technical career-readiness and learning app for software engineeri
 
 ## Current State
 
-Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite local-first persistence, Zod schemas, and Pyodide/sql.js WASM sandbox execution. The content pack ships 104 lessons (101 active plus 3 deprecated) across 11 tracks — 71 of the active lessons are Python — with 104 quizzes (380 questions), 15 modules, and 20 portfolio missions, all validated by the `npm run verify` pipeline.
+Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite local-first persistence, Zod schemas, and Pyodide/sql.js WASM sandbox execution. The content pack ships 110 lessons (107 active plus 3 deprecated) across 11 tracks — 71 of the active lessons are Python — with 110 quizzes, 17 modules, and 20 portfolio missions, all validated by the `npm run verify` pipeline.
 
 ## Verified Capabilities
 
-- Content pack: 11 tracks, 15 modules, 104 lessons (101 active + 3 deprecated Python lessons), 104 quizzes, 160 registered concepts, and 20 proof-required missions (`npm run report:content`).
+- Content pack: 11 tracks, 17 modules, 110 lessons (107 active + 3 deprecated Python lessons), 110 quizzes, 178 registered concepts, and 20 proof-required missions (`npm run report:content`).
 - Local-first Expo SQLite persistence and offline progress tracking.
 - Proof-First 5-step lesson stepper (`Understand` -> `Experiment` -> `Apply` -> `Checkpoint` -> `Evidence`).
 - Sandboxes: Pyodide WASM for full Python (WebView), native regex Python fallback for levels 0-1, sql.js WASM for SQL; policy engine blocks fetch, DOM mutations, and filesystem access.
