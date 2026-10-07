@@ -10,6 +10,7 @@ import { formatPolicyViolationFeedback, formatSandboxFailureFeedback } from "@/s
 import {
   createNativeWebViewRunnerHtml,
   NATIVE_ANDROID_SANDBOX_BASE_URL,
+  nativeStartupAllowanceMs,
   parseNativeWebViewRunnerMessage,
   type NativeWebViewRunnerRequest
 } from "@/sandbox/native-webview-runner";
@@ -22,17 +23,8 @@ import { CodeTerminal } from "@/ui/code-terminal";
 import { SyntaxHighlightedEditor } from "@/ui/syntax-highlighted-editor";
 import type { CodeLabProps } from "@/ui/code-lab.shared";
 
-/**
- * Extra wall-clock time granted on top of a lesson's `timeoutMs` for the first
- * run in a session, covering the cost of loading a large sandbox runtime into
- * the WebView. Python (Pyodide) and SQL (sql.js) and now TypeScript all load a
- * bundled asset, so all three need the allowance: TypeScript loads an ~9 MB
- * compiler, which is heavier than sql.js and comparable to Pyodide. The learner
- * should not see a spurious timeout because the runtime was still parsing.
- */
-const NATIVE_RUNTIME_STARTUP_ALLOWANCE_MS = 20000;
-const NATIVE_RUNTIME_ASSET_LANGUAGES = ["python", "sql", "typescript"] as const;
-const NATIVE_DEFAULT_STARTUP_ALLOWANCE_MS = 250;
+// The native run-time startup allowance (and the unmeasured-cold-start note)
+// lives in `nativeStartupAllowanceMs`, next to the asset paths it protects.
 
 function formatVisibleTestExpectation(expectedOutputIncludes?: string[]): string {
   if (!expectedOutputIncludes?.length) {
@@ -138,11 +130,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const runCode = async (runMode: CodeRunMode): Promise<void> => {
     const now = new Date().toISOString();
     const policyViolations = validateSandboxSubmission(runnerSpec, code);
-    const nativeTimeoutMs = runnerSpec.timeoutMs + (
-      (NATIVE_RUNTIME_ASSET_LANGUAGES as readonly string[]).includes(runnerSpec.language)
-        ? NATIVE_RUNTIME_STARTUP_ALLOWANCE_MS
-        : NATIVE_DEFAULT_STARTUP_ALLOWANCE_MS
-    );
+    const nativeTimeoutMs = runnerSpec.timeoutMs + nativeStartupAllowanceMs(runnerSpec.language);
 
     setRunError(null);
     setIsRunning(true);

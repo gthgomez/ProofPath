@@ -277,7 +277,14 @@ type EmbeddedAttempt = {
   hiddenCheckSummary: { total: number; passed: number; failed: number };
 };
 
-interface EmbeddedRunnerOptions {
+interface EmbeddedRunnerStubs {
+  initSqlJs?: (config?: { locateFile?: (file: string) => string }) => Promise<{ Database: new () => unknown }>;
+  loadPyodide?: (config: { indexURL: string }) => Promise<unknown>;
+  ts?: unknown;
+  typeScriptLibs?: Record<string, string>;
+}
+
+interface EmbeddedRunnerOptions extends EmbeddedRunnerStubs {
   request: {
     lessonId: string;
     spec: LessonRunnerSpec;
@@ -285,48 +292,79 @@ interface EmbeddedRunnerOptions {
     now: string;
     runMode: CodeRunMode;
   };
-  initSqlJs?: () => Promise<{ Database: new () => unknown }>;
-  loadPyodide?: () => Promise<unknown>;
-  ts?: unknown;
-  typeScriptLibs?: Record<string, string>;
 }
 
-function runEmbeddedNativeRunner(options: EmbeddedRunnerOptions): Promise<EmbeddedAttempt> {
+interface EmbeddedRunnerWindow {
+  windowStub: Record<string, any>;
+  sandbox: {
+    run: (payload: unknown) => void;
+    preload: (payload: { language: string }) => void;
+  };
+  dispatchMessage: (data: string) => void;
+}
+
+function createEmbeddedNativeRunnerWindow(options: EmbeddedRunnerStubs = {}): EmbeddedRunnerWindow {
   const html = createNativeWebViewRunnerHtml();
   const script = /<script>([\s\S]*)<\/script>/.exec(html)?.[1];
   if (!script) {
     throw new Error("embedded runner script not found");
   }
 
-  let resolveResult!: (attempt: EmbeddedAttempt) => void;
-  const resultPromise = new Promise<EmbeddedAttempt>((resolve) => {
-    resolveResult = resolve;
-  });
-
+  // The runner registers the same `message` handler on both window and document,
+  // mirroring the two bridges react-native-webview may use. Capture them so a
+  // test can deliver a raw bridge payload through the real handler.
+  const messageListeners: Array<(event: { data: unknown }) => void> = [];
   const windowStub: Record<string, any> = {
-    ReactNativeWebView: {
-      postMessage: (payload: string) => {
-        const message = JSON.parse(payload) as { type?: string; attempt?: EmbeddedAttempt };
-        if (message.type === "sandbox-result" && message.attempt) {
-          resolveResult(message.attempt);
-        }
+    ReactNativeWebView: { postMessage: () => {} },
+    addEventListener: (type: string, listener: (event: { data: unknown }) => void) => {
+      if (type === "message") {
+        messageListeners.push(listener);
       }
     },
-    addEventListener: () => {},
     initSqlJs: options.initSqlJs,
     loadPyodide: options.loadPyodide,
     ts: options.ts,
     PROOFPATH_TYPESCRIPT_LIBS: options.typeScriptLibs
   };
   const documentStub = {
-    addEventListener: () => {},
+    addEventListener: (type: string, listener: (event: { data: unknown }) => void) => {
+      if (type === "message") {
+        messageListeners.push(listener);
+      }
+    },
     querySelector: () => null,
     createElement: () => ({}),
     head: { appendChild: () => {} }
   };
 
   new Function("window", "document", script)(windowStub, documentStub);
-  windowStub.ProofPathSandbox.run({ type: "run", request: options.request });
+
+  return {
+    windowStub,
+    sandbox: windowStub.ProofPathSandbox,
+    dispatchMessage: (data: string) => {
+      // Both bridges hold the same handler; one delivery exercises the contract.
+      messageListeners[0]?.({ data });
+    }
+  };
+}
+
+function runEmbeddedNativeRunner(options: EmbeddedRunnerOptions): Promise<EmbeddedAttempt> {
+  const { windowStub, sandbox } = createEmbeddedNativeRunnerWindow(options);
+
+  let resolveResult!: (attempt: EmbeddedAttempt) => void;
+  const resultPromise = new Promise<EmbeddedAttempt>((resolve) => {
+    resolveResult = resolve;
+  });
+
+  windowStub.ReactNativeWebView.postMessage = (payload: string) => {
+    const message = JSON.parse(payload) as { type?: string; attempt?: EmbeddedAttempt };
+    if (message.type === "sandbox-result" && message.attempt) {
+      resolveResult(message.attempt);
+    }
+  };
+
+  sandbox.run({ type: "run", request: options.request });
   return resultPromise;
 }
 
@@ -369,6 +407,40 @@ function createFakeSqlRuntime(): {
 }
 
 describe("native WebView runner behavior (embedded script executed with stubs)", () => {
+  it("exposes the preload bridge and routes a preload payload to the runtime loader", async () => {
+    const pyodideCalls: Array<{ indexURL: string }> = [];
+    const sqlInitCalls: Array<{ locateFile?: (file: string) => string }> = [];
+    const { sandbox, dispatchMessage } = createEmbeddedNativeRunnerWindow({
+      loadPyodide: async (config) => {
+        pyodideCalls.push(config);
+        return {};
+      },
+      initSqlJs: async (config) => {
+        sqlInitCalls.push(config ?? {});
+        return { Database: class {} };
+      }
+    });
+
+    // code-lab.native.tsx warms the runtime through this entrypoint on the
+    // sandbox-ready handshake, so it must survive in the generated HTML.
+    expect(typeof sandbox.preload).toBe("function");
+    const html = createNativeWebViewRunnerHtml();
+    expect(html).toContain("preload: function(payload)");
+    expect(html).toContain('payload.type === "preload"');
+    expect(html).toContain("preloadRuntime(payload.language)");
+
+    // The bridge method warms Pyodide with the bundled asset index URL.
+    sandbox.preload({ language: "python" });
+    await Promise.resolve();
+    expect(pyodideCalls).toEqual([{ indexURL: SANDBOX_ASSET_PATHS.pyodide }]);
+
+    // A raw bridge payload follows the same preload contract.
+    dispatchMessage(JSON.stringify({ type: "preload", language: "sql" }));
+    await Promise.resolve();
+    expect(sqlInitCalls).toHaveLength(1);
+    expect(typeof sqlInitCalls[0]?.locateFile).toBe("function");
+  });
+
   it("creates and closes a fresh database per check, running the gated harness before the query", async () => {
     const setupCode = "CREATE TABLE sessions (topic TEXT, minutes INTEGER);";
     const hiddenHarness = "INSERT INTO sessions (topic, minutes) VALUES ('sql', 45);";

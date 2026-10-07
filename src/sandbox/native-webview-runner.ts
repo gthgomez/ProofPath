@@ -1,5 +1,5 @@
 import { normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
-import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec } from "@/domain/types";
+import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec, RunnerLanguage } from "@/domain/types";
 import {
   PYTHON_DIRECT_RUN_NAME,
   PYTHON_IMPORT_RUN_NAME,
@@ -24,6 +24,31 @@ export const SANDBOX_ASSET_PATHS = {
 } as const;
 
 export const NATIVE_ANDROID_SANDBOX_BASE_URL = "file:///android_asset/";
+
+const NATIVE_RUNTIME_ASSET_LANGUAGES = ["python", "sql", "typescript"] as const;
+
+/**
+ * Extra wall-clock time granted on top of a lesson's `timeoutMs` for the first
+ * run in a session, covering the cost of loading a large sandbox runtime into
+ * the WebView. Python (Pyodide), SQL (sql.js), and TypeScript all load a bundled
+ * asset, so all three need the allowance: TypeScript loads an ~9 MB compiler,
+ * heavier than sql.js and comparable to Pyodide. A learner should not see a
+ * spurious timeout because the runtime was still parsing.
+ *
+ * Status: this is a flat, deliberately generous ceiling. The ~4250 ms device
+ * cold-start figure often quoted for the TypeScript asset has not been measured
+ * on a physical device, so treat 20 s as an unvalidated upper bound rather than
+ * a measured budget. Do not lower it without device timing evidence.
+ */
+export const NATIVE_RUNTIME_STARTUP_ALLOWANCE_MS = 20000;
+export const NATIVE_DEFAULT_STARTUP_ALLOWANCE_MS = 250;
+
+/** Resolve the startup allowance a native run gets for its language runtime. */
+export function nativeStartupAllowanceMs(language: RunnerLanguage): number {
+  return (NATIVE_RUNTIME_ASSET_LANGUAGES as readonly string[]).includes(language)
+    ? NATIVE_RUNTIME_STARTUP_ALLOWANCE_MS
+    : NATIVE_DEFAULT_STARTUP_ALLOWANCE_MS;
+}
 
 /**
  * Exported test seam. The native runtime path does not call this wrapper: the
