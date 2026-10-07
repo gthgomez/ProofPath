@@ -1,4 +1,14 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -39,22 +49,59 @@ function makeFixture(): string {
   return root;
 }
 
+function outputPaths(root: string): string[] {
+  const outputRoots = [join(root, "public"), join(root, "android", "app", "src", "main", "assets")];
+  return outputRoots.flatMap((outputRoot) =>
+    ASSET_TARGETS.flatMap((target) =>
+      target.files.map((file) => join(outputRoot, target.relativeDir, file))
+    )
+  );
+}
+
 describe("copy-sandbox-assets", () => {
   it("copies every asset into both output roots with mode 644", () => {
     const root = makeFixture();
 
     copySandboxAssets(root);
 
-    const outputRoots = [join(root, "public"), join(root, "android", "app", "src", "main", "assets")];
-    const outputs = outputRoots.flatMap((outputRoot) =>
-      ASSET_TARGETS.flatMap((target) =>
-        target.files.map((file) => join(outputRoot, target.relativeDir, file))
-      )
-    );
+    const outputs = outputPaths(root);
 
     expect(outputs.length).toBeGreaterThan(0);
     for (const output of outputs) {
       expect(statSync(output).mode & 0o777).toBe(ASSET_MODE);
     }
+  });
+
+  it("is idempotent: a second run keeps mode 644 and stable content", () => {
+    const root = makeFixture();
+
+    copySandboxAssets(root);
+    const outputs = outputPaths(root);
+    const before = outputs.map((output) => readFileSync(output, "utf8"));
+
+    copySandboxAssets(root);
+
+    for (const [index, output] of outputs.entries()) {
+      expect(statSync(output).mode & 0o777).toBe(ASSET_MODE);
+      expect(readFileSync(output, "utf8")).toBe(before[index]);
+    }
+  });
+
+  it("replaces a pre-existing symlink at the destination with a real 644 file", () => {
+    const root = makeFixture();
+
+    const outside = join(root, "outside-secret.txt");
+    writeFileSync(outside, "do not overwrite");
+
+    const victim = outputPaths(root)[0];
+    mkdirSync(join(victim, ".."), { recursive: true });
+    symlinkSync(outside, victim);
+
+    copySandboxAssets(root);
+
+    expect(lstatSync(victim).isSymbolicLink()).toBe(false);
+    expect(statSync(victim).mode & 0o777).toBe(ASSET_MODE);
+    expect(readFileSync(victim, "utf8")).toBe("// fixture asset");
+    expect(readFileSync(outside, "utf8")).toBe("do not overwrite");
   });
 });

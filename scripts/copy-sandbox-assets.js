@@ -50,6 +50,20 @@ function copySandboxAssets(root) {
           throw new Error(`Missing sandbox asset: ${source}`);
         }
 
+        // Harden against a pre-placed symlink at the destination: remove it
+        // first so the copy and the chmod below cannot follow the link out of
+        // the output tree. Absent destinations are a no-op (ENOENT), and normal
+        // files are left untouched.
+        try {
+          if (fs.lstatSync(destination).isSymbolicLink()) {
+            fs.unlinkSync(destination);
+          }
+        } catch (error) {
+          if (error.code !== "ENOENT") {
+            throw error;
+          }
+        }
+
         fs.copyFileSync(source, destination);
         // fs.copyFileSync preserves the source file mode, and the upstream
         // node_modules assets are often 755. Force the committed 644 mode so
