@@ -1,7 +1,7 @@
 import type { CurriculumMetadata, Difficulty, Lesson, LessonMiniProject, LessonMiniProjectTester, LessonMisconceptionCheck, LessonPracticeBlock, LessonRecallCard, LessonRunnerSpec, LessonWorkshop, MissionEvidenceRequirements, Quiz, QuizQuestion, RunnerLanguage } from "@/domain/types";
 
 export const foundationEvidence: MissionEvidenceRequirements = {
-  repoUrl: false,
+  repoUrl: true,
   commitHash: false,
   passingVerifierOutput: true,
   readmeStatus: "basic",
