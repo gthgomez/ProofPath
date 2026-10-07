@@ -97,7 +97,10 @@ export async function answerQuiz(quiz: Quiz, mode: "correct" | "wrong" = "correc
     const choiceIndex = mode === "correct"
       ? question.correctChoiceIndex
       : (question.correctChoiceIndex + 1) % question.choices.length;
-    const badge = screen.getByText(`Question ${index + 1}/${quiz.questions.length}`);
+    // Async query: the Checkpoint step renders its quiz after the step
+    // transition, so a synchronous `getByText` here can run before the
+    // question block exists and fail spuriously.
+    const badge = await screen.findByText(`Question ${index + 1}/${quiz.questions.length}`);
     // Text → Badge View → Row → question block View
     const questionBlock = badge.parentElement?.parentElement?.parentElement;
     if (!questionBlock) {
@@ -110,16 +113,40 @@ export async function answerQuiz(quiz: Quiz, mode: "correct" | "wrong" = "correc
   }
 }
 
+/**
+ * Wait for a Code Lab run to finish. The run-state badge (src/ui/code-lab.tsx)
+ * reads "Running file" / "Running checks" while `isRunning` is true and flips
+ * to a settled state ("File ran", "Check passed", "Needs attention", or back
+ * to "Ready to run") once the attempt has been recorded.
+ *
+ * Waiting on the button being enabled is not sufficient: the button is already
+ * enabled at click time, so such a wait resolves immediately and races ahead of
+ * the run.
+ */
+async function waitForRunToSettle(mode: "file" | "checks"): Promise<void> {
+  const runningLabel = new RegExp(`^Running ${mode}$`);
+  // Two elements carry this label while a run is in flight: the run-state
+  // badge and the trigger button itself, so query by "all", not "the".
+  //
+  // Phase 1: the run has started. `fireEvent` flushes React state inside
+  // `act`, so this holds on the first tick — but asserting it keeps the wait
+  // honest if that ever changes, instead of passing through a state that
+  // never happened.
+  await waitFor(() => expect(screen.getAllByText(runningLabel).length).toBeGreaterThan(0));
+  // Phase 2: the run has finished and the attempt has been recorded.
+  await waitFor(() => expect(screen.queryAllByText(runningLabel)).toHaveLength(0));
+}
+
 /** Click the Code Lab "Run file" button and wait for the run to settle. */
 export async function clickRunFile(): Promise<void> {
   fireEvent.click(screen.getByRole("button", { name: "Run file" }));
-  await waitFor(() => expect(screen.getByRole("button", { name: /Run file/ })).toBeEnabled());
+  await waitForRunToSettle("file");
 }
 
 /** Click the Code Lab "Run checks" button and wait for the run to settle. */
 export async function clickRunChecks(): Promise<void> {
-  fireEvent.click(screen.getByRole("button", { name: /Run checks/ }));
-  await waitFor(() => expect(screen.getByRole("button", { name: /Run checks/ })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: /^Run checks( again)?$/ }));
+  await waitForRunToSettle("checks");
 }
 
 /** Navigate the stepper forward via the in-content "Continue … →" buttons. */
