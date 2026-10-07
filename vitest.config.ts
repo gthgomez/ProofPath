@@ -30,9 +30,12 @@ export default defineConfig({
     // Default stays "node" for the existing domain/content suites. Journey
     // tests opt into jsdom with a `// @vitest-environment jsdom` docblock.
     environment: "node",
-    // Journey tests render React components and wait on sandbox mock delays;
-    // the 5 s default is too tight for the full stepper workflow.
-    testTimeout: 20000,
+    // Journey tests render the full lesson stepper; the 5s default is tight on
+    // a cold, loaded CI box. The Code Lab's wall-clock phase delays are disabled
+    // in tests (tests/setup.ts), so this budget covers real render/work time
+    // only, not animation. Kept close to the default rather than masking slow,
+    // genuinely-hung runs.
+    testTimeout: 15000,
     setupFiles: [
       resolve(rootDir, "tests/setup.ts")
     ],
