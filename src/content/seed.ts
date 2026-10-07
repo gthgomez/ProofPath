@@ -122,7 +122,7 @@ export const contentPack: ContentPack = {
       title: "SQL and Postgres",
       summary: "Queries, joins, schema thinking, and persistence for app builders.",
       roleTargets: ["Backend, APIs & Data Systems", "Secure Software & AppSec"],
-      moduleIds: ["module-sql-core"],
+      moduleIds: ["module-sql-core", "module-sql-querying", "module-sql-modeling"],
       accentColor: "#08234F"
     },
     {
@@ -325,6 +325,34 @@ export const contentPack: ContentPack = {
       projectMissionIds: ["mission-sql-portfolio-ledger", "mission-job-tracker-schema"],
       skillIds: ["skill-sql-joins"],
       sortOrder: 1
+    },
+    {
+      id: "module-sql-querying",
+      trackId: "track-sql",
+      slug: "sql-querying",
+      title: "SQL Querying",
+      summary: "Aggregate, filter with subqueries, name steps with CTEs, and add per-row windows.",
+      lessonIds: [
+        "lesson-sql-aggregates",
+        "lesson-sql-subqueries",
+        "lesson-sql-ctes",
+        "lesson-sql-window-functions",
+        "lesson-sql-join-fanout"
+      ],
+      projectMissionIds: ["mission-sql-portfolio-ledger", "mission-job-tracker-schema"],
+      skillIds: ["skill-sql-joins", "skill-data-quality"],
+      sortOrder: 2
+    },
+    {
+      id: "module-sql-modeling",
+      trackId: "track-sql",
+      slug: "sql-modeling",
+      title: "SQL Data Modeling",
+      summary: "Keep one fact in one place and reference it by key so reports stay consistent.",
+      lessonIds: ["lesson-sql-normalization"],
+      projectMissionIds: ["mission-job-tracker-schema"],
+      skillIds: ["skill-sql-joins", "skill-data-quality"],
+      sortOrder: 3
     },
     {
       id: "module-git-core",

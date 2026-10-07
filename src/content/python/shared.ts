@@ -263,6 +263,12 @@ export interface ProofLessonInput {
   runnerLanguage?: RunnerLanguage;
   runnerStarterCode: string;
   runnerTestCode: string;
+  /**
+   * Optional privileged schema/seed SQL for SQL lessons. Runs directly against
+   * SQLite before the learner query (like the inline SQL lessons' setupCode) and
+   * is only permitted for lessons on the validator's setupCode allow-list.
+   */
+  runnerSetupCode?: string;
   /** Exact whole-line expectations for the visible check (conceptual identification activities). */
   runnerExpectedExactLines?: string[];
   hiddenTests?: any[]; // optional hidden tests override
@@ -332,6 +338,7 @@ export function proofLesson(input: ProofLessonInput): Lesson {
         runnerSpec: {
           language: input.runnerLanguage ?? "javascript",
           starterCode: input.runnerStarterCode,
+          setupCode: input.runnerSetupCode,
           visibleTests: [
             {
               id: `${input.slug}-visible-check`,
