@@ -95,9 +95,10 @@ Known limits:
 
 Current status:
 
-- TypeScript is transformed for execution before checks run.
-- The sandbox does not run the full TypeScript compiler yet.
-- UI should describe this as `transform + run + verify`.
+- TypeScript runs the real compiler (`typecheck`) before execution, then strips annotations for running.
+- The compiler is bundled offline in `sandbox-assets/typescript/`; no network access is required.
+- Checking covers the single learner file against the ES2015 standard library plus a `console` prelude. It is not a project build, `strict` is off, and harness test code is not type-checked.
+- UI should describe this as `typecheck + transform + run + verify`.
 
 Terminal phases:
 
@@ -108,13 +109,13 @@ Terminal phases:
 
 Known limits:
 
-- Do not label sandbox phases as full compiler validation until a real compiler pass exists.
-- Type annotations and simple type/interface declarations may be stripped for execution.
+- The `typecheck` phase reflects a real compiler pass; it is still not "full compiler validation" of a project (single file, ES2015 lib, `strict` off).
+- Type annotations and simple type/interface declarations are stripped only to prepare code for execution, after the type check has run.
 - Lessons may still ask students to capture external project command evidence, such as `npm run typecheck`, but that is separate from the current Code Lab sandbox runtime.
 
 ## Next Sandbox Priorities
 
 1. Capture the full web and Android screenshot baseline listed in `docs/sandbox-qa-baseline.md`.
 2. Keep expanding Python, SQL, JavaScript, and TypeScript fixture parity before adding larger IDE features.
-3. Add a real TypeScript compiler pass before any sandbox UI claims full compiler validation.
+3. Extend the TypeScript compiler pass to cover more than a single file (project/file imports, richer lib targets, `strict`) if lesson content needs it. The compiler pass itself now exists — see below.
 4. Delay file tabs, file tree, debugger concepts, package awareness, and multi-file execution until the single-file workflow remains stable across run modes and proof capture.

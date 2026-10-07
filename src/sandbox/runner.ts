@@ -1051,8 +1051,8 @@ export function getSandboxCapabilityLabel(language: string): {
 
   if (language === "typescript") {
     return {
-      label: "TypeScript: V8 sandbox",
-      note: "Types stripped at runtime."
+      label: "TypeScript: typecheck + V8 sandbox",
+      note: "Types are checked by the bundled TypeScript compiler before the file runs, then stripped for execution. One file, ES2015 lib, strict off."
     };
   }
 

@@ -86,9 +86,8 @@ ProofPath includes a **Learner Sandbox with Defensive Guardrails** for run-testi
 
 Track depth is intentionally uneven: the Python track is the deepest, while the **SQL and TypeScript tracks are still thin** (see `npm run report:content` and [STATUS.md](STATUS.md)). Lesson and sandbox breadth are being expanded before new feature surface is added.
 
-* **TypeScript Execution:** Relies on lightweight JS transformation to strip types at runtime before running inside the local JavaScript runtime engine, rather than invoking a full, heavy TypeScript compiler.
+* **TypeScript Type Checking:** Runs the real TypeScript compiler (bundled as an offline sandbox asset, ~9 MB) against the learner's file before execution, so type errors fail the check with a line-numbered diagnostic instead of being silently stripped. Checking covers the single submitted file against the ES2015 standard library plus a `console` prelude — it is not a project build, and `strict` is off.
 * **API Redaction & Policies:** Explicitly blocks standard browser network calls (like `fetch`), DOM mutations, and malicious filesystem/database operations before execution, providing beginner-focused diagnostic hints instead of generic failures.
-* **TypeScript Execution:** Relies on lightweight JS transformation to strip types at runtime before running inside the local JavaScript runtime engine, rather than invoking a full, heavy TypeScript compiler.
 * **API Redaction & Policies:** Explicitly blocks standard browser network calls (like `fetch`), DOM mutations, and malicious filesystem/database operations before execution, providing beginner-focused diagnostic hints instead of generic failures.
 
 ---

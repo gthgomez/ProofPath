@@ -19,7 +19,7 @@ CareerForge can claim production-style sandbox quality only when all of these ar
 - Hidden checks are redacted before terminal rendering, proof capture, copied transcript, storage, and native bridge messages.
 - Problems diagnostics are deterministic, line locations are only shown when known, and unknown locations say `Location unknown`.
 - Python does not use `compile` language unless a lesson explicitly teaches Python internals.
-- TypeScript does not use `typecheck` language unless a real compiler/typechecking pass exists.
+- TypeScript uses `typecheck` language because a real compiler/typechecking pass exists (single file, ES2015 lib, `strict` off — the UI must not imply project-wide validation).
 - Web/native behavior is covered by parity tests for normalized attempts, diagnostics, redaction, and proof artifacts.
 
 ## Phase 0: Baseline Lock
@@ -38,7 +38,7 @@ Tasks:
 - Record a current baseline screenshot set for web and Android: fresh lesson, Run file pass, Run checks pass, SyntaxError, policy block, hidden-check failure.
 - Add a short `docs/sandbox-qa-baseline.md` with device, browser, emulator, and app build details.
 - Confirm no Code Lab screen still says Python `compile`.
-- Confirm no sandbox phase says TypeScript `typecheck`.
+- Confirm the TypeScript `typecheck` phase is present only because a real compiler pass exists. ✅ Now true: the compiler is bundled and a type error fails the check.
 
 Acceptance criteria:
 
@@ -154,7 +154,7 @@ Tasks:
   - Python: SyntaxError, IndentationError, NameError, TypeError, timeout, policy
   - SQL: syntax error, no such table, no such column
   - JavaScript: SyntaxError, ReferenceError, TypeError
-  - TypeScript transform/runtime errors, without claiming typechecking
+  - TypeScript: syntax error, type error (real compiler), runtime error, policy
 - Add diagnostic source counters in Problems: parser/runtime/check/policy/system.
 
 Acceptance criteria:
@@ -230,10 +230,9 @@ JavaScript tasks:
 
 TypeScript tasks:
 
-- Keep current wording as `transform + run + verify`.
-- Add tests that prove `supportsTypecheck === false`.
-- Add a real TypeScript compiler phase only if a real compiler/typechecking pass is implemented.
-- If implemented later, add a new phase:
+- Wording is now `typecheck + transform + run + verify`.
+- Tests prove `supportsTypecheck === true` **and** that a real type error fails a check (see `tests/typescript-typecheck.test.ts`). Do not weaken these back to asserting a boolean without the behavioural proof.
+- The real TypeScript compiler phase is implemented and emits:
   - `[typecheck] Running TypeScript compiler...`
 
 Acceptance criteria:
@@ -385,7 +384,7 @@ CareerForge sandbox can move from `SANDBOX` to `PRODUCTION-CANDIDATE` when:
 - Android emulator QA passes on a Pixel profile.
 - No hidden sentinel string appears in terminal UI, copied transcript, proof artifact, storage, or logs.
 - Python, SQL, JavaScript, and TypeScript each have pass/fail/policy fixture coverage.
-- TypeScript either has real typechecking or all UI/docs continue to say transform/run/verify.
+- TypeScript now has real typechecking, so UI and docs must describe it as `typecheck + transform + run + verify` rather than transform-only. This is satisfied; keep it true.
 - Manual evidence and auto-verified proof are visually distinct.
 
 ## Anti-Goals
@@ -393,7 +392,7 @@ CareerForge sandbox can move from `SANDBOX` to `PRODUCTION-CANDIDATE` when:
 Do not build these early:
 
 - File tabs before terminal/proof contracts are stable.
-- TypeScript typecheck labels before real typechecking exists.
+- TypeScript typecheck labels before real typechecking exists. ~~Retired~~ — real typechecking now exists, so the label is legitimate; do not let it imply project-wide validation it does not perform.
 - Python compile labels unless teaching Python internals.
 - AI-generated diagnostics in MVP.
 - Hidden-check hints that reveal edge cases.
