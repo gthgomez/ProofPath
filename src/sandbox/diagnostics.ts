@@ -203,6 +203,24 @@ function parseJavaScriptDiagnostics(message: string, language: RunnerLanguage): 
   const label = language === "typescript" ? "TypeScript" : "JavaScript";
   const diagnostics: ProblemDiagnostic[] = [];
 
+  // The real TypeScript compiler reports diagnostics as
+  // `lesson.ts(1,7): error TS2322: Type 'string' is not assignable ...`.
+  // Surface those as parse-time errors with a known location.
+  const typeCheckMatch = /\((\d+),(\d+)\):\s*error\s+TS(\d+):\s*([^\n]+)/i.exec(message);
+  if (typeCheckMatch) {
+    diagnostics.push({
+      id: `${language}-typecheck-error`,
+      severity: "error",
+      source: "parser",
+      message: firstMatchingLine(message, /error TS\d+:/i) ?? `${label} type error`,
+      beginnerExplanation: `${label} found a type mismatch before running the code. Read the type error, fix the value or the annotation, then run the check again.`,
+      rawDetail: message,
+      line: Number(typeCheckMatch[1]),
+      column: Number(typeCheckMatch[2]),
+      confidence: "known"
+    });
+  }
+
   if (/SyntaxError/i.test(message)) {
     diagnostics.push({
       id: `${language}-syntax-error`,

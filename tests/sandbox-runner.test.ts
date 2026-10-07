@@ -13,6 +13,13 @@ import {
 } from "@/sandbox/runner";
 
 describe("lesson sandbox runner", () => {
+  beforeAll(() => {
+    // The TypeScript runner imports its compiler through the same Node test seam
+    // the Python and SQL runners use; the sandbox's `new Function` dynamic import
+    // is not available under Vitest's module loader.
+    globalThis.__proofpathImportRuntimeModuleForTests = (specifier: string) => import(specifier);
+  });
+
   it("runs TypeScript-style lesson code through the local runner", async () => {
     const lesson = contentPack.lessons.find((candidate) => candidate.id === "lesson-typescript-contracts")!;
     const result = await runLessonSandbox(

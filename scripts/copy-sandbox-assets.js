@@ -23,7 +23,34 @@ const assetTargets = [
       "sql-wasm.wasm",
       "worker.sql-wasm.js"
     ]
+  },
+  {
+    fromDir: path.join(root, "node_modules", "typescript", "lib"),
+    relativeDir: path.join("sandbox-assets", "typescript"),
+    files: [
+      "typescript.js"
+    ]
   }
+];
+
+// The WebView cannot `fetch` individual `lib.*.d.ts` files from `file://`, so the
+// TypeScript standard library is emitted as one script that assigns a name ->
+// source map to a global. `proofPathTypeCheck` in src/sandbox/typescript-typecheck.ts
+// reads that map (the web runtime builds the same map from the compiler's sys).
+const typescriptLibFiles = [
+  "lib.es5.d.ts",
+  "lib.decorators.d.ts",
+  "lib.decorators.legacy.d.ts",
+  "lib.es2015.d.ts",
+  "lib.es2015.core.d.ts",
+  "lib.es2015.collection.d.ts",
+  "lib.es2015.iterable.d.ts",
+  "lib.es2015.generator.d.ts",
+  "lib.es2015.promise.d.ts",
+  "lib.es2015.proxy.d.ts",
+  "lib.es2015.reflect.d.ts",
+  "lib.es2015.symbol.d.ts",
+  "lib.es2015.symbol.wellknown.d.ts"
 ];
 
 const outputRoots = [
@@ -48,4 +75,21 @@ for (const target of assetTargets) {
       console.log(`copied ${path.relative(root, destination)}`);
     }
   }
+}
+
+for (const outputRoot of outputRoots) {
+  const toDir = path.join(outputRoot, "sandbox-assets", "typescript");
+  const libSources = {};
+
+  for (const file of typescriptLibFiles) {
+    const source = path.join(root, "node_modules", "typescript", "lib", file);
+    if (!fs.existsSync(source)) {
+      throw new Error(`Missing sandbox asset: ${source}`);
+    }
+    libSources[file] = fs.readFileSync(source, "utf8");
+  }
+
+  const destination = path.join(toDir, "typescript-libs.js");
+  fs.writeFileSync(destination, `window.PROOFPATH_TYPESCRIPT_LIBS = ${JSON.stringify(libSources)};\n`);
+  console.log(`generated ${path.relative(root, destination)}`);
 }

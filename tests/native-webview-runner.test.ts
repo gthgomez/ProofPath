@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as tsModule from "typescript";
 import { normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
 import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec } from "@/domain/types";
 import {
@@ -16,6 +17,12 @@ import {
   SQL_HARNESS_PATTERN,
   isTrustedSqlHarness
 } from "@/sandbox/runner";
+import {
+  loadTypeScriptLibFiles,
+  type TypeScriptCompiler
+} from "@/sandbox/typescript-typecheck";
+
+const typeScriptCompiler = ((tsModule as unknown as { default?: TypeScriptCompiler }).default ?? tsModule) as unknown as TypeScriptCompiler;
 
 describe("native WebView sandbox runner bridge", () => {
   it("exposes the bridge entrypoint and ready handshake in the generated HTML", () => {
@@ -25,9 +32,22 @@ describe("native WebView sandbox runner bridge", () => {
     expect(html).toContain("sandbox-ready");
     expect(html).toContain(SANDBOX_ASSET_PATHS.pyodide);
     expect(html).toContain(SANDBOX_ASSET_PATHS.sqlJs);
+    expect(html).toContain(SANDBOX_ASSET_PATHS.typescript);
     expect(html).toContain("loadPyodide");
     expect(html).toContain("initSqlJs");
+    expect(html).toContain('window.PROOFPATH_SANDBOX_ASSETS.typescript + "typescript.js"');
+    expect(html).toContain('window.PROOFPATH_SANDBOX_ASSETS.typescript + "typescript-libs.js"');
     expect(NATIVE_ANDROID_SANDBOX_BASE_URL).toBe("file:///android_asset/");
+  });
+
+  it("embeds the shared TypeScript type-check source", () => {
+    const html = createNativeWebViewRunnerHtml();
+
+    // The native runner must run the very same type check as the web runner.
+    expect(html).toContain("/* typescript-typecheck:start */");
+    expect(html).toContain("/* typescript-typecheck:end */");
+    expect(html).toContain("function proofPathTypeCheck(ts, libFiles, fileName, code)");
+    expect(html).toContain("proofPathFormatTypeCheckLearnerMessage");
   });
 
   it("embeds the shared Python run-mode sentinels used by the web runner", () => {
@@ -267,6 +287,8 @@ interface EmbeddedRunnerOptions {
   };
   initSqlJs?: () => Promise<{ Database: new () => unknown }>;
   loadPyodide?: () => Promise<unknown>;
+  ts?: unknown;
+  typeScriptLibs?: Record<string, string>;
 }
 
 function runEmbeddedNativeRunner(options: EmbeddedRunnerOptions): Promise<EmbeddedAttempt> {
@@ -292,7 +314,9 @@ function runEmbeddedNativeRunner(options: EmbeddedRunnerOptions): Promise<Embedd
     },
     addEventListener: () => {},
     initSqlJs: options.initSqlJs,
-    loadPyodide: options.loadPyodide
+    loadPyodide: options.loadPyodide,
+    ts: options.ts,
+    PROOFPATH_TYPESCRIPT_LIBS: options.typeScriptLibs
   };
   const documentStub = {
     addEventListener: () => {},
@@ -469,5 +493,68 @@ describe("native WebView runner behavior (embedded script executed with stubs)",
     });
 
     expect(direct.events[0]).toBe(`globals.set:__name__=${PYTHON_DIRECT_RUN_NAME}`);
+  });
+
+  it("fails a native TypeScript check with a learner-facing type error", async () => {
+    const code = 'const value: number = "hello";';
+    const typeScriptLibs = loadTypeScriptLibFiles(typeScriptCompiler);
+    const attempt = await runEmbeddedNativeRunner({
+      request: {
+        lessonId: "lesson-native-typescript",
+        code,
+        now: "2026-10-07T20:10:00.000Z",
+        runMode: "run_checks",
+        spec: {
+          language: "typescript",
+          instructions: "Declare a number and print it.",
+          starterCode: code,
+          visibleTests: [
+            { id: "visible", name: "Prints the number", code: "console.log(value);", expectedOutputIncludes: ["2"] }
+          ],
+          hiddenTests: [],
+          expectedOutput: ["2"],
+          timeoutMs: 4000,
+          allowNetwork: false
+        }
+      },
+      ts: typeScriptCompiler,
+      typeScriptLibs
+    });
+
+    expect(attempt.passed).toBe(false);
+    expect(attempt.testResults[0]?.passed).toBe(false);
+    expect(attempt.testResults[0]?.message).toMatch(/type error/i);
+    expect(attempt.testResults[0]?.message).toMatch(/not assignable to type 'number'/i);
+    expect(attempt.stderr).toMatch(/error TS2322/);
+  });
+
+  it("passes a type-correct native TypeScript check", async () => {
+    const code = "const value: number = 2;\nconsole.log(value);";
+    const typeScriptLibs = loadTypeScriptLibFiles(typeScriptCompiler);
+    const attempt = await runEmbeddedNativeRunner({
+      request: {
+        lessonId: "lesson-native-typescript",
+        code,
+        now: "2026-10-07T20:11:00.000Z",
+        runMode: "run_checks",
+        spec: {
+          language: "typescript",
+          instructions: "Declare a number and print it.",
+          starterCode: code,
+          visibleTests: [
+            { id: "visible", name: "Prints the number", code: "console.log(value);", expectedOutputIncludes: ["2"] }
+          ],
+          hiddenTests: [],
+          expectedOutput: ["2"],
+          timeoutMs: 4000,
+          allowNetwork: false
+        }
+      },
+      ts: typeScriptCompiler,
+      typeScriptLibs
+    });
+
+    expect(attempt.passed).toBe(true);
+    expect(attempt.stdout).toContain("2");
   });
 });

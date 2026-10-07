@@ -26,11 +26,12 @@ describe("production-style sandbox workflow contracts", () => {
     expect(redacted.hiddenCheckSummary).toEqual({ total: 1, passed: 0, failed: 1 });
   });
 
-  it("builds language-accurate phase labels without Python compile or fake TypeScript typecheck", () => {
+  it("builds language-accurate phase labels and includes the real TypeScript type check", () => {
     expect(phaseLabelsFor("python", "run_checks").join("\n")).toContain("[parse] Checking Python syntax");
     expect(phaseLabelsFor("python", "run_checks").join("\n")).not.toMatch(/compile/i);
+    expect(phaseLabelsFor("typescript", "run_checks").join("\n")).toContain("[typecheck] Checking TypeScript types");
     expect(phaseLabelsFor("typescript", "run_checks").join("\n")).toContain("[transform] Preparing JavaScript runtime");
-    expect(phaseLabelsFor("typescript", "run_checks").join("\n")).not.toMatch(/typecheck/i);
+    expect(phaseLabelsFor("typescript", "run_checks").join("\n")).toMatch(/typecheck/i);
 
     const runningEvents = buildRunningTerminalEvents("python", "run_checks", 1);
     expect(runningEvents[0]).toEqual({ type: "context", cwd: "proofpath://lesson-sandbox", file: "study_session.py", language: "python" });
@@ -38,12 +39,13 @@ describe("production-style sandbox workflow contracts", () => {
     expect(runningEvents.some((event) => event.type === "phase" && event.status === "active")).toBe(true);
   });
 
-  it("keeps TypeScript runtime capability honest until full compiler validation exists", () => {
+  it("reports the real TypeScript type check in the runtime capability", () => {
     const capabilities = runtimeCapabilitiesFor("typescript");
 
-    expect(capabilities.workflowLabel).toBe("transform + run + verify");
-    expect(capabilities.supportsTypecheck).toBe(false);
-    expect(capabilities.beginnerNote).toContain("does not run the full TypeScript compiler yet");
+    expect(capabilities.workflowLabel).toBe("typecheck + transform + run + verify");
+    expect(capabilities.supportsTypecheck).toBe(true);
+    expect(capabilities.beginnerNote).toMatch(/real TypeScript type check/i);
+    expect(capabilities.limitations.join("\n")).toMatch(/type error/i);
   });
 
   it("keeps run file attempts from completing progress or creating proof", () => {

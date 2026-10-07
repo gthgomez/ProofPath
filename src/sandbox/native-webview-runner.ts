@@ -7,6 +7,7 @@ import {
   SQL_HARNESS_PATTERN,
   isTrustedSqlHarness
 } from "./runner";
+import { TYPESCRIPT_TYPE_CHECK_SOURCE } from "./typescript-typecheck";
 
 export interface NativeWebViewRunnerRequest {
   lessonId: string;
@@ -18,7 +19,8 @@ export interface NativeWebViewRunnerRequest {
 
 export const SANDBOX_ASSET_PATHS = {
   pyodide: "file:///android_asset/sandbox-assets/pyodide/",
-  sqlJs: "file:///android_asset/sandbox-assets/sql.js/"
+  sqlJs: "file:///android_asset/sandbox-assets/sql.js/",
+  typescript: "file:///android_asset/sandbox-assets/typescript/"
 } as const;
 
 export const NATIVE_ANDROID_SANDBOX_BASE_URL = "file:///android_asset/";
@@ -135,6 +137,11 @@ export function createNativeWebViewRunnerHtml(): string {
       return true;
     }
     /* trusted-sql-harness-gate:end */
+    /* typescript-typecheck:start */
+    // Shared with the web runner (src/sandbox/typescript-typecheck.ts) so a type
+    // error fails a check identically in the browser and the native WebView.
+    ${TYPESCRIPT_TYPE_CHECK_SOURCE}
+    /* typescript-typecheck:end */
     function post(payload) {
       window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
     }
@@ -265,10 +272,38 @@ export function createNativeWebViewRunnerHtml(): string {
       };
     }
 
-    function runJavaScriptLike(request) {
+    let typeScriptRuntime = null;
+    async function getTypeScriptRuntime() {
+      if (typeScriptRuntime) return typeScriptRuntime;
+
+      if (!window.ts) {
+        await loadScript(window.PROOFPATH_SANDBOX_ASSETS.typescript + "typescript.js");
+      }
+
+      if (!window.ts) {
+        throw new Error("TypeScript compiler asset loaded without ts.");
+      }
+
+      if (!window.PROOFPATH_TYPESCRIPT_LIBS) {
+        await loadScript(window.PROOFPATH_SANDBOX_ASSETS.typescript + "typescript-libs.js");
+      }
+
+      if (!window.PROOFPATH_TYPESCRIPT_LIBS) {
+        throw new Error("TypeScript library assets loaded without libs.");
+      }
+
+      typeScriptRuntime = window.ts;
+      return typeScriptRuntime;
+    }
+
+    async function runTypeScriptTypeCheck(code) {
+      const ts = await getTypeScriptRuntime();
+      return proofPathTypeCheck(ts, window.PROOFPATH_TYPESCRIPT_LIBS, "lesson.ts", code);
+    }
+
+    async function runJavaScriptLike(request) {
       const startedAt = Date.now();
       const spec = request.spec;
-      const runtimeCode = spec.language === "typescript" ? stripTypeScript(request.code) : request.code;
       const stdout = [];
       const stderr = [];
       const testResults = [];
@@ -277,6 +312,31 @@ export function createNativeWebViewRunnerHtml(): string {
         log: (...values) => stdout.push(values.map(normalizeOutput).join(" ")),
         error: (...values) => stderr.push(values.map(normalizeOutput).join(" "))
       };
+
+      // TypeScript lessons must fail on type errors, which stripping and running
+      // the code can never detect. stripTypeScript is still used below, but only
+      // to erase annotations before execution.
+      if (spec.language === "typescript") {
+        const typeCheck = await runTypeScriptTypeCheck(request.code);
+        if (typeCheck.diagnostics.length > 0) {
+          stderr.push(typeCheck.stderr);
+          if (request.runMode === "run_file") {
+            return buildAttempt(request, startedAt, stdout, stderr, testResults);
+          }
+          for (let index = 0; index < tests.length; index += 1) {
+            testResults.push({
+              id: tests[index].id,
+              name: tests[index].name,
+              passed: false,
+              visible: index < spec.visibleTests.length,
+              message: typeCheck.learnerMessage
+            });
+          }
+          return buildAttempt(request, startedAt, stdout, stderr, testResults);
+        }
+      }
+
+      const runtimeCode = spec.language === "typescript" ? stripTypeScript(request.code) : request.code;
 
       if (request.runMode === "run_file") {
         try {
@@ -542,7 +602,7 @@ export function createNativeWebViewRunnerHtml(): string {
         } else if (request.spec.language === "sql") {
           attempt = await runSql(request);
         } else {
-          attempt = runJavaScriptLike(request);
+          attempt = await runJavaScriptLike(request);
         }
       } catch (error) {
         attempt = runnerErrorAttempt(request, error);
