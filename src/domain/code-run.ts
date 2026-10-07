@@ -461,10 +461,13 @@ function phaseStatusForReason(
     // A parse/type-check failure is the first analysis gate. Later phases were
     // never attempted, so keep them pending instead of implying that the runner
     // deliberately skipped their work. TypeScript reports its type errors during
-    // the [typecheck] phase, Python/JavaScript during [parse], and SQL during
-    // [prepare].
-    const analysisIndex = phases.findIndex((phase) => /\[(parse|typecheck|prepare)\]/.test(phase));
-    const failureIndex = analysisIndex >= 0 ? analysisIndex : 0;
+    // [typecheck] (after a [prepare] that only read the source), so prefer
+    // [typecheck] over [parse]/[prepare]; Python/JavaScript report during
+    // [parse] and SQL during [prepare].
+    const analysisIndex = ["[typecheck]", "[parse]", "[prepare]"]
+      .map((marker) => phases.findIndex((phase) => phase.includes(marker)))
+      .find((index) => index >= 0);
+    const failureIndex = analysisIndex ?? 0;
     return index < failureIndex ? "done" : index === failureIndex ? "failed" : "pending";
   }
 
