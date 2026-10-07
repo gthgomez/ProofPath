@@ -1,6 +1,6 @@
 # Career paths (2026 draft)
 
-CareerForge keeps three stable role IDs for routing and saved progress: `role-junior-swe`, `role-python-fullstack`, and `role-ai-app-fullstack`. This document sharpens how they differ for learners and hiring signals in 2026—not a content rewrite of every lesson.
+ProofPath keeps three stable role IDs for routing and saved progress: `role-junior-swe`, `role-python-fullstack`, and `role-ai-app-fullstack`. This document sharpens how they differ for learners and hiring signals in 2026—not a content rewrite of every lesson.
 
 ## Market signals (brief, non-exhaustive)
 
@@ -14,7 +14,7 @@ Sources are directional, not guarantees. Use them to prioritize proof and review
 | **Job-posting aggregates** (e.g. large 2025–2026 SWE posting samples) | Python, SQL, APIs, Git/CI, and cloud keywords appear often; TypeScript clusters with web/full-stack postings; LLM/RAG/eval language shows up as a **differentiator**, not a replacement for fundamentals. |
 | **Hiring composition** (multiple 2025–2026 commentaries) | Fewer pure “write CRUD from scratch” junior slots; more weight on **portfolio proof**, verification, and communication. Treat this as pressure to show evidence, not as “juniors are gone.” |
 
-CareerForge encodes this by making **verifier-backed Code Lab runs**, **portfolio entries**, and **missions** count more than checkbox quizzes alone.
+ProofPath encodes this by making **verifier-backed Code Lab runs**, **portfolio entries**, and **missions** count more than checkbox quizzes alone.
 
 ## Three role targets (product stance)
 

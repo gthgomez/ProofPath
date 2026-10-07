@@ -1,4 +1,4 @@
-# CareerForge Sandbox Production-Quality Roadmap
+# ProofPath Sandbox Production-Quality Roadmap
 
 Status: implementation-control roadmap  
 Scope: single-file Code Lab first, then multi-file IDE features later  
@@ -8,7 +8,7 @@ This roadmap converts the terminal/sandbox audit into build phases. The target i
 
 ## Production-Quality Definition
 
-CareerForge can claim production-style sandbox quality only when all of these are true:
+ProofPath can claim production-style sandbox quality only when all of these are true:
 
 - `Run file` and `Run checks` are separate in data, UI, storage, and progress behavior.
 - `Run file` never completes progress and never captures proof.
@@ -377,7 +377,7 @@ Entry criteria:
 
 ## Production-Candidate Gate
 
-CareerForge sandbox can move from `SANDBOX` to `PRODUCTION-CANDIDATE` when:
+ProofPath sandbox can move from `SANDBOX` to `PRODUCTION-CANDIDATE` when:
 
 - Phase 1 through Phase 8 are complete.
 - `npm run verify` passes.

@@ -2,7 +2,7 @@
 
 Status: archived historical record.
 
-This file was written when CareerForge Mobile still used the `SoloLearnDup` working name and path. It is retained only for provenance and should not be used as a current mission prompt, routing file, or execution envelope. Current work belongs in `C:\Workspace\Project_Android\CareerForgeMobile`; use [docs/README.md](./README.md) and [career-paths-status-and-plan-2026.md](./career-paths-status-and-plan-2026.md) for current documentation routing.
+This file was written when CareerForge Mobile still used the `SoloLearnDup` working name and path. It is retained only for provenance and should not be used as a current mission prompt, routing file, or execution envelope. Current work belongs in the `ProofPath/` repo root; use [docs/README.md](./README.md) and [career-paths-status-and-plan-2026.md](./career-paths-status-and-plan-2026.md) for current documentation routing.
 
 Use this prompt to run the full SoloLearnDup build as a bounded, phase-gated mission. The mission is not complete until the Android app is implemented, audited, reviewed, APK-tested, and ready for the intended release target.
 

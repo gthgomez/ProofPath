@@ -1,6 +1,6 @@
 # Career paths research (2026)
 
-**Purpose:** Evidence-backed input for CareerForge Mobile’s three role targets and six learning tracks. This supplements [`career-paths-2026.md`](./career-paths-2026.md) (product stance) with 2025–2026 labor-market and skills signals. It is **not** labor-market advice or a curriculum rewrite mandate.
+**Purpose:** Evidence-backed input for ProofPath’s three role targets and six learning tracks. This supplements [`career-paths-2026.md`](./career-paths-2026.md) (product stance) with 2025–2026 labor-market and skills signals. It is **not** labor-market advice or a curriculum rewrite mandate.
 
 **Product baseline (verified in repo):**
 
@@ -19,7 +19,7 @@
 
 2. **Python, SQL, and Git remain the most durable “posting backbone”** for junior and intern SWE roles across surveys and aggregated job-skill lists (Lightcast occupational skill bundles; recurring intern JD patterns). TypeScript/JavaScript cluster with **web and full-stack** postings; Python clusters with **backend, data, and AI-adjacent** work.
 
-3. **TypeScript’s rise is real but role-specific.** GitHub Octoverse 2025 reports TypeScript as #1 by monthly contributors (Aug 2025), driven partly by typed, AI-assisted app work; **Python still leads AI-tagged repositories** and ML/data workflows. CareerForge should teach **both**, with **path-dependent ordering** (already reflected in `roles.ts`).
+3. **TypeScript’s rise is real but role-specific.** GitHub Octoverse 2025 reports TypeScript as #1 by monthly contributors (Aug 2025), driven partly by typed, AI-assisted app work; **Python still leads AI-tagged repositories** and ML/data workflows. ProofPath should teach **both**, with **path-dependent ordering** (already reflected in `roles.ts`).
 
 4. **APIs, testing, and basic security are “assumed” more than listed**—employers often omit SQL or testing because they expect baseline competence (Stack Overflow “admired/desired” language data; NACE career-readiness framing). The app should make **HTTP/REST literacy, test evidence, and safe handling of secrets/PII** explicit outcomes, not optional footnotes.
 
@@ -33,7 +33,7 @@
 
 9. **Junior slot composition is shifting, not vanishing.** Macro reports note automation pressure on some tasks, but CS hiring intent remains strong (NACE: computer science tied for top bachelor’s hiring intent ~67% of respondents). Differentiation is **breadth + evidence + AI fluency with judgment**, not a single buzzword stack.
 
-10. **CareerForge’s three-path split is well aligned** with posting clusters: generalist junior (polyglot + AI verification), Python/data/API path (persistence + practical AI boundaries), AI product path (TypeScript + evals/safety earlier). **Defer `track-ml` for all roles** until learners have production-style proof—supported by role-skill separation above.
+10. **ProofPath’s three-path split is well aligned** with posting clusters: generalist junior (polyglot + AI verification), Python/data/API path (persistence + practical AI boundaries), AI product path (TypeScript + evals/safety earlier). **Defer `track-ml` for all roles** until learners have production-style proof—supported by role-skill separation above.
 
 ---
 
@@ -44,7 +44,7 @@ Evidence strength reflects **source type and reproducibility**, not importance t
 | Rank | Category | Strength | Representative signals |
 | --- | --- | --- | --- |
 | 1 | **Foundational programming** (variables, types, debugging, data structures, OOP basics) | **Hard** | SO 2025: developers resist AI for high-risk tasks; intern JDs require debugging tracebacks without autocomplete; NACE competencies emphasize problem-solving |
-| 2 | **Version control (Git) & collaboration hygiene** | **Hard** | Lightcast “Software Developers” top skills include agile/software engineering practices; intern postings routinely require Git; CareerForge `track-git` |
+| 2 | **Version control (Git) & collaboration hygiene** | **Hard** | Lightcast “Software Developers” top skills include agile/software engineering practices; intern postings routinely require Git; ProofPath `track-git` |
 | 3 | **SQL & data modeling basics** | **Hard** | Lightcast occupational lists: SQL among top skills for software developers; SO surveys historically rank SQL highly desired; intern/data roles require queries + schema |
 | 4 | **Python proficiency** | **Hard** | Lightcast/GW RevU-style aggregates: Python among most cited languages in SWE postings; GitHub: Python +48% YoY contributors, dominant in AI-tagged repos (Octoverse 2025) |
 | 5 | **TypeScript / JavaScript (typed web & APIs)** | **Hard** (trend) | GitHub Octoverse 2025: TypeScript #1 by contributors; SO 2025: high “desired” language interest; clusters with full-stack/front-end JDs |
@@ -69,9 +69,9 @@ Evidence strength reflects **source type and reproducibility**, not importance t
 | **Stack emphasis** | PyTorch/sklearn, feature pipelines, MLOps | Hosted LLM APIs, vector DBs, TypeScript/Python services, test sets |
 | **Math/stat depth** | Higher expectation for modeling roles | Enough to interpret evals; less emphasis on proving theorems |
 | **Junior posting fit** | Uncommon unless internship is explicitly ML research/platform | Growing in “backend + AI”, “full-stack + LLM feature” intern roles |
-| **CareerForge mapping** | `track-ml` (phase 2) | `track-ai-apps` + `track-ai-tools`; TS/Python/SQL/Git |
+| **ProofPath mapping** | `track-ml` (phase 2) | `track-ai-apps` + `track-ai-tools`; TS/Python/SQL/Git |
 
-**Hiring reality:** Job titles conflate “AI Engineer,” “ML Engineer,” and “LLM Engineer.” Candidates should match **layer** (model vs application) to the team’s actual work. CareerForge’s `role-ai-app-fullstack` should **not** imply ML research training; `role-python-fullstack` should teach **AI product boundaries** (`track-ai-apps`) without replacing **daily verification habits** (`track-ai-tools` on the junior/AI-product paths).
+**Hiring reality:** Job titles conflate “AI Engineer,” “ML Engineer,” and “LLM Engineer.” Candidates should match **layer** (model vs application) to the team’s actual work. ProofPath’s `role-ai-app-fullstack` should **not** imply ML research training; `role-python-fullstack` should teach **AI product boundaries** (`track-ai-apps`) without replacing **daily verification habits** (`track-ai-tools` on the junior/AI-product paths).
 
 ---
 
@@ -136,7 +136,7 @@ Aligned with existing onboarding copy in `roles.ts` and market backbone skills.
 
 ---
 
-## Implications for CareerForge Mobile (three career paths)
+## Implications for ProofPath (three career paths)
 
 ### 1. Junior SWE (`role-junior-swe`)
 
@@ -210,7 +210,7 @@ Aligned with existing onboarding copy in `roles.ts` and market backbone skills.
 
 ## Document metadata
 
-- **Authoring context:** Research task for CareerForge Mobile, May 2026.
+- **Authoring context:** Research task for ProofPath, May 2026.
 - **Companion doc:** [`career-paths-2026.md`](./career-paths-2026.md)
 - **Content tracks reference:** `src/content/seed.ts` (`track-python` … `track-ml`)
 - **Routing reference:** `src/content/roles.ts`

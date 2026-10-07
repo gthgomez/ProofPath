@@ -6,6 +6,7 @@ import { isScaffoldStarter, scaffoldStarterNotice, type ScaffoldStarterNotice } 
 import type { CodeRunAttempt, CodeRunMode, HiddenCheckSummary, TerminalEvent } from "@/domain/types";
 import { runLessonSandbox, getSandboxCapabilityLabel } from "@/sandbox/runner";
 import { Badge, BodyText, ButtonShell, MutedText, Row, SectionTitle } from "@/ui/primitives";
+import { runPhaseDelay } from "@/ui/run-phase-timing";
 import { colors, radius, semanticColors, spacing } from "@/ui/theme";
 import { CodeProblems } from "@/ui/code-problems";
 import { CodeTerminal } from "@/ui/code-terminal";
@@ -237,10 +238,8 @@ function redactLearnerTerminalEvents(events: TerminalEvent[]): TerminalEvent[] {
   });
 }
 
-function waitForRunPhase(durationMs = 260): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, durationMs);
-  });
+function waitForRunPhase(defaultDurationMs = 260): Promise<void> {
+  return runPhaseDelay(defaultDurationMs);
 }
 
 function ScaffoldStarterCard({ notice }: { notice: ScaffoldStarterNotice }): ReactElement {

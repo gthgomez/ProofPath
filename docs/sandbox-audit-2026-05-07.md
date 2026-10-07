@@ -1,8 +1,8 @@
-# CareerForge Sandbox Audit - 2026-05-07
+# ProofPath Sandbox Audit - 2026-05-07
 
 ## Current State
 
-CareerForge now has a real lesson Code Lab instead of a manual proof checkbox. Lesson mini-project completion is driven by `CodeRunAttempt.passed`, and every attempt stores code snapshot, stdout, stderr, score, runtime, and per-test results.
+ProofPath now has a real lesson Code Lab instead of a manual proof checkbox. Lesson mini-project completion is driven by `CodeRunAttempt.passed`, and every attempt stores code snapshot, stdout, stderr, score, runtime, and per-test results.
 
 Supported local runners:
 

@@ -59,7 +59,7 @@ On top: SM-2-like spaced repetition (`review.ts`, intervals 1/3/7/14/30 days), p
 
 | # | Issue | Evidence |
 |---|---|---|
-| 1 | **Incomplete rebrand**: package `careerforge-mobile`, `app.json` "CareerForge Mobile", Android package `com.jonathangomez.careerforge`, DB `careerforge.db`, runtime strings "Loading CareerForge" / `eyebrow="CareerForge Mobile"` | `package.json`, `app.json`, `app/_layout.tsx:33`, `app/index.tsx:62`, `src/state/progress-shell.native.tsx` |
+| 1 | **Incomplete rebrand** (since fixed): package `careerforge-mobile`, `app.json` "CareerForge Mobile", Android package `com.jonathangomez.careerforge`, DB `careerforge.db`, runtime strings "Loading CareerForge" / `eyebrow="CareerForge Mobile"` | `package.json`, `app.json`, `app/_layout.tsx:33`, `app/index.tsx:62`, `src/state/progress-shell.native.tsx` |
 | 2 | **Stale docs**: `docs/career-paths-current-curriculum-2026.md` says 63 lessons/63 quizzes/18 missions vs actual 104/104/20; `QA_CHECKLIST.md:50` says "19 test suites" vs actual 22 files | docs/ |
 | 3 | **Missing referenced doc**: `CLAUDE.md` and `PROJECT_CONTEXT.md` both point to `docs/PROJECT_LAYOUT.md`, which doesn't exist | docs/ |
 | 4 | **Concentration risk**: 10 of 11 tracks are 2–6 token lessons with no depth block, 1–2-sentence bodies, and (for TS) a paste-based tester rather than a sandbox verifier. The catalog *looks* broad but only Python is real. | `report:content` warnings, `seed.ts` |
@@ -157,7 +157,7 @@ ProofPath's README explicitly defines itself against the W3Schools/SoloLearn mod
 - Advertising/upsell UX; certificate-of-clicking (the readiness cap is the better product).
 
 **Internal fixes surfaced by this audit:**
-1. Finish the CareerForge → ProofPath rebrand (package names, `app.json`, DB name needs a migration, runtime strings).
+1. ~~Finish the CareerForge → ProofPath rebrand (package names, `app.json`, DB name needs a migration, runtime strings).~~ **Done.** Package `proofpath`, `app.json` name/slug, Android `com.jonathangomez.proofpath`, `proofpath.db` with ATTACH-based legacy import, and all runtime strings. `careerforge.db` and `careerforge.progress.v1` survive only as `LEGACY_*` migration identifiers in `src/storage/legacy-db-import.ts` and the web progress provider — renaming those would strand existing installs' progress.
 2. Refresh stale docs: `career-paths-current-curriculum-2026.md` (63→104), `QA_CHECKLIST.md` (19→22 suites).
 3. Create the missing `docs/PROJECT_LAYOUT.md` that two top-level docs reference.
 4. Decide and document the policy for TODO starters (learner-facing "expected to fail until you implement it" messaging in Code Lab), since ~1/3 of active lessons open in a failing state by design.

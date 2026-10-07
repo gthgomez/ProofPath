@@ -1,6 +1,6 @@
 # Career paths adversarial critique (2026)
 
-Adversarial review of CareerForge’s three stable role IDs (`role-junior-swe`, `role-python-fullstack`, `role-ai-app-fullstack`) against common CS-student “pick your lane” patterns in 2026. Grounded in `docs/career-paths-2026.md`, `src/content/roles.ts`, `src/content/seed.ts` (seven tracks, six in routing), and `app/onboarding.tsx`.
+Adversarial review of ProofPath’s three stable role IDs (`role-junior-swe`, `role-python-fullstack`, `role-ai-app-fullstack`) against common CS-student “pick your lane” patterns in 2026. Grounded in `docs/career-paths-2026.md`, `src/content/roles.ts`, `src/content/seed.ts` (seven tracks, six in routing), and `app/onboarding.tsx`.
 
 This is a **product and pedagogy** critique—not labor-market advice. Stable role IDs may stay; positioning, gating, and onboarding copy may not.
 
@@ -22,7 +22,7 @@ The current triad is **market-plausible** but **weakly differentiated at the tra
 
 **Pattern:** Three cards that differ only by track order or one elective swap while sharing ~80% of curriculum.
 
-**CareerForge today:**  
+**ProofPath today:**  
 | Role | `trackIds` (order) |
 | --- | --- |
 | Junior SWE | python → typescript → sql → git → **ai-tools** |
@@ -39,7 +39,7 @@ All paths include Python, TypeScript, SQL, and Git. Two paths include both AI tr
 
 **Pattern:** Paths named or sequenced like mid-level roles (product engineer, full-stack) while week-1–2 content is still values, functions, and first Code Lab.
 
-**CareerForge today:**
+**ProofPath today:**
 
 - **AI product engineer** leads with TypeScript + “AI verification habits” and Portfolio “safety/eval decision”—correct *topic* emphasis for 2026 hiring, but the **title** implies shipping production LLM features before CLI/SQL/Git proof exists in other paths.
 - **Python backend & full-stack** promises “APIs, data modeling, services” while first actions are still first Python lesson + mission logging—appropriate if framed as *target job family*, misleading if read as *current skill level*.
@@ -51,7 +51,7 @@ All paths include Python, TypeScript, SQL, and Git. Two paths include both AI tr
 
 **Pattern:** “Learn AI apps now, add ML later → ML engineer” implied pipeline.
 
-**CareerForge today (mostly healthy):**
+**ProofPath today (mostly healthy):**
 
 - `track-ml` exists in `seed.ts` but is **excluded from all role `trackIds`**; doc defers ML to phase 2.
 - **Risk remains:** Two AI tracks (`track-ai-tools`, `track-ai-apps`) plus a future `track-ml` can read as “AI career ladder” in onboarding excluded lists (“ML Foundations … phase 2”), especially on the AI path card that already lists two AI tracks.
@@ -63,7 +63,7 @@ All paths include Python, TypeScript, SQL, and Git. Two paths include both AI tr
 
 **Pattern:** UI celebrates lesson/quiz progress; hiring celebrates **verifier output, repo, README, failure stories**.
 
-**CareerForge today (strong backend, weak first-run story):**
+**ProofPath today (strong backend, weak first-run story):**
 
 - Readiness weights: projects 40%, evidence 30%, lessons 10%, quizzes 10%, review 10%.
 - Evidence quality scoring rewards repo, commit hash, passing tests, verifier output, README, reflection (`evidenceQuality` in `readiness.ts`).
@@ -75,7 +75,7 @@ All paths include Python, TypeScript, SQL, and Git. Two paths include both AI tr
 
 **Pattern:** First-run screen asks users to compare three multi-paragraph product specs.
 
-**CareerForge today (`app/onboarding.tsx` per card):**
+**ProofPath today (`app/onboarding.tsx` per card):**
 
 - Outcome summary (`target.summary`)
 - “N learning tracks:” + comma-separated **five** included titles
@@ -150,7 +150,7 @@ Each triad is a **positioning alternative**—would require new copy and possibl
 | Good for mobile product truth (sandbox limits). | Harder to maintain three parallel weekly plans in content. |
 | Surfaces honest limits of mobile Code Lab vs desktop Git. | May duplicate “Today plan” features if not careful. |
 
-**Not recommended as primary triad for CareerForge:** pure language splits (Python vs Java vs Go)—content pack is polyglot Python/TS/SQL by design.
+**Not recommended as primary triad for ProofPath:** pure language splits (Python vs Java vs Go)—content pack is polyglot Python/TS/SQL by design.
 
 ---
 
@@ -185,7 +185,7 @@ Each triad is a **positioning alternative**—would require new copy and possibl
 ## Red lines (what NOT to promise learners)
 
 1. **“You will be hired as an AI/ML engineer after this path.”** RAG/eval lessons ≠ ML hiring bar; `track-ml` is not production-grade ML project simulation.
-2. **“This path replaces a CS degree or bootcamp portfolio.”** CareerForge supplements proof-building; it does not place candidates.
+2. **“This path replaces a CS degree or bootcamp portfolio.”** ProofPath supplements proof-building; it does not place candidates.
 3. **“Senior / product engineer titles mean senior-level work in week 1.”** Titles describe **job family targets**, not current seniority.
 4. **“Completing all lessons means you’re ready.”** Readiness explicitly caps without missions/evidence—never contradict that in marketing.
 5. **“AI-assisted coding means employers trust AI output.”** Market signal is the opposite: trust comes from **human verification**—align with AI-tools track, not “autopilot.”

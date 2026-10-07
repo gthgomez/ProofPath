@@ -79,15 +79,6 @@ export default function EvidenceLogScreen(): ReactElement {
     ...(linkedMission?.skillIds ?? []),
     ...(linkedLesson?.skillIds ?? [])
   ]));
-  const linkedMissionRequirements = linkedMission ? [
-    linkedMission.evidenceRequirements.repoUrl ? "repo link" : undefined,
-    linkedMission.evidenceRequirements.commitHash ? "commit hash" : undefined,
-    linkedMission.evidenceRequirements.passingVerifierOutput ? "passing check" : undefined,
-    linkedMission.evidenceRequirements.readmeStatus !== "missing" ? `README ${linkedMission.evidenceRequirements.readmeStatus}` : undefined,
-    linkedMission.evidenceRequirements.artifactOrDeployment ? "artifact or deployment" : undefined,
-    linkedMission.evidenceRequirements.reflection ? "reflection" : undefined
-  ].filter((label): label is string => Boolean(label)) : [];
-
   const canSubmit = title.trim().length > 0 && body.trim().length > 0;
 
   if (isCheckingOnboarding) {

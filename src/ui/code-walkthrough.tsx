@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { CodeWalkthroughNote as CodeWalkthroughNoteType } from "@/domain/types";
-import { Badge, BodyText, MutedText, SubPanel, SectionTitle } from "./primitives";
+import { Badge, BodyText, SubPanel, SectionTitle } from "./primitives";
 import { colors, radius, spacing } from "./theme";
 
 interface CodeWalkthroughProps {

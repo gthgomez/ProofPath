@@ -7,7 +7,6 @@ import {
   addEvidenceItem,
   createInitialProgress,
   dismissDashboardTour,
-  fastTrackLessons,
   placementSkip,
   generateWeeklyReport,
   recordCodeRunAttempt,
@@ -20,7 +19,7 @@ import {
 import { calculateReadinessScore } from "@/domain/readiness";
 import { getContentForRole, getRoleTarget } from "@/domain/role-routing";
 import { roleTargets } from "@/content/roles";
-import type { CodeRunAttempt, EvidenceTestStatus, EvidenceType, ProjectMission, Quiz, ReadinessScore, ReadmeStatus, ReviewRating, ReviewTargetType, RoleTarget, UserProfile, UserProgress } from "@/domain/types";
+import type { CodeRunAttempt, EvidenceTestStatus, EvidenceType, Quiz, ReadinessScore, ReadmeStatus, ReviewRating, ReviewTargetType, RoleTarget, UserProfile, UserProgress } from "@/domain/types";
 import { loadProgress, resetProgress, saveProgress } from "@/storage/progress-store";
 
 interface EvidenceInput {

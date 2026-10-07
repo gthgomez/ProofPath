@@ -127,7 +127,6 @@ export default function LessonDetailScreen(): ReactElement {
   const lessonDone = progress.completedLessonIds.includes(lesson.id);
   const miniProjectDone = progress.completedLessonMiniProjectIds.includes(lesson.id);
   const quizDone = quiz ? progress.completedQuizIds.includes(quiz.id) : false;
-  const canCompleteLesson = miniProjectDone && quizDone;
   const lessonProgressPercent = Math.round(((miniProjectDone ? 1 : 0) + (quizDone ? 1 : 0)) / 2 * 100);
   const latestQuizAttempt = quiz ? progress.quizAttempts.find((attempt) => attempt.quizId === quiz.id) : undefined;
   const latestCodeRun = progress.codeRunAttempts.find((attempt) => attempt.lessonId === lesson.id);

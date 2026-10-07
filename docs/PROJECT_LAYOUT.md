@@ -41,13 +41,14 @@ Each file is a route. Screens render state; they do not own logic — domain rul
 
 ## src/content/ — Curriculum Data
 
-Content is TypeScript data validated by Zod (`npm run validate:content`). No runtime I/O; no lesson IDs outside `seed.ts` registration.
+Content is TypeScript data validated by Zod (`npm run validate:content`). No runtime I/O. Adding a lesson means adding it to its track file (or `python/level-N.ts`) and splicing that export into `seed.ts` — `seed.ts` is the assembly point, not the storage location.
 
-- `seed.ts` — single source of truth: tracks, modules, lessons, quizzes, and missions (11 tracks, 15 modules, 104 lessons, 104 quizzes, 20 missions).
+- `seed.ts` — assembles the content pack: skills, skillEdges, tracks, modules, and missions, and splices in every track's lessons and quizzes (11 tracks, 15 modules, 104 lessons, 104 quizzes, 20 missions). It holds no lesson bodies.
 - `roles.ts` — selectable `path-*` career paths and their track membership.
 - `concepts.ts` — concept registry (160 concepts) with category, label, and `introducedLevel`.
-- `python/level-0.ts` … `level-9.ts` — Python proof lessons grouped by level 0-9.
-- `python/shared.ts` — shared Python lesson helpers, including the deterministic quiz answer shuffle.
+- `python/level-0.ts` … `level-9.ts` — Python proof lessons grouped by level 0-9 (71 lessons).
+- `python/shared.ts` — the lesson builders every track uses: `proofLesson`, `workshop`, `checkpointQuiz`, `miniProjectWithTester`, and the deterministic quiz shuffles. Despite the directory name these are **not** Python-specific; non-Python tracks import from here too.
+- `<track>/lessons.ts` — one file per non-Python track, each exporting `<track>Lessons` and `<track>Quizzes` (30 lessons total): `typescript`, `sql`, `git`, `ai-tools`, `ai-apps`, `ml`, `testing-debugging`, `secure-software`, `cloud-platform-basics`, `data-systems`.
 - `progress.ts` — demo progress fixture for previews and tests.
 
 ## src/domain/ — Pure Logic
@@ -106,11 +107,13 @@ Screen-level building blocks; no curriculum definitions live here.
 - `scan-sandbox-redaction.ts` — scans sandbox templates for policy violations (`npm run scan:redaction`).
 - `python-depth-audit.ts` — Python depth-coverage audit.
 - `copy-sandbox-assets.js` — copies Pyodide/sql.js WASM bundles into `android/` and `public/` (runs on postinstall).
-- `generate-careerforge-icon.ps1` — icon generation helper (legacy file name).
+- `generate-proofpath-icon.ps1` — icon generation helper. Also writes `docs/careerforge-icon-512.png` (legacy file name) plus the app-facing `assets/proofpath-icon.png` and Android drawable.
 
 ## tests/ — Vitest Suite
 
 Vitest suite mirroring domain, sandbox, storage, and content rules. File/test counts change with every commit, so they live in CI per run rather than here (`npm run test`; `npm run verify` is the full gate: validate:content + report:content + scan:redaction + typecheck + test).
+
+Journey tests (`journey-*.test.tsx`) render React components through `react-native-web` under jsdom and share `journey-helpers.tsx`. They disable the Code Lab's wall-clock run-phase padding via `setRunPhaseDelaysOverride(0)` in `tests/setup.ts`, so run phases settle on a microtask and testing-library's `waitFor` polling does not race a real timer; the app's real delays are unchanged.
 
 ## android/app/src/main/assets/sandbox-assets/ — Bundled WASM
 

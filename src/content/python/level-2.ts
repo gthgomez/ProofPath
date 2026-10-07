@@ -1,5 +1,5 @@
 import type { Lesson, LessonPracticeBlock, Quiz } from "@/domain/types";
-import { proofLesson, checkpointQuiz, codeReadingQuiz } from "./shared";
+import { proofLesson, codeReadingQuiz } from "./shared";
 
 const pythonListPracticeReps: LessonPracticeBlock[] = [
   {

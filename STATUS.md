@@ -1,6 +1,6 @@
 # ProofPath Status
 
-**Last verified:** 2026-09-23
+**Last verified:** 2026-10-06
 **Status:** active development
 **Confidence:** high
 
@@ -14,7 +14,7 @@ Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite lo
 
 ## Verified Capabilities
 
-- Content pack: 11 tracks, 15 modules, 104 lessons (101 active + 3 deprecated Python lessons), 104 quizzes with 380 quiz questions, 160 registered concepts, and 20 proof-required missions (`npm run report:content`).
+- Content pack: 11 tracks, 15 modules, 104 lessons (101 active + 3 deprecated Python lessons), 104 quizzes, 160 registered concepts, and 20 proof-required missions (`npm run report:content`).
 - Local-first Expo SQLite persistence and offline progress tracking.
 - Proof-First 5-step lesson stepper (`Understand` -> `Experiment` -> `Apply` -> `Checkpoint` -> `Evidence`).
 - Sandboxes: Pyodide WASM for full Python (WebView), native regex Python fallback for levels 0-1, sql.js WASM for SQL; policy engine blocks fetch, DOM mutations, and filesystem access.
@@ -29,10 +29,13 @@ Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite lo
 - `QA_CHECKLIST.md` documents the 9-section automated verification pipeline (`npm run verify`).
 - `docs/agent/PROJECT_CONTEXT.md` details TypeScript/RN/Expo stack invariants and content integrity rules.
 
+## Rebrand
+
+The CareerForge -> ProofPath rename is complete. Package `proofpath`, `app.json` name/slug, Android `com.jonathangomez.proofpath`, `proofpath.db`, and all runtime strings are updated. `careerforge.db` and `careerforge.progress.v1` remain **only** as `LEGACY_*` migration identifiers in `src/storage/legacy-db-import.ts` and the web progress provider; renaming them would strand existing installs' progress.
+
 ## In Progress
 
-- Modularizing `src/content/seed.ts` (curriculum data still lives in one large file).
-- Enriching SQL and TypeScript sandbox exercises (both tracks currently have thin lesson coverage per `npm run report:content`).
+- Enriching SQL and TypeScript sandbox exercises — `report:content` shows `track-typescript` at 3 lessons and `track-sql` at 2, against 71 for `track-python`.
 
 ## Blockers
 
@@ -46,14 +49,20 @@ Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite lo
 ## Verification
 
 - Command: `npm run verify` (runs the three content-integrity stages through the single-process `verify:content` runner — `validate:content`, `report:content`, `scan:redaction` — then `tsc --noEmit` with incremental build info cached in `node_modules/.cache`, and Vitest tests).
+- Journey tests disable the Code Lab's wall-clock run-phase padding via `setRunPhaseDelaysOverride(0)` in `tests/setup.ts`, so run phases settle on a microtask and testing-library's `waitFor` polling does not race a real timer. The app's real delays are unchanged.
 
 ## Next Actions
 
 1. Keep `npm run verify` green as content changes land.
-2. Modularize `src/content/seed.ts` without breaking validation.
-3. Enrich SQL and TypeScript sandbox depth toward the Python lesson standard.
+2. Enrich SQL and TypeScript sandbox depth toward the Python lesson standard.
+3. Decide whether `canCompleteLesson` (removed from `app/lesson/[lessonId].tsx` as dead code) was an intended lesson-completion gate that was never wired up. `noUnusedLocals` is now on, so dead code fails the gate instead of hiding.
+
+## Content Layout
+
+`src/content/seed.ts` assembles the content pack (skills, tracks, modules, missions) and splices in each track's lessons and quizzes. Lesson bodies live per track: `python/level-0.ts` … `level-9.ts` for the 71 Python lessons, and `src/content/<track>/lessons.ts` for the other 30. All builders — `proofLesson`, `workshop`, `checkpointQuiz`, `miniProjectWithTester` — live in `src/content/python/shared.ts`, which despite its directory name serves every track. See [docs/PROJECT_LAYOUT.md](./docs/PROJECT_LAYOUT.md).
 
 ## Evidence Sources
 
 - [README.md](./README.md)
 - [QA_CHECKLIST.md](./QA_CHECKLIST.md)
+- [docs/PROJECT_LAYOUT.md](./docs/PROJECT_LAYOUT.md)

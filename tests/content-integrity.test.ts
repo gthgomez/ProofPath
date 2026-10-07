@@ -49,6 +49,36 @@ describe("content pack", () => {
     }
   });
 
+  it("requires repository evidence for standard missions but not the beginner Python missions", () => {
+    // Two level-0/1 Python missions deliberately skip the repo link because no
+    // lesson teaches Git/GitHub yet (content-integrity Rule Group D). Every other
+    // mission must still require it; the seed.ts split previously dropped this.
+    const beginnerMissionIds = ["mission-cli-study-tracker", "mission-python-data-cleaner"];
+    const standardMissionIds = [
+      "mission-web-progress-board",
+      "mission-api-contract-playground",
+      "mission-sql-portfolio-ledger",
+      "mission-ai-bug-rubric",
+      "mission-ai-study-planner",
+      "mission-ml-metrics-report",
+      "mission-regression-proof-pack",
+      "mission-cloud-release-runbook",
+      "mission-data-quality-report"
+    ];
+
+    for (const id of standardMissionIds) {
+      const mission = contentPack.projectMissions.find((candidate) => candidate.id === id);
+      expect(mission, `${id} should exist`).toBeDefined();
+      expect(mission?.evidenceRequirements.repoUrl, `${id} must require a repository link`).toBe(true);
+    }
+
+    for (const id of beginnerMissionIds) {
+      const mission = contentPack.projectMissions.find((candidate) => candidate.id === id);
+      expect(mission, `${id} should exist`).toBeDefined();
+      expect(mission?.evidenceRequirements.repoUrl, `${id} must not require a repository link`).toBe(false);
+    }
+  });
+
   it("frames each lesson for a brand-new learner", () => {
     for (const lesson of contentPack.lessons) {
       expect(lesson.workshop.language.length).toBeGreaterThan(0);

@@ -1,7 +1,6 @@
 import { contentPack } from "../src/content/seed";
 import { roleTargets } from "../src/content/roles";
-import { generatePythonAuditRows } from "../src/domain/content-audit";
-import type { ContentPack, Quiz } from "../src/domain/types";
+import type { Quiz } from "../src/domain/types";
 import * as fs from "fs";
 import * as path from "path";
 

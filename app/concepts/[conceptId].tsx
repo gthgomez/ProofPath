@@ -6,7 +6,7 @@ import { contentPack } from "@/content/seed";
 import { buildConceptIndex, conceptCategoryLabels, type ConceptIndexEntry } from "@/domain/reference";
 import { ConceptCapsuleList } from "@/ui/concept-capsule";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
-import { colors, spacing } from "@/ui/theme";
+import { spacing } from "@/ui/theme";
 
 const conceptIndex = buildConceptIndex(contentPack, conceptRegistry);
 
