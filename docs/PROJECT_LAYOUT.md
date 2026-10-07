@@ -106,7 +106,6 @@ Screen-level building blocks; no curriculum definitions live here.
 - `scan-sandbox-redaction.ts` — scans sandbox templates for policy violations (`npm run scan:redaction`).
 - `python-depth-audit.ts` — Python depth-coverage audit.
 - `copy-sandbox-assets.js` — copies Pyodide/sql.js WASM bundles into `android/` and `public/` (runs on postinstall).
-- `copy-typescript-assets.js` — copies the TypeScript compiler and generates `typescript-libs.js` (the `.d.ts` standard library) into `android/` and `public/` (runs on postinstall, after `copy-sandbox-assets.js`).
 - `generate-careerforge-icon.ps1` — icon generation helper (legacy file name).
 
 ## tests/ — Vitest Suite
@@ -115,7 +114,7 @@ Vitest suite mirroring domain, sandbox, storage, and content rules. File/test co
 
 ## android/app/src/main/assets/sandbox-assets/ — Bundled WASM
 
-Bundled `pyodide/`, `sql.js/`, and `typescript/` runtimes for offline in-app execution; refreshed by `scripts/copy-sandbox-assets.js` (Pyodide/sql.js) and `scripts/copy-typescript-assets.js` (TypeScript compiler and standard library). `public/sandbox-assets/` mirrors them for web preview.
+Bundled `pyodide/` and `sql.js/` runtimes for offline in-app execution; refreshed by `scripts/copy-sandbox-assets.js`. `public/sandbox-assets/` mirrors them for web preview.
 
 ## docs/ — Documentation
 
