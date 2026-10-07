@@ -604,7 +604,11 @@ if (registeredConceptIds.size !== conceptRegistry.length) {
   errors.push("Rule Group A: Duplicate concept IDs found in conceptRegistry");
 }
 
-const stableNamespaces = ["py.", "tool.", "git.", "github.", "runner.", "evidence.", "debug.", "stderr.", "ops.", "testing.", "files."];
+// Namespace prefixes that are allowed to appear in concept IDs. Each maps to a
+// content area with its own track files under src/content/. Adding a new track
+// namespace means adding its prefix here too, otherwise its concepts fail Rule
+// Group A even when a lesson teaches them.
+const stableNamespaces = ["py.", "sql.", "ts.", "tool.", "git.", "github.", "runner.", "evidence.", "debug.", "stderr.", "ops.", "testing.", "files."];
 for (const concept of conceptRegistry) {
   const match = stableNamespaces.some((ns) => concept.id.startsWith(ns));
   if (!match) {
