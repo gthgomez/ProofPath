@@ -694,12 +694,14 @@ export const sqlLessons: Lesson[] = [
     runnerStarterCode: "SELECT learner, topic, SUM(minutes) AS total\nFROM study_sessions\nWHERE SUM(minutes) >= 40\nGROUP BY learner, topic;",
     runnerTestCode: "EXPECT_ROWS:ada | sql | 75",
     runnerExpectedExactLines: ["ada | sql | 75", "grace | git | 60"],
+    runnerExpectedExactSet: true,
     hiddenTests: [
       {
         id: "sql-aggregates-hidden",
         name: "Hidden check adds a session that pushes a group over the threshold",
         code: "INSERT INTO study_sessions (learner, topic, minutes) VALUES ('ada', 'python', 25);",
-        expectedOutputIncludes: ["ada | python | 45"]
+        expectedOutputExactLines: ["ada | sql | 75", "grace | git | 60", "ada | python | 45"],
+        expectedOutputExactSet: true
       }
     ],
     curriculum: sqlCurriculum({
@@ -761,12 +763,14 @@ export const sqlLessons: Lesson[] = [
     runnerStarterCode: "SELECT DISTINCT topic\nFROM study_sessions\nWHERE topic = (SELECT topic FROM study_sessions WHERE minutes > 40);",
     runnerTestCode: "EXPECT_ROWS:git",
     runnerExpectedExactLines: ["git", "sql"],
+    runnerExpectedExactSet: true,
     hiddenTests: [
       {
         id: "sql-subqueries-hidden",
         name: "Hidden check adds a longer session that widens the derived set",
         code: "INSERT INTO study_sessions (learner, topic, minutes) VALUES ('linus', 'python', 55);",
-        expectedOutputIncludes: ["python"]
+        expectedOutputExactLines: ["git", "python", "sql"],
+        expectedOutputExactSet: true
       }
     ],
     curriculum: sqlCurriculum({
@@ -985,12 +989,14 @@ export const sqlLessons: Lesson[] = [
       "SELECT learners.name, COUNT(*) AS course_count\nFROM learners\nJOIN enrollments ON enrollments.learner_id = learners.id\nJOIN submissions ON submissions.enrollment_id = enrollments.id\nGROUP BY learners.id, learners.name\nORDER BY learners.name;",
     runnerTestCode: "EXPECT_ROWS:Ada | 2",
     runnerExpectedExactLines: ["Ada | 2", "Grace | 1"],
+    runnerExpectedExactSet: true,
     hiddenTests: [
       {
         id: "sql-join-fanout-hidden",
         name: "Hidden check adds an enrollment and proves the distinct count follows it",
         code: "INSERT INTO enrollments VALUES ('e4', 'l2', 'git');",
-        expectedOutputIncludes: ["Grace | 2"]
+        expectedOutputExactLines: ["Ada | 2", "Grace | 2"],
+        expectedOutputExactSet: true
       }
     ],
     curriculum: sqlCurriculum({

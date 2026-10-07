@@ -216,10 +216,27 @@ function outputHasExactLines(output: string, expectedLines: string[]): boolean {
 
 // Exact-line checks identify the learner's answer as a whole line, so taught
 // misconceptions that merely contain the answer as a substring still fail.
+// Exact-set matching: the output must be exactly the expected lines, with no
+// extras. Subset matching tolerates extra rows, which lets a query that forgot
+// its filter (or a constant UNION of every literal) satisfy a filtering lesson.
+function outputMatchesExactSet(output: string, expectedLines: string[]): boolean {
+  const actual = new Set(
+    output.split("\n").map((line) => line.trim().toLowerCase()).filter(Boolean)
+  );
+  const expected = new Set(expectedLines.map((line) => line.trim().toLowerCase()));
+  if (actual.size !== expected.size) {
+    return false;
+  }
+  return [...expected].every((line) => actual.has(line));
+}
+
 function passesOutputCheck(output: string, test: LessonRunnerTest): boolean {
-  return test.expectedOutputExactLines && test.expectedOutputExactLines.length > 0
-    ? outputHasExactLines(output, test.expectedOutputExactLines)
-    : includesAll(output, test.expectedOutputIncludes);
+  if (test.expectedOutputExactLines && test.expectedOutputExactLines.length > 0) {
+    return test.expectedOutputExactSet
+      ? outputMatchesExactSet(output, test.expectedOutputExactLines)
+      : outputHasExactLines(output, test.expectedOutputExactLines);
+  }
+  return includesAll(output, test.expectedOutputIncludes);
 }
 
 function sameOriginAssetUrl(path: string): string {

@@ -271,6 +271,8 @@ export interface ProofLessonInput {
   runnerSetupCode?: string;
   /** Exact whole-line expectations for the visible check (conceptual identification activities). */
   runnerExpectedExactLines?: string[];
+  /** When true, the visible check requires exactly runnerExpectedExactLines and no extra rows. */
+  runnerExpectedExactSet?: boolean;
   hiddenTests?: any[]; // optional hidden tests override
   curriculum?: CurriculumMetadata;
   codeShape?: string;
@@ -345,7 +347,8 @@ export function proofLesson(input: ProofLessonInput): Lesson {
               name: `${input.title} visible check`,
               code: input.runnerTestCode,
               expectedOutputIncludes: input.requiredOutputIncludes,
-              expectedOutputExactLines: input.runnerExpectedExactLines
+              expectedOutputExactLines: input.runnerExpectedExactLines,
+              expectedOutputExactSet: input.runnerExpectedExactSet
             }
           ],
           hiddenTests: input.hiddenTests ?? [],
