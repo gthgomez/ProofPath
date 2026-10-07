@@ -41,3 +41,6 @@ pnpm-debug.log*
 runs/
 ProofPath_Review.zip
 val_err.txt
+
+# Agent worktrees (never committed)
+.worktrees/
