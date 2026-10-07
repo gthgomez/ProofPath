@@ -380,22 +380,34 @@ export function createNativeWebViewRunnerHtml(): string {
       return buildAttempt(request, startedAt, stdout, stderr, testResults);
     }
 
+    const scriptPromises = {};
     function loadScript(src) {
-      return new Promise((resolve, reject) => {
-        const existing = document.querySelector('script[data-proofpath-src="' + src + '"]');
-        if (existing) {
-          resolve();
-          return;
-        }
+      // Cache the in-flight promise so overlapping loads (a preload racing the
+      // first run) share one load instead of the second caller seeing the
+      // first's still-loading tag and resolving before the asset is usable.
+      if (scriptPromises[src]) {
+        return scriptPromises[src];
+      }
 
+      const promise = new Promise((resolve, reject) => {
         const script = document.createElement("script");
         script.async = true;
         script.dataset.proofpathSrc = src;
         script.src = src;
         script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Unable to load bundled sandbox asset: " + src));
+        script.onerror = () => {
+          script.remove();
+          reject(new Error("Unable to load bundled sandbox asset: " + src));
+        };
         document.head.appendChild(script);
+      }).catch((error) => {
+        // Allow a later attempt to retry after a transient load failure.
+        delete scriptPromises[src];
+        throw error;
       });
+
+      scriptPromises[src] = promise;
+      return promise;
     }
 
     let pyodideRuntime = null;
@@ -611,16 +623,33 @@ export function createNativeWebViewRunnerHtml(): string {
       post({ type: "sandbox-result", attempt });
     }
 
+    function preloadRuntime(language) {
+      // Warm the bundled asset before the first timed run so a cold 9 MB
+      // TypeScript parse does not race the per-run allowance.
+      if (language === "typescript") {
+        getTypeScriptRuntime().catch(function() {});
+      } else if (language === "python") {
+        getPyodideRuntime().catch(function() {});
+      } else if (language === "sql") {
+        getSqlRuntime().catch(function() {});
+      }
+    }
+
     function handleMessage(event) {
       const payload = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
       if (payload && payload.type === "run") {
         handleRun(payload.request);
+      } else if (payload && payload.type === "preload") {
+        preloadRuntime(payload.language);
       }
     }
 
     window.ProofPathSandbox = {
       run: function(payload) {
         handleMessage({ data: payload });
+      },
+      preload: function(payload) {
+        handleMessage({ data: { type: "preload", language: payload.language } });
       }
     };
 

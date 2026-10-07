@@ -258,6 +258,11 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
 
     if (message?.type === "sandbox-ready") {
       setIsBridgeReady(true);
+      // Warm the bundled runtime (the TypeScript compiler is ~9 MB) before the
+      // first timed run so the cold parse does not count against the allowance.
+      webViewRef.current?.injectJavaScript(
+        `window.ProofPathSandbox && window.ProofPathSandbox.preload(${JSON.stringify({ language: runnerSpec.language })}); true;`
+      );
       return;
     }
 
