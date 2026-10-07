@@ -16,7 +16,6 @@ import {
 } from "@/sandbox/native-webview-runner";
 import { canRunNativePythonProof, runNativePythonFile, runNativePythonProof } from "@/sandbox/native-python-proof-runner";
 import { validateSandboxSubmission } from "@/sandbox/policy";
-import { runPhaseDelay } from "@/ui/run-phase-timing";
 import { Badge, BodyText, ButtonShell, MutedText, Row, SectionTitle } from "@/ui/primitives";
 import { runPhaseDelay } from "@/ui/run-phase-timing";
 import { colors, radius, semanticColors, spacing } from "@/ui/theme";
