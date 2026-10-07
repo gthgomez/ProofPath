@@ -16,6 +16,7 @@ import {
 import { canRunNativePythonProof, runNativePythonFile, runNativePythonProof } from "@/sandbox/native-python-proof-runner";
 import { validateSandboxSubmission } from "@/sandbox/policy";
 import { Badge, BodyText, ButtonShell, MutedText, Row, SectionTitle } from "@/ui/primitives";
+import { runPhaseDelay } from "@/ui/run-phase-timing";
 import { colors, radius, semanticColors, spacing } from "@/ui/theme";
 import { CodeProblems } from "@/ui/code-problems";
 import { CodeTerminal } from "@/ui/code-terminal";
@@ -431,9 +432,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
 }
 
 function waitForRunPhase(durationMs = 260): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, durationMs);
-  });
+  return runPhaseDelay(durationMs);
 }
 
 function formatNativeTimeoutFeedback(language: CodeLabProps["runnerSpec"]["language"], timeoutMs: number): string {

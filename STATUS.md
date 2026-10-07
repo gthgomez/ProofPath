@@ -49,7 +49,7 @@ The CareerForge -> ProofPath rename is complete. Package `proofpath`, `app.json`
 ## Verification
 
 - Command: `npm run verify` (runs the three content-integrity stages through the single-process `verify:content` runner — `validate:content`, `report:content`, `scan:redaction` — then `tsc --noEmit` with incremental build info cached in `node_modules/.cache`, and Vitest tests).
-- Journey tests need testing-library's `asyncUtilTimeout` raised above the 1000ms default (configured in `tests/setup.ts`) because the Code Lab pads runs with real timers. Do not lower it without re-running the full suite several times.
+- Journey tests disable the Code Lab's wall-clock run-phase padding via `setRunPhaseDelaysOverride(0)` in `tests/setup.ts`, so run phases settle on a microtask and testing-library's `waitFor` polling does not race a real timer. The app's real delays are unchanged.
 
 ## Next Actions
 
