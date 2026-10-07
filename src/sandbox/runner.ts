@@ -289,7 +289,10 @@ function stripTypeScript(code: string): string {
     .replace(/:\s*[A-Za-z_$][A-Za-z0-9_$<>,\s[\]|]*(?=\s*[=,);])/g, "");
 }
 
-function createJavaScriptWorkerSource(): string {
+// Exported as a test seam: the generated worker string is what actually runs in
+// the browser, so tests evaluate this exact source to prove the inlined evidence
+// checks cannot drift from `passesOutputCheck` in this module.
+export function createJavaScriptWorkerSource(): string {
   return `
 function normalizeOutput(value) {
   if (value === undefined || value === null) return "";
@@ -345,10 +348,24 @@ function outputHasExactLines(output, expectedLines) {
   return (expectedLines || []).every(function (expected) { return lines.has(String(expected).trim().toLowerCase()); });
 }
 
+function outputMatchesExactSet(output, expectedLines) {
+  const actual = new Set(
+    output.split("\\n").map(function (line) { return line.trim().toLowerCase(); }).filter(Boolean)
+  );
+  const expected = new Set((expectedLines || []).map(function (line) { return String(line).trim().toLowerCase(); }));
+  if (actual.size !== expected.size) return false;
+  let matched = true;
+  expected.forEach(function (line) { if (!actual.has(line)) matched = false; });
+  return matched;
+}
+
 function passesOutputCheck(output, test) {
-  return test.expectedOutputExactLines && test.expectedOutputExactLines.length > 0
-    ? outputHasExactLines(output, test.expectedOutputExactLines)
-    : includesAll(output, test.expectedOutputIncludes);
+  if (test.expectedOutputExactLines && test.expectedOutputExactLines.length > 0) {
+    return test.expectedOutputExactSet
+      ? outputMatchesExactSet(output, test.expectedOutputExactLines)
+      : outputHasExactLines(output, test.expectedOutputExactLines);
+  }
+  return includesAll(output, test.expectedOutputIncludes);
 }
 
 self.onmessage = (event) => {

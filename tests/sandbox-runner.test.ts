@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import { contentPack } from "@/content/seed";
-import type { LessonRunnerSpec } from "@/domain/types";
+import type { LessonRunnerSpec, LessonRunnerTest } from "@/domain/types";
 import { runNativePythonProof } from "@/sandbox/native-python-proof-runner";
 import {
   PYTHON_DIRECT_RUN_NAME,
   PYTHON_IMPORT_RUN_NAME,
   SQL_HARNESS_PATTERN,
+  createJavaScriptWorkerSource,
   isTrustedSqlHarness,
   preloadSandbox,
   runLessonSandbox
@@ -462,4 +463,89 @@ describe("lesson sandbox runner", () => {
       expect(importStyle.stdout).not.toContain("45 total minutes");
     });
   }, 60000);
+});
+
+describe("sandbox runners honor expectedOutputExactSet", () => {
+  it("rejects extra output rows in the generated Web Worker template", () => {
+    const runWorker = (runtimeCode: string, tests: LessonRunnerTest[]) => {
+      const workerSource = createJavaScriptWorkerSource();
+      let posted: { testResults: Array<{ passed: boolean }> } | undefined;
+      const selfStub: { postMessage: (message: unknown) => void; onmessage?: (event: unknown) => void } = {
+        postMessage: (message) => {
+          posted = message as typeof posted;
+        }
+      };
+
+      // Evaluate the exact generated source with a stubbed `self`, then feed it a
+      // run_checks message the way the browser Worker would receive it.
+      new Function("self", workerSource)(selfStub);
+      selfStub.onmessage?.({
+        data: {
+          language: "javascript",
+          runMode: "run_checks",
+          runtimeCode,
+          tests,
+          visibleCount: tests.length
+        }
+      });
+
+      return posted?.testResults ?? [];
+    };
+
+    const exactTest: LessonRunnerTest = {
+      id: "exact",
+      name: "Exact",
+      code: "",
+      expectedOutputExactLines: ["python | 50", "git | 15"],
+      expectedOutputExactSet: true
+    };
+    const subsetTest: LessonRunnerTest = {
+      id: "subset",
+      name: "Subset",
+      code: "",
+      expectedOutputExactLines: ["python | 50", "git | 15"]
+    };
+    const exactOutput = 'console.log("python | 50"); console.log("git | 15");';
+    const extraOutput = 'console.log("python | 50"); console.log("git | 15"); console.log("sql | 45");';
+
+    expect(runWorker(exactOutput, [exactTest])[0]?.passed).toBe(true);
+    expect(runWorker(extraOutput, [exactTest])[0]?.passed).toBe(false);
+    // Without the flag, legacy subset semantics still tolerate extra rows.
+    expect(runWorker(extraOutput, [subsetTest])[0]?.passed).toBe(true);
+  });
+
+  it("rejects extra output rows in the native offline Python verifier", () => {
+    const spec: LessonRunnerSpec = {
+      language: "python",
+      instructions: "Print exactly the expected lines.",
+      starterCode: 'print("alpha")\nprint("beta")',
+      visibleTests: [
+        {
+          id: "visible",
+          name: "Visible",
+          code: "# comment-only checker grades learner stdout",
+          expectedOutputExactLines: ["alpha", "beta"],
+          expectedOutputExactSet: true
+        }
+      ],
+      hiddenTests: [],
+      expectedOutput: ["alpha", "beta"],
+      timeoutMs: 30000,
+      allowNetwork: false
+    };
+
+    const exact = runNativePythonProof(spec, "lesson-python-exact", 'print("alpha")\nprint("beta")', "2026-05-08T22:24:00.000Z");
+    expect(exact.passed).toBe(true);
+
+    const extra = runNativePythonProof(spec, "lesson-python-extra", 'print("alpha")\nprint("beta")\nprint("gamma")', "2026-05-08T22:25:00.000Z");
+    expect(extra.passed).toBe(false);
+
+    // Absent flag keeps subset semantics: extra lines still pass.
+    const subsetSpec: LessonRunnerSpec = {
+      ...spec,
+      visibleTests: [{ ...spec.visibleTests[0]!, expectedOutputExactSet: undefined }]
+    };
+    const subset = runNativePythonProof(subsetSpec, "lesson-python-subset", 'print("alpha")\nprint("beta")\nprint("gamma")', "2026-05-08T22:26:00.000Z");
+    expect(subset.passed).toBe(true);
+  });
 });

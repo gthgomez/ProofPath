@@ -164,10 +164,24 @@ export function createNativeWebViewRunnerHtml(): string {
       return (expectedLines || []).every(function (expected) { return lines.has(String(expected).trim().toLowerCase()); });
     }
 
+    function outputMatchesExactSet(output, expectedLines) {
+      const actual = new Set(
+        output.split("\\n").map(function (line) { return line.trim().toLowerCase(); }).filter(Boolean)
+      );
+      const expected = new Set((expectedLines || []).map(function (line) { return String(line).trim().toLowerCase(); }));
+      if (actual.size !== expected.size) return false;
+      let matched = true;
+      expected.forEach(function (line) { if (!actual.has(line)) matched = false; });
+      return matched;
+    }
+
     function passesOutputCheck(output, test) {
-      return test.expectedOutputExactLines && test.expectedOutputExactLines.length > 0
-        ? outputHasExactLines(output, test.expectedOutputExactLines)
-        : includesAll(output, test.expectedOutputIncludes);
+      if (test.expectedOutputExactLines && test.expectedOutputExactLines.length > 0) {
+        return test.expectedOutputExactSet
+          ? outputMatchesExactSet(output, test.expectedOutputExactLines)
+          : outputHasExactLines(output, test.expectedOutputExactLines);
+      }
+      return includesAll(output, test.expectedOutputIncludes);
     }
 
     function classifySandboxError(error) {
