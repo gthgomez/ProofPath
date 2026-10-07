@@ -14,7 +14,7 @@ Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite lo
 
 ## Verified Capabilities
 
-- Content pack: 11 tracks, 15 modules, 104 lessons (101 active + 3 deprecated Python lessons), 104 quizzes, 160 registered concepts, and 20 proof-required missions (`npm run report:content`).
+- Content pack: 11 tracks, 15 modules, 104 lessons (101 active + 3 deprecated Python lessons), 104 quizzes, 166 registered concepts, and 20 proof-required missions (`npm run report:content`).
 - Local-first Expo SQLite persistence and offline progress tracking.
 - Proof-First 5-step lesson stepper (`Understand` -> `Experiment` -> `Apply` -> `Checkpoint` -> `Evidence`).
 - Sandboxes: Pyodide WASM for full Python (WebView), native regex Python fallback for levels 0-1, sql.js WASM for SQL; policy engine blocks fetch, DOM mutations, and filesystem access.
