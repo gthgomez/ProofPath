@@ -4,7 +4,9 @@ import { resolveRunPhaseDelay, runPhaseDelay, setRunPhaseDelaysOverride } from "
 describe("run phase timing", () => {
   afterEach(() => {
     vi.useRealTimers();
-    setRunPhaseDelaysOverride(null);
+    // Restore the suite default set by tests/setup.ts (0), not `null`, so a
+    // test that forgets to set an override does not leak real delays.
+    setRunPhaseDelaysOverride(0);
   });
 
   it("keeps the app's real delay when no override is set", () => {

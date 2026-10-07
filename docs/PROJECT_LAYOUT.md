@@ -113,7 +113,7 @@ Screen-level building blocks; no curriculum definitions live here.
 
 Vitest suite mirroring domain, sandbox, storage, and content rules. File/test counts change with every commit, so they live in CI per run rather than here (`npm run test`; `npm run verify` is the full gate: validate:content + report:content + scan:redaction + typecheck + test).
 
-Journey tests (`journey-*.test.tsx`) render React components through `react-native-web` under jsdom and share `journey-helpers.tsx`. They set testing-library's `asyncUtilTimeout` to 20000 in `tests/setup.ts` because the Code Lab pads each run with real `waitForRunPhase` timers; the default 1000ms makes those tests fail intermittently under parallel load.
+Journey tests (`journey-*.test.tsx`) render React components through `react-native-web` under jsdom and share `journey-helpers.tsx`. They disable the Code Lab's wall-clock run-phase padding via `setRunPhaseDelaysOverride(0)` in `tests/setup.ts`, so run phases settle on a microtask and testing-library's `waitFor` polling does not race a real timer; the app's real delays are unchanged.
 
 ## android/app/src/main/assets/sandbox-assets/ — Bundled WASM
 
