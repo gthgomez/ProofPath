@@ -332,7 +332,13 @@ function runTest(test: LessonRunnerTest, visible: boolean, scope: PythonScope, s
       const lines = new Set(
         (output + "\n" + completeOutput).split("\n").map((line) => line.trim().toLowerCase()).filter(Boolean)
       );
-      const matched = test.expectedOutputExactLines.every((expected) => lines.has(expected.trim().toLowerCase()));
+      const expected = test.expectedOutputExactLines.map((line) => line.trim().toLowerCase());
+      // Exact-set checks additionally reject extra rows: a query that dropped its
+      // filter (or forged a constant UNION of every literal) must not pass just
+      // because it still contains the expected lines as a subset.
+      const matched = test.expectedOutputExactSet
+        ? lines.size === new Set(expected).size && expected.every((line) => lines.has(line))
+        : expected.every((line) => lines.has(line));
       if (!matched) {
         throw new Error("Output missing");
       }

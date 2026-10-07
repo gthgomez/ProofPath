@@ -72,7 +72,13 @@ export const supportingConceptAllowList: readonly string[] = [
 export const setupCodeAllowedLessonIds = new Set<string>([
   "lesson-python-sqlite-persistence",
   "lesson-sql-joins",
-  "lesson-sql-constraints"
+  "lesson-sql-constraints",
+  "lesson-sql-aggregates",
+  "lesson-sql-subqueries",
+  "lesson-sql-ctes",
+  "lesson-sql-window-functions",
+  "lesson-sql-join-fanout",
+  "lesson-sql-normalization"
 ]);
 
 // Operations trusted runner SQL may never contain: schema + seed only.

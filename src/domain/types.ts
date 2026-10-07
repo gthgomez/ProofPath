@@ -223,6 +223,13 @@ export interface LessonRunnerTest {
    * fails the exact line "py"; "$ python hello.py" fails "python hello.py").
    */
   expectedOutputExactLines?: string[];
+  /**
+   * When true alongside expectedOutputExactLines, the output must contain
+   * exactly those lines and no others. Use when the lesson's objective is
+   * filtering or set membership, where an extra row means the query did not
+   * actually narrow the result set.
+   */
+  expectedOutputExactSet?: boolean;
 }
 
 export interface CodeRunAttempt {

@@ -43,9 +43,9 @@ Each file is a route. Screens render state; they do not own logic — domain rul
 
 Content is TypeScript data validated by Zod (`npm run validate:content`). No runtime I/O. Adding a lesson means adding it to its track file (or `python/level-N.ts`) and splicing that export into `seed.ts` — `seed.ts` is the assembly point, not the storage location.
 
-- `seed.ts` — assembles the content pack: skills, skillEdges, tracks, modules, and missions, and splices in every track's lessons and quizzes (11 tracks, 15 modules, 104 lessons, 104 quizzes, 20 missions). It holds no lesson bodies.
+- `seed.ts` — assembles the content pack: skills, skillEdges, tracks, modules, and missions, and splices in every track's lessons and quizzes (11 tracks, 17 modules, 110 lessons, 110 quizzes, 20 missions). It holds no lesson bodies.
 - `roles.ts` — selectable `path-*` career paths and their track membership.
-- `concepts.ts` — concept registry (166 concepts) with category, label, and `introducedLevel`.
+- `concepts.ts` — concept registry (178 concepts) with category, label, and `introducedLevel`.
 - `python/level-0.ts` … `level-9.ts` — Python proof lessons grouped by level 0-9 (71 lessons).
 - `python/shared.ts` — the lesson builders every track uses: `proofLesson`, `workshop`, `checkpointQuiz`, `miniProjectWithTester`, and the deterministic quiz shuffles. Despite the directory name these are **not** Python-specific; non-Python tracks import from here too.
 - `<track>/lessons.ts` — one file per non-Python track, each exporting `<track>Lessons` and `<track>Quizzes` (30 lessons total): `typescript`, `sql`, `git`, `ai-tools`, `ai-apps`, `ml`, `testing-debugging`, `secure-software`, `cloud-platform-basics`, `data-systems`.

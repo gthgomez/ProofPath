@@ -145,14 +145,16 @@ export const lessonWorkshopSchema = z.object({
         name: nonEmptyString,
         code: nonEmptyString,
         expectedOutputIncludes: z.array(nonEmptyString).optional(),
-        expectedOutputExactLines: z.array(nonEmptyString).optional()
+        expectedOutputExactLines: z.array(nonEmptyString).optional(),
+        expectedOutputExactSet: z.boolean().optional()
       })).min(1),
       hiddenTests: z.array(z.object({
         id: nonEmptyString,
         name: nonEmptyString,
         code: nonEmptyString,
         expectedOutputIncludes: z.array(nonEmptyString).optional(),
-        expectedOutputExactLines: z.array(nonEmptyString).optional()
+        expectedOutputExactLines: z.array(nonEmptyString).optional(),
+        expectedOutputExactSet: z.boolean().optional()
       })),
       expectedOutput: z.array(nonEmptyString),
       timeoutMs: z.number().int().positive(),

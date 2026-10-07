@@ -1220,4 +1220,89 @@ export const conceptRegistry: ConceptDefinition[] = [
     description: "Represent state transitions as explicit event types instead of scattered flags.",
     introducedLevel: 1
   },
+  // SQL track: querying and modeling concepts
+  {
+    id: "sql.aggregate.group_by",
+    label: "GROUP BY",
+    category: "data",
+    description: "Collapse rows into one row per group before computing aggregates.",
+    introducedLevel: 1
+  },
+  {
+    id: "sql.aggregate.having",
+    label: "HAVING",
+    category: "data",
+    description: "Filter finished groups by an aggregate such as SUM or COUNT.",
+    introducedLevel: 1
+  },
+  {
+    id: "sql.subquery.scalar",
+    label: "Scalar Subquery",
+    category: "data",
+    description: "Return exactly one value from an inner query and compare it with =, >, or <.",
+    introducedLevel: 2
+  },
+  {
+    id: "sql.subquery.in",
+    label: "IN Subquery",
+    category: "data",
+    description: "Filter rows against a set returned by an inner query using IN.",
+    introducedLevel: 2
+  },
+  {
+    id: "sql.cte.with",
+    label: "Common Table Expression (WITH)",
+    category: "data",
+    description: "Name an intermediate result so a multi-step query reads in steps.",
+    introducedLevel: 2
+  },
+  {
+    id: "sql.cte.chained",
+    label: "Chained CTEs",
+    category: "data",
+    description: "Build later common table expressions on top of earlier ones in one WITH block.",
+    introducedLevel: 2
+  },
+  {
+    id: "sql.window.rank",
+    label: "Window RANK()",
+    category: "data",
+    description: "Rank rows within a partition while keeping every row in the result.",
+    introducedLevel: 3
+  },
+  {
+    id: "sql.window.running_total",
+    label: "Running Total",
+    category: "data",
+    description: "Accumulate a value across rows ordered within a window without collapsing rows.",
+    introducedLevel: 3
+  },
+  {
+    id: "sql.join.fanout",
+    label: "Join Row Fan-Out",
+    category: "data",
+    description: "Recognize that joining two one-to-many tables multiplies matching rows.",
+    introducedLevel: 3
+  },
+  {
+    id: "sql.aggregate.count_distinct",
+    label: "COUNT(DISTINCT)",
+    category: "data",
+    description: "Count each different value once, immune to join fan-out.",
+    introducedLevel: 3
+  },
+  {
+    id: "sql.normalization.one_fact_one_place",
+    label: "One Fact in One Place",
+    category: "data",
+    description: "Store each fact once so copies cannot drift out of sync.",
+    introducedLevel: 2
+  },
+  {
+    id: "sql.normalization.reference_key",
+    label: "Reference Key",
+    category: "data",
+    description: "Point at the single authoritative row a fact lives in instead of copying values.",
+    introducedLevel: 2
+  }
 ];
