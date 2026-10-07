@@ -14,6 +14,6 @@ afterEach(() => {
 // (`waitForRunPhase` in src/ui/code-lab.tsx) so learners can see the progress
 // phases. Journey tests do not need to watch that animation, and relying on it
 // made their `waitFor` polling race the real timer under parallel load. Disable
-// the padding here so runs settle on the next macrotask and testing-library's
-// default `asyncUtilTimeout` (1000ms) is plenty of headroom.
+// the padding here so the code lab's run phases settle on a microtask, with no
+// real-timer hop for testing-library's `waitFor` polling to race.
 setRunPhaseDelaysOverride(0);

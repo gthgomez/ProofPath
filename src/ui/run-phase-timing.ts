@@ -21,3 +21,16 @@ export function setRunPhaseDelaysOverride(delayMs: number | null): void {
 export function resolveRunPhaseDelay(defaultDurationMs: number): number {
   return overrideMs ?? defaultDurationMs;
 }
+
+/**
+ * Await one run-phase delay. A zero override resolves on a microtask so tests
+ * carry no real-timer reliance instead of a clamped `setTimeout` hop.
+ */
+export function runPhaseDelay(defaultDurationMs: number): Promise<void> {
+  const delayMs = resolveRunPhaseDelay(defaultDurationMs);
+  return delayMs <= 0
+    ? Promise.resolve()
+    : new Promise((resolve) => {
+        setTimeout(resolve, delayMs);
+      });
+}

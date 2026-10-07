@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { resolveRunPhaseDelay, setRunPhaseDelaysOverride } from "@/ui/run-phase-timing";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { resolveRunPhaseDelay, runPhaseDelay, setRunPhaseDelaysOverride } from "@/ui/run-phase-timing";
 
 describe("run phase timing", () => {
   afterEach(() => {
+    vi.useRealTimers();
     setRunPhaseDelaysOverride(null);
   });
 
@@ -21,5 +22,36 @@ describe("run phase timing", () => {
     setRunPhaseDelaysOverride(0);
     setRunPhaseDelaysOverride(null);
     expect(resolveRunPhaseDelay(260)).toBe(260);
+  });
+
+  it("resolves a zero override without scheduling a real timer", async () => {
+    vi.useFakeTimers();
+    setRunPhaseDelaysOverride(0);
+
+    let settled = false;
+    void runPhaseDelay(260).then(() => {
+      settled = true;
+    });
+
+    // With fake timers active, a setTimeout-based delay would stay pending.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(settled).toBe(true);
+  });
+
+  it("schedules the real delay when no override is set", async () => {
+    vi.useFakeTimers();
+    setRunPhaseDelaysOverride(null);
+
+    let settled = false;
+    void runPhaseDelay(260).then(() => {
+      settled = true;
+    });
+
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(260);
+    expect(settled).toBe(true);
   });
 });
