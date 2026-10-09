@@ -484,7 +484,7 @@ export const evidenceItemSchema = z.object({
   verifierOutput: z.string().optional(),
   reflection: z.string().optional(),
   proofArtifact: proofArtifactSchema.optional(),
-  trust: z.enum(["auto_verified_code_lab", "manual_verifier_output", "manual_note"]).default("manual_note"),
+  trust: z.enum(["auto_verified_code_lab", "externally_reproducible", "manual_verifier_output", "manual_note"]).default("manual_note"),
   createdAt: nonEmptyString
 });
 
