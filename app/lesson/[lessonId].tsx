@@ -143,6 +143,9 @@ export default function LessonDetailScreen(): ReactElement {
   const lessonPosition = moduleLessonIds.indexOf(lesson.id);
   const nextLessonId = lessonPosition >= 0 ? moduleLessonIds[lessonPosition + 1] : undefined;
   const nextLesson = nextLessonId ? findLesson(contentPack, nextLessonId) : undefined;
+  const previousLessonId = lessonPosition > 0 ? moduleLessonIds[lessonPosition - 1] : undefined;
+  const previousLesson = previousLessonId ? findLesson(contentPack, previousLessonId) : undefined;
+  const hasUnfinishedPrerequisites = lessonPosition > 0 && moduleLessonIds.slice(0, lessonPosition).some((id) => !progress.completedLessonIds.includes(id));
   const fluencyRepTone = opensBeginnerPythonSupport ? "green" : "teal";
   const fluencyRepLabel = opensBeginnerPythonSupport ? "guided reps" : "optional reps";
   
@@ -241,7 +244,15 @@ export default function LessonDetailScreen(): ReactElement {
           <Badge tone="amber">{lesson.workshop.language}</Badge>
           {moduleItem && lessonPosition >= 0 ? <Badge tone="blue">part {lessonPosition + 1}/{moduleLessonIds.length}</Badge> : null}
           {lessonDone ? <Badge tone="green">complete</Badge> : null}
+          {hasUnfinishedPrerequisites ? <Badge tone="amber">prerequisites recommended</Badge> : null}
         </Row>
+        {hasUnfinishedPrerequisites && previousLesson ? (
+          <SubPanel style={{ marginVertical: spacing.xs }}>
+            <MutedText>
+              Recommended sequence: completing <Text style={{ color: colors.text, fontWeight: "600" }}>{previousLesson.title}</Text> first gives you the foundation for this lesson. You can still preview and practice here anytime.
+            </MutedText>
+          </SubPanel>
+        ) : null}
         <ProgressBar label="Lesson progress" value={lessonProgressPercent} />
       </Panel>
 
@@ -778,11 +789,11 @@ export default function LessonDetailScreen(): ReactElement {
           <Panel>
             <Row>
               <Badge tone="blue">Step 5</Badge>
-              <Badge tone={lessonDone ? "green" : "amber"}>{lessonDone ? "Complete" : "Evidence checklist"}</Badge>
+              <Badge tone={lessonDone ? "green" : "blue"}>{lessonDone ? "Lesson completed" : "Step 5: Portfolio extension"}</Badge>
             </Row>
-            <SectionTitle>Document your proof</SectionTitle>
+            <SectionTitle>Portfolio connection & proof</SectionTitle>
             <BodyText>
-              To complete the lesson and build portfolio credibility, save your proof. Prefill your passing verifier logs directly into the evidence tracker.
+              Your lesson practice and checkpoint are already complete! Step 5 helps you bridge this concept into real portfolio evidence for project missions.
             </BodyText>
             
             <SubPanel>

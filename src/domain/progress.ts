@@ -105,20 +105,40 @@ function withTimestamp(progress: Omit<UserProgress, "updatedAt">, now: string): 
 type StoredEvidenceItem = Omit<EvidenceItem, "linkedSkillIds" | "testStatus" | "readmeStatus">
   & Partial<Pick<EvidenceItem, "linkedSkillIds" | "testStatus" | "readmeStatus" | "trust">>;
 
+export function isExternallyReproducibleEvidence(item: {
+  repoUrl?: string | null;
+  commitHash?: string | null;
+  testStatus?: string | null;
+  verifierOutput?: string | null;
+  readmeStatus?: string | null;
+}): boolean {
+  return Boolean(
+    item.repoUrl && isUrlLike(item.repoUrl)
+    && item.commitHash && isCommitHashLike(item.commitHash)
+    && item.testStatus === "passing"
+    && item.verifierOutput && item.verifierOutput.trim().length > 0
+    && (item.readmeStatus === "complete" || item.readmeStatus === "basic")
+  );
+}
+
 function normalizeEvidenceItem(item: StoredEvidenceItem): EvidenceItem {
   const verifierOutput = item.verifierOutput?.trim();
+  const inferredTrust = item.trust ?? (
+    item.proofArtifact
+      ? "auto_verified_code_lab"
+      : isExternallyReproducibleEvidence(item)
+        ? "externally_reproducible"
+        : verifierOutput
+          ? "manual_verifier_output"
+          : "manual_note"
+  );
+
   return {
     ...item,
     linkedSkillIds: item.linkedSkillIds ?? [],
     testStatus: item.testStatus ?? "unknown",
     readmeStatus: item.readmeStatus ?? "missing",
-    trust: item.trust ?? (
-      item.proofArtifact
-        ? "auto_verified_code_lab"
-        : verifierOutput
-          ? "manual_verifier_output"
-          : "manual_note"
-    )
+    trust: inferredTrust
   };
 }
 
@@ -751,9 +771,17 @@ export function addEvidenceItem(progress: UserProgress, draft: EvidenceDraft, no
     trust: draft.trust ?? (
       draft.proofArtifact
         ? "auto_verified_code_lab"
-        : optionalTrimmed(draft.verifierOutput)
-          ? "manual_verifier_output"
-          : "manual_note"
+        : isExternallyReproducibleEvidence({
+            repoUrl: optionalTrimmed(draft.repoUrl),
+            commitHash: optionalTrimmed(draft.commitHash),
+            testStatus: draft.testStatus,
+            verifierOutput: optionalTrimmed(draft.verifierOutput),
+            readmeStatus: draft.readmeStatus
+          })
+          ? "externally_reproducible"
+          : optionalTrimmed(draft.verifierOutput)
+            ? "manual_verifier_output"
+            : "manual_note"
     ),
     createdAt: now
   };

@@ -31,10 +31,20 @@ describe("portfolio evidence quality", () => {
     }, NOW);
     const roleContent = getContentForRole(contentPack, progress.profile.roleTargetId);
 
+    const manualVerifierOnly = addEvidenceItem(progress, {
+      type: "test-output",
+      title: "Manual verifier output only",
+      body: "Self-reported output without repository reproduction details.",
+      linkedProjectMissionId: "mission-cli-study-tracker",
+      testStatus: "passing",
+      verifierOutput: "pytest"
+    }, NOW);
+
     expect(calculateReadinessScore(roleContent, structured, NOW).breakdown.evidenceHygiene)
       .toBeGreaterThan(calculateReadinessScore(roleContent, basic, NOW).breakdown.evidenceHygiene);
     expect(structured.evidenceItems[0]?.linkedSkillIds).toHaveLength(3);
-    expect(structured.evidenceItems[0]?.trust).toBe("manual_verifier_output");
+    expect(structured.evidenceItems[0]?.trust).toBe("externally_reproducible");
+    expect(manualVerifierOnly.evidenceItems[0]?.trust).toBe("manual_verifier_output");
     expect(basic.evidenceItems[0]?.trust).toBe("manual_note");
   });
 

@@ -7,7 +7,7 @@ import { findLesson } from "@/domain/content";
 import { formatTerminalTranscript } from "@/domain/code-run";
 import { getMissionsForRole, isGitTrackCompleted } from "@/domain/role-routing";
 import { getMissionProofChecklist } from "@/domain/progress";
-import type { EvidenceTestStatus, EvidenceType, ReadmeStatus } from "@/domain/types";
+import type { EvidenceTestStatus, EvidenceTrustClassification, EvidenceType, ReadmeStatus } from "@/domain/types";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
@@ -408,7 +408,7 @@ export default function EvidenceLogScreen(): ReactElement {
         <Panel key={item.id}>
           <Row>
             <Badge tone="green">{item.type}</Badge>
-            <Badge tone={item.trust === "auto_verified_code_lab" ? "green" : item.trust === "manual_verifier_output" ? "amber" : "blue"}>
+            <Badge tone={item.trust === "auto_verified_code_lab" ? "green" : item.trust === "externally_reproducible" ? "teal" : item.trust === "manual_verifier_output" ? "amber" : "blue"}>
               {trustLabel(item.trust ?? "manual_note")}
             </Badge>
             <MutedText>{new Date(item.createdAt).toLocaleDateString()}</MutedText>
@@ -469,9 +469,13 @@ const styles = StyleSheet.create({
   }
 });
 
-function trustLabel(trust: "auto_verified_code_lab" | "manual_verifier_output" | "manual_note"): string {
+function trustLabel(trust: EvidenceTrustClassification): string {
   if (trust === "auto_verified_code_lab") {
-    return "auto-verified";
+    return "auto-verified Code Lab";
+  }
+
+  if (trust === "externally_reproducible") {
+    return "externally reproducible project";
   }
 
   if (trust === "manual_verifier_output") {

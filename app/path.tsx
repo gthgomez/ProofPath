@@ -211,15 +211,16 @@ export default function LearningPathScreen(): ReactElement {
                       </Row>
                       <SectionTitle style={styles.nodeTitleText}>{node.title}</SectionTitle>
                       {isLocked ? (
-                        <ButtonShell
-                          accessibilityHint="This item is locked until you complete the previous lessons."
-                          size="compact"
-                          disabled={true}
-                          tone="ink"
-                          variant="secondary"
-                        >
-                          Locked
-                        </ButtonShell>
+                        <Link href={nodeHref} asChild>
+                          <ButtonShell
+                            accessibilityHint={`Previews ${node.title}. Prerequisite lessons in sequence are recommended.`}
+                            size="compact"
+                            tone="ink"
+                            variant="secondary"
+                          >
+                            Preview
+                          </ButtonShell>
+                        </Link>
                       ) : (
                         <Link href={nodeHref} asChild>
                           <ButtonShell

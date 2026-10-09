@@ -21,7 +21,11 @@ export type TerminalResultReason =
   | "timeout"
   | "policy_blocked"
   | "runner_error";
-export type EvidenceTrustClassification = "auto_verified_code_lab" | "manual_verifier_output" | "manual_note";
+export type EvidenceTrustClassification =
+  | "auto_verified_code_lab"
+  | "externally_reproducible"
+  | "manual_verifier_output"
+  | "manual_note";
 
 export type TerminalEvent =
   | { type: "context"; cwd: string; file: string; language: RunnerLanguage }
