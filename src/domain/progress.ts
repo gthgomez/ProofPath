@@ -1,14 +1,23 @@
 import { DEFAULT_ROLE_TARGET_ID, legacyCareerPathIdMap } from "@/content/roles";
 import { createProofArtifactFromAttempt, formatProofArtifactVerifierOutput, normalizeCodeRunAttempt } from "@/domain/code-run";
+import { classifyEvidenceTrust, isCommitHashLike, isUrlLike, normalizeTrustClassification } from "@/domain/evidence-trust";
 import { advanceReviewItem, createReviewItem, recordReviewEvent, removeReviewItem, reviewKey, upsertReviewItem } from "@/domain/review";
 import { createWeeklyReportSnapshot, upsertWeeklyReport } from "@/domain/weekly-report";
 import type { CodeRunAttempt, ContentPack, EvidenceItem, EvidenceTestStatus, EvidenceTrustClassification, EvidenceType, Lesson, ProjectMission, ProofArtifact, Quiz, QuizAttempt, ReadmeStatus, ReviewRating, ReviewTargetType, UserProfile, UserProgress, WeeklyPlanTask } from "./types";
+
+export type MissionProofCategory = "verification" | "artifact" | "documentation";
 
 export interface MissionProofChecklistItem {
   id: string;
   label: string;
   required: boolean;
   complete: boolean;
+  /**
+   * What kind of evidence the requirement is. `verification`, `artifact`, and
+   * README requirements must all be satisfied by one coherent submission;
+   * `documentation` requirements (reflection) may be supplied separately.
+   */
+  category: MissionProofCategory;
 }
 
 interface EvidenceDraft {
@@ -105,33 +114,17 @@ function withTimestamp(progress: Omit<UserProgress, "updatedAt">, now: string): 
 type StoredEvidenceItem = Omit<EvidenceItem, "linkedSkillIds" | "testStatus" | "readmeStatus">
   & Partial<Pick<EvidenceItem, "linkedSkillIds" | "testStatus" | "readmeStatus" | "trust">>;
 
-export function isExternallyReproducibleEvidence(item: {
-  repoUrl?: string | null;
-  commitHash?: string | null;
-  testStatus?: string | null;
-  verifierOutput?: string | null;
-  readmeStatus?: string | null;
-}): boolean {
-  return Boolean(
-    item.repoUrl && isUrlLike(item.repoUrl)
-    && item.commitHash && isCommitHashLike(item.commitHash)
-    && item.testStatus === "passing"
-    && item.verifierOutput && item.verifierOutput.trim().length > 0
-    && (item.readmeStatus === "complete" || item.readmeStatus === "basic")
-  );
-}
-
 function normalizeEvidenceItem(item: StoredEvidenceItem): EvidenceItem {
-  const verifierOutput = item.verifierOutput?.trim();
-  const inferredTrust = item.trust ?? (
-    item.proofArtifact
-      ? "auto_verified_code_lab"
-      : isExternallyReproducibleEvidence(item)
-        ? "externally_reproducible"
-        : verifierOutput
-          ? "manual_verifier_output"
-          : "manual_note"
-  );
+  // Prefer the persisted classification, but remap legacy values through the
+  // shared provenance map so a historical record is never promoted to a
+  // stronger claim than it originally made.
+  const persistedTrust = normalizeTrustClassification(item.trust);
+  const inferredTrust = persistedTrust ?? classifyEvidenceTrust({
+    proofArtifact: item.proofArtifact,
+    repoUrl: item.repoUrl,
+    commitHash: item.commitHash,
+    verifierOutput: item.verifierOutput
+  });
 
   return {
     ...item,
@@ -140,14 +133,6 @@ function normalizeEvidenceItem(item: StoredEvidenceItem): EvidenceItem {
     readmeStatus: item.readmeStatus ?? "missing",
     trust: inferredTrust
   };
-}
-
-function isUrlLike(value: string): boolean {
-  return /^https?:\/\/[^\s]+$/i.test(value.trim());
-}
-
-function isCommitHashLike(value: string): boolean {
-  return /^[a-f0-9]{7,40}$/i.test(value.trim());
 }
 
 function optionalTrimmed(value?: string): string | undefined {
@@ -521,24 +506,98 @@ function getLinkedMissionEvidence(progress: UserProgress, missionId: string): Ev
   return progress.evidenceItems.filter((item) => item.linkedProjectMissionId === missionId);
 }
 
+interface MissionRequirementDefinition {
+  id: string;
+  label: string;
+  category: MissionProofCategory;
+  required: boolean;
+}
+
+function missionRequirementDefinitions(requirements: ProjectMission["evidenceRequirements"]): MissionRequirementDefinition[] {
+  return [
+    { id: "repo-url", label: "Repo link", category: "artifact", required: requirements.repoUrl },
+    { id: "commit-hash", label: "Commit hash", category: "verification", required: requirements.commitHash },
+    { id: "passing-verifier", label: "Passing check output", category: "verification", required: requirements.passingVerifierOutput },
+    { id: "readme-status", label: `README ${requirements.readmeStatus}`, category: "documentation", required: requirements.readmeStatus !== "missing" },
+    { id: "artifact-or-deployment", label: "Artifact or deployment", category: "artifact", required: requirements.artifactOrDeployment },
+    { id: "reflection", label: "Reflection", category: "documentation", required: requirements.reflection }
+  ];
+}
+
+function evidenceSatisfiesRequirement(item: EvidenceItem, requirementId: string, requirements: ProjectMission["evidenceRequirements"]): boolean {
+  switch (requirementId) {
+    case "repo-url":
+      return Boolean(item.repoUrl);
+    case "commit-hash":
+      return Boolean(item.commitHash);
+    case "passing-verifier":
+      return item.testStatus === "passing" && Boolean(item.verifierOutput);
+    case "readme-status":
+      return readmeMeetsRequirement(item.readmeStatus, requirements.readmeStatus);
+    case "artifact-or-deployment":
+      return Boolean(item.artifactUri || item.deploymentUrl);
+    case "reflection":
+      return Boolean(item.reflection) || item.body.trim().length >= 120;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Mission proof must be traceable to one coherent submission. Repository,
+ * revision, check output, README, and artifact requirements therefore have to
+ * co-occur on a single evidence record — stitched-together fields from separate
+ * records do not describe the same revision and are not accepted. Only the
+ * reflection (supporting documentation) may come from a separate linked note.
+ */
 export function getMissionProofChecklist(progress: UserProgress, mission: ProjectMission): MissionProofChecklistItem[] {
   const linkedEvidence = getLinkedMissionEvidence(progress, mission.id);
   const requirements = mission.evidenceRequirements;
-  const hasRepoUrl = linkedEvidence.some((item) => Boolean(item.repoUrl));
-  const hasCommitHash = linkedEvidence.some((item) => Boolean(item.commitHash));
-  const hasPassingVerifierOutput = linkedEvidence.some((item) => item.testStatus === "passing" && Boolean(item.verifierOutput));
-  const hasRequiredReadme = linkedEvidence.some((item) => readmeMeetsRequirement(item.readmeStatus, requirements.readmeStatus));
-  const hasArtifactOrDeployment = linkedEvidence.some((item) => Boolean(item.artifactUri || item.deploymentUrl));
-  const hasReflection = linkedEvidence.some((item) => Boolean(item.reflection) || item.body.trim().length >= 120);
+  const required = missionRequirementDefinitions(requirements).filter((definition) => definition.required);
+  const bindingRequirements = required.filter((definition) => definition.id !== "reflection");
 
-  return [
-    { id: "repo-url", label: "Repo link", required: requirements.repoUrl, complete: hasRepoUrl },
-    { id: "commit-hash", label: "Commit hash", required: requirements.commitHash, complete: hasCommitHash },
-    { id: "passing-verifier", label: "Passing verifier", required: requirements.passingVerifierOutput, complete: hasPassingVerifierOutput },
-    { id: "readme-status", label: `README ${requirements.readmeStatus}`, required: requirements.readmeStatus !== "missing", complete: hasRequiredReadme },
-    { id: "artifact-or-deployment", label: "Artifact or deployment", required: requirements.artifactOrDeployment, complete: hasArtifactOrDeployment },
-    { id: "reflection", label: "Reflection", required: requirements.reflection, complete: hasReflection }
-  ].filter((item) => item.required);
+  const submission = linkedEvidence
+    .map((item) => ({
+      item,
+      satisfied: bindingRequirements.filter((definition) => evidenceSatisfiesRequirement(item, definition.id, requirements)).length
+    }))
+    .sort((left, right) => right.satisfied - left.satisfied || Date.parse(right.item.createdAt) - Date.parse(left.item.createdAt))[0];
+
+  const reflectionSatisfied = linkedEvidence.some((item) => evidenceSatisfiesRequirement(item, "reflection", requirements));
+
+  return required.map((definition) => {
+    const complete = definition.id === "reflection"
+      ? reflectionSatisfied
+      : bindingRequirements.length === 0
+        ? true
+        : Boolean(submission && evidenceSatisfiesRequirement(submission.item, definition.id, requirements));
+
+    return { ...definition, complete };
+  });
+}
+
+export interface MissionProofSummary {
+  checklist: MissionProofChecklistItem[];
+  documentationComplete: boolean;
+  verificationProvided: boolean;
+  meetsRequirements: boolean;
+}
+
+/**
+ * Separates the three claims a mission award must not conflate: documentation
+ * complete, verification evidence supplied, and the overall mission award.
+ */
+export function summarizeMissionProof(progress: UserProgress, mission: ProjectMission): MissionProofSummary {
+  const checklist = getMissionProofChecklist(progress, mission);
+  const documentation = checklist.filter((item) => item.category === "documentation");
+  const verification = checklist.filter((item) => item.category === "verification");
+
+  return {
+    checklist,
+    documentationComplete: documentation.every((item) => item.complete),
+    verificationProvided: verification.every((item) => item.complete),
+    meetsRequirements: checklist.length > 0 && checklist.every((item) => item.complete)
+  };
 }
 
 export function missionEvidenceMeetsRequirements(progress: UserProgress, mission: ProjectMission): boolean {
@@ -713,6 +772,10 @@ export function reconcileDerivedProgress(content: ContentPack, progress: UserPro
   };
   const nextProgress = {
     ...withMissions,
+    // Re-normalize evidence trust on every reconcile so legacy persisted
+    // classifications load through the current provenance map on the web
+    // provider too (the native provider remaps earlier in ensureProgressProfile).
+    evidenceItems: withMissions.evidenceItems.map(normalizeEvidenceItem),
     weeklyPlanTaskIds: deriveCompletedWeeklyTaskIds(content, withMissions)
   };
 
@@ -768,21 +831,12 @@ export function addEvidenceItem(progress: UserProgress, draft: EvidenceDraft, no
     verifierOutput: optionalTrimmed(draft.verifierOutput),
     reflection: optionalTrimmed(draft.reflection),
     proofArtifact: draft.proofArtifact,
-    trust: draft.trust ?? (
-      draft.proofArtifact
-        ? "auto_verified_code_lab"
-        : isExternallyReproducibleEvidence({
-            repoUrl: optionalTrimmed(draft.repoUrl),
-            commitHash: optionalTrimmed(draft.commitHash),
-            testStatus: draft.testStatus,
-            verifierOutput: optionalTrimmed(draft.verifierOutput),
-            readmeStatus: draft.readmeStatus
-          })
-          ? "externally_reproducible"
-          : optionalTrimmed(draft.verifierOutput)
-            ? "manual_verifier_output"
-            : "manual_note"
-    ),
+    trust: draft.trust ?? classifyEvidenceTrust({
+      proofArtifact: draft.proofArtifact,
+      repoUrl: optionalTrimmed(draft.repoUrl),
+      commitHash: optionalTrimmed(draft.commitHash),
+      verifierOutput: optionalTrimmed(draft.verifierOutput)
+    }),
     createdAt: now
   };
 

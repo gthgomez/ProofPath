@@ -12,7 +12,8 @@ export interface ReviewerPortfolioExport {
   summary: {
     totalEvidenceCount: number;
     autoVerifiedCount: number;
-    externallyReproducibleCount: number;
+    /** Repositories+revisions+commands supplied but not executed by ProofPath. */
+    reproductionPackageCount: number;
     selfReportedCount: number;
     completedMissionsCount: number;
   };
@@ -44,7 +45,7 @@ export function generateReviewerPortfolioExport(
   const evidenceItems = progress.evidenceItems;
 
   const autoVerifiedCount = evidenceItems.filter((item) => item.trust === "auto_verified_code_lab").length;
-  const externallyReproducibleCount = evidenceItems.filter((item) => item.trust === "externally_reproducible").length;
+  const reproductionPackageCount = evidenceItems.filter((item) => item.trust === "reproduction_package_supplied").length;
   const selfReportedCount = evidenceItems.filter((item) => (
     item.trust === "manual_verifier_output" || item.trust === "manual_note" || !item.trust
   )).length;
@@ -87,12 +88,12 @@ export function generateReviewerPortfolioExport(
     `**Readiness Score (Practice Heuristic):** ${readiness.score}% (${readiness.label})`,
     ``,
     `> [!NOTE]`,
-    `> This packet exports local and verified artifacts logged by the learner. ProofPath distinguishes auto-verified code lab results and externally reproducible project submissions from self-reported notes.`,
+    `> This packet exports artifacts logged by the learner. Only "Locally verified (Code Lab)" entries were executed by ProofPath itself. Reproduction packages, pasted check output, and notes are learner-supplied and have not been independently executed or verified.`,
     ``,
     `## Evidence Provenance Overview`,
-    `- **Auto-Verified Code Lab Checks:** ${autoVerifiedCount}`,
-    `- **Externally Reproducible Projects:** ${externallyReproducibleCount}`,
-    `- **Self-Reported Checks & Notes:** ${selfReportedCount}`,
+    `- **Locally verified (Code Lab):** ${autoVerifiedCount}`,
+    `- **Reproduction packages supplied (not executed by ProofPath):** ${reproductionPackageCount}`,
+    `- **Self-reported checks & notes:** ${selfReportedCount}`,
     `- **Completed Missions:** ${progress.completedProjectMissionIds.length}`,
     ``,
     `## Portfolio Missions & Verified Deliverables`
@@ -133,7 +134,7 @@ export function generateReviewerPortfolioExport(
     summary: {
       totalEvidenceCount: evidenceItems.length,
       autoVerifiedCount,
-      externallyReproducibleCount,
+      reproductionPackageCount,
       selfReportedCount,
       completedMissionsCount: progress.completedProjectMissionIds.length
     },

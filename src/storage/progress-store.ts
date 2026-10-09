@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { roleTargets } from "@/content/roles";
 import { contentPack } from "@/content/seed";
 import { createInitialProgress, ensureProgressProfile } from "@/domain/progress";
+import { classifyEvidenceTrust, normalizeTrustClassification } from "@/domain/evidence-trust";
 import { userProgressSchema } from "@/domain/schemas";
 import type {
   EvidenceItem,
@@ -1045,7 +1046,12 @@ async function saveEvidenceItems(db: SQLiteDatabase, evidenceItems: EvidenceItem
       item.verifierOutput ?? null,
       item.reflection ?? null,
       item.proofArtifact ? JSON.stringify(item.proofArtifact) : null,
-      item.trust ?? (item.proofArtifact ? "auto_verified_code_lab" : item.verifierOutput ? "manual_verifier_output" : "manual_note"),
+      item.trust ?? classifyEvidenceTrust({
+        proofArtifact: item.proofArtifact,
+        repoUrl: item.repoUrl,
+        commitHash: item.commitHash,
+        verifierOutput: item.verifierOutput
+      }),
       item.createdAt,
       index
     );
@@ -1321,7 +1327,9 @@ async function loadNormalizedProgress(db: SQLiteDatabase): Promise<UserProgress 
       verifierOutput: optionalString(row.verifier_output),
       reflection: optionalString(row.reflection),
       proofArtifact: row.proof_artifact_json ? JSON.parse(row.proof_artifact_json) as EvidenceItem["proofArtifact"] : undefined,
-      trust: row.trust ?? (row.proof_artifact_json ? "auto_verified_code_lab" : row.verifier_output ? "manual_verifier_output" : "manual_note"),
+      // Remap historical values (e.g. the retired `externally_reproducible`)
+      // through the shared provenance map so old rows are never promoted.
+      trust: normalizeTrustClassification(row.trust) ?? (row.proof_artifact_json ? "auto_verified_code_lab" : row.verifier_output ? "manual_verifier_output" : "manual_note"),
       createdAt: row.created_at
     })),
     quizAttempts: quizAttemptRows.map((row) => ({

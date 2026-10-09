@@ -22,10 +22,16 @@ export type TerminalResultReason =
   | "policy_blocked"
   | "runner_error";
 export type EvidenceTrustClassification =
+  /** ProofPath executed the check in its own sandbox (Code Lab). */
   | "auto_verified_code_lab"
-  | "externally_reproducible"
+  /** Repository, revision, and verification command supplied but not executed. */
+  | "reproduction_package_supplied"
+  /** Learner-pasted check output. Self-reported. */
   | "manual_verifier_output"
-  | "manual_note";
+  /** Learner-written note. Self-reported. */
+  | "manual_note"
+  /** A trusted verifier executed the artifact. Reserved; not awarded today. */
+  | "independently_verified";
 
 export type TerminalEvent =
   | { type: "context"; cwd: string; file: string; language: RunnerLanguage }

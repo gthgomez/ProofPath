@@ -43,7 +43,7 @@ describe("portfolio evidence quality", () => {
     expect(calculateReadinessScore(roleContent, structured, NOW).breakdown.evidenceHygiene)
       .toBeGreaterThan(calculateReadinessScore(roleContent, basic, NOW).breakdown.evidenceHygiene);
     expect(structured.evidenceItems[0]?.linkedSkillIds).toHaveLength(3);
-    expect(structured.evidenceItems[0]?.trust).toBe("externally_reproducible");
+    expect(structured.evidenceItems[0]?.trust).toBe("reproduction_package_supplied");
     expect(manualVerifierOnly.evidenceItems[0]?.trust).toBe("manual_verifier_output");
     expect(basic.evidenceItems[0]?.trust).toBe("manual_note");
   });

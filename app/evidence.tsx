@@ -8,6 +8,7 @@ import { formatTerminalTranscript } from "@/domain/code-run";
 import { getMissionsForRole, isGitTrackCompleted } from "@/domain/role-routing";
 import { getMissionProofChecklist } from "@/domain/progress";
 import type { EvidenceTestStatus, EvidenceTrustClassification, EvidenceType, ReadmeStatus } from "@/domain/types";
+import { evidenceTrustLabel } from "@/domain/evidence-trust";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
@@ -455,8 +456,8 @@ export default function EvidenceLogScreen(): ReactElement {
         <Panel key={item.id}>
           <Row>
             <Badge tone="green">{item.type}</Badge>
-            <Badge tone={item.trust === "auto_verified_code_lab" ? "green" : item.trust === "externally_reproducible" ? "teal" : item.trust === "manual_verifier_output" ? "amber" : "blue"}>
-              {trustLabel(item.trust ?? "manual_note")}
+            <Badge tone={trustTone(item.trust ?? "manual_note")}>
+              {evidenceTrustLabel(item.trust ?? "manual_note")}
             </Badge>
             <MutedText>{new Date(item.createdAt).toLocaleDateString()}</MutedText>
           </Row>
@@ -516,18 +517,22 @@ const styles = StyleSheet.create({
   }
 });
 
-function trustLabel(trust: EvidenceTrustClassification): string {
+function trustTone(trust: EvidenceTrustClassification): "green" | "teal" | "amber" | "blue" {
   if (trust === "auto_verified_code_lab") {
-    return "auto-verified Code Lab";
+    return "green";
   }
 
-  if (trust === "externally_reproducible") {
-    return "externally reproducible project";
+  if (trust === "independently_verified") {
+    return "green";
+  }
+
+  if (trust === "reproduction_package_supplied") {
+    return "teal";
   }
 
   if (trust === "manual_verifier_output") {
-    return "self-reported check";
+    return "amber";
   }
 
-  return "self-reported note";
+  return "blue";
 }

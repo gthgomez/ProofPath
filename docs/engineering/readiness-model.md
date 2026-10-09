@@ -41,6 +41,24 @@ All five inputs are normalized to 0–100, then combined:
   most **45**, regardless of other attributes (repo URL, commit hash,
   README status, artifacts, reflection).
 
+### Provenance weighting
+
+Documentation completeness alone cannot earn full evidence credit. Each item's
+documentation score is multiplied by a confidence factor for how its contents
+were actually produced:
+
+| Provenance | Confidence | Meaning |
+| --- | --- | --- |
+| `auto_verified_code_lab` / `independently_verified` | 1.0 | ProofPath (or a trusted verifier) executed the check |
+| `reproduction_package_supplied` | 0.7 | Repo + revision + command supplied, not executed |
+| `manual_verifier_output` | 0.45 | Learner-pasted check output |
+| `manual_note` (and any unclassified item) | 0.25 | Learner-written note |
+
+So a learner who types in every field still cannot reach a fully credited
+evidence score without verification: the strongest self-reported evidence is
+credited at the reproduction-package confidence. This is why an unclassified or
+self-reported portfolio cannot reach `portfolio-ready` on evidence alone.
+
 Evidence hygiene rewards coverage of distinct targets: only the strongest
 evidence item per lesson/mission contributes, so duplicates do not inflate the
 score.

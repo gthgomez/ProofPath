@@ -8,7 +8,7 @@
  * docs/engineering/readiness-model.md.
  */
 import { getRelevantReviewEvents } from "./review";
-import type { ContentPack, EvidenceItem, ReadinessBreakdown, ReadinessScore, UserProgress } from "./types";
+import type { ContentPack, EvidenceItem, EvidenceTrustClassification, ReadinessBreakdown, ReadinessScore, UserProgress } from "./types";
 import { getSatisfiedLessonIds, getSatisfiedQuizIds } from "./progress";
 
 function percentage(completed: number, total: number): number {
@@ -65,6 +65,21 @@ function calculateReviewCadence(content: ContentPack, progress: UserProgress, no
   return clampScore(score);
 }
 
+/**
+ * How much a provenance category is allowed to contribute to evidence quality.
+ * Documentation completeness alone cannot earn full credit: a learner who types
+ * in every field makes claims, while only ProofPath-executed work is verified.
+ * `independently_verified` stays at 1 because a trusted third party re-ran the
+ * work; the resolver never awards it today.
+ */
+const PROVENANCE_CONFIDENCE: Record<EvidenceTrustClassification, number> = {
+  auto_verified_code_lab: 1,
+  independently_verified: 1,
+  reproduction_package_supplied: 0.7,
+  manual_verifier_output: 0.45,
+  manual_note: 0.25
+};
+
 function evidenceQuality(item: EvidenceItem): number {
   if (item.testStatus === "unknown" && !item.repoUrl && !item.commitHash && !item.verifierOutput && !item.artifactUri && !item.deploymentUrl) {
     return 0;
@@ -108,11 +123,10 @@ function evidenceQuality(item: EvidenceItem): number {
     score += 6;
   }
 
-  if (!hasPassingTests) {
-    return Math.min(45, score);
-  }
+  const documentationScore = !hasPassingTests ? Math.min(45, score) : Math.min(100, score);
+  const confidence = PROVENANCE_CONFIDENCE[item.trust ?? "manual_note"] ?? PROVENANCE_CONFIDENCE.manual_note;
 
-  return Math.min(100, score);
+  return Math.round(documentationScore * confidence);
 }
 
 export function calculateReadinessScore(content: ContentPack, progress: UserProgress, now = new Date().toISOString()): ReadinessScore {
@@ -190,7 +204,7 @@ export function calculateReadinessScore(content: ContentPack, progress: UserProg
         : "Complete the next workshop lesson and attach evidence to a mission.";
   const explanation = [
     `Projects carry 40% of readiness; current project completion is ${projectCompletion}%.`,
-    `Evidence quality carries 30%; current evidence hygiene is ${evidenceHygiene}%.`,
+    `Evidence quality carries 30%; current evidence hygiene is ${evidenceHygiene}% (weighted by provenance — Code Lab-run checks count fully, supplied repositories and pasted output count at reduced confidence).`,
     blockingProofRequirement
   ];
 

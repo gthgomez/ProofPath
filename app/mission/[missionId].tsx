@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import { contentPack } from "@/content/seed";
 import { findMission } from "@/domain/content";
 import { getLessonsForRole } from "@/domain/role-routing";
-import { getMissionProofChecklist, getMissionSupportedLessonIds } from "@/domain/progress";
+import { getMissionSupportedLessonIds, summarizeMissionProof } from "@/domain/progress";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, ProgressBar, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
@@ -42,7 +42,8 @@ export default function MissionDetailScreen(): ReactElement {
   const missionDone = progress.completedProjectMissionIds.includes(mission.id);
   const linkedEvidence = progress.evidenceItems.filter((item) => item.linkedProjectMissionId === mission.id);
   const hasVerifierEvidence = linkedEvidence.some((item) => item.testStatus === "passing" && Boolean(item.verifierOutput));
-  const proofChecklist = getMissionProofChecklist(progress, mission);
+  const proofSummary = summarizeMissionProof(progress, mission);
+  const proofChecklist = proofSummary.checklist;
   const completedProofCount = proofChecklist.filter((item) => item.complete).length;
   const relatedLessons = getLessonsForRole(contentPack, roleTarget.id)
     .filter((lesson) => lesson.skillIds.some((skillId) => mission.skillIds.includes(skillId)))
@@ -75,6 +76,17 @@ export default function MissionDetailScreen(): ReactElement {
         <SectionTitle>Tracked gates</SectionTitle>
         <ProgressBar label="Lesson preparation" value={preparationProgress} />
         <ProgressBar label="Evidence checklist" tone="green" value={proofProgress} />
+        <Row>
+          <Badge tone={proofSummary.documentationComplete ? "green" : "rose"}>
+            Documentation {proofSummary.documentationComplete ? "complete" : "incomplete"}
+          </Badge>
+          <Badge tone={proofSummary.verificationProvided ? "green" : "rose"}>
+            Verification evidence {proofSummary.verificationProvided ? "provided" : "missing"}
+          </Badge>
+        </Row>
+        <MutedText>
+          Documentation and verification are tracked separately. Supplied check output is self-reported unless it came from the Code Lab.
+        </MutedText>
         <BodyText>{missionDone ? "All mission gates are satisfied." : "Finish the incomplete gates below to earn this mission award."}</BodyText>
         <Link href={{ pathname: "/evidence", params: { missionId: mission.id } }} asChild>
           <ButtonShell accessibilityHint={`Opens evidence capture for ${mission.title}.`} disabled={isSaving} tone="green">Add evidence for this mission</ButtonShell>
