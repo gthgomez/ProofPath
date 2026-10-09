@@ -109,7 +109,7 @@ export default function LessonDetailScreen(): ReactElement {
     );
   }
 
-  if (needsOnboarding) {
+  if (needsOnboarding && lessonIdValue !== "lesson-python-zero-first-script" && lessonIdValue !== "lesson-python-zero-files-folders") {
     return <Redirect href="/onboarding" />;
   }
 
