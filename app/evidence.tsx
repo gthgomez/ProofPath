@@ -11,6 +11,7 @@ import type { EvidenceTestStatus, EvidenceTrustClassification, EvidenceType, Rea
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
+import { generateReviewerPortfolioExport } from "@/domain/evidence-export";
 import { colors, radius, spacing } from "@/ui/theme";
 
 export default function EvidenceLogScreen(): ReactElement {
@@ -29,6 +30,7 @@ export default function EvidenceLogScreen(): ReactElement {
   const [reflection, setReflection] = useState("");
   const [showProofDetails, setShowProofDetails] = useState(false);
   const [manualDeveloperMode, setManualDeveloperMode] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const isGitDone = isGitTrackCompleted(contentPack, progress);
   const developerModeActive = isGitDone || manualDeveloperMode;
   const roleMissions = getMissionsForRole(contentPack, roleTarget.id);
@@ -36,6 +38,28 @@ export default function EvidenceLogScreen(): ReactElement {
     roleMissions.some((mission) => mission.id === missionId) ? missionId : roleMissions[0]?.id
   ));
   const [linkedLessonId, setLinkedLessonId] = useState<string | undefined>(lessonId);
+
+  const handleCopyMarkdownPacket = async (): Promise<void> => {
+    const packet = generateReviewerPortfolioExport(contentPack, progress);
+    const maybeNavigator = globalThis.navigator as ({ clipboard?: { writeText?: (value: string) => Promise<void> } } | undefined);
+    if (maybeNavigator?.clipboard?.writeText) {
+      await maybeNavigator.clipboard.writeText(packet.markdownPacket);
+      setCopyStatus("Reviewer Markdown packet copied to clipboard!");
+    } else {
+      setCopyStatus("Clipboard not available in this environment.");
+    }
+  };
+
+  const handleCopyJsonPacket = async (): Promise<void> => {
+    const packet = generateReviewerPortfolioExport(contentPack, progress);
+    const maybeNavigator = globalThis.navigator as ({ clipboard?: { writeText?: (value: string) => Promise<void> } } | undefined);
+    if (maybeNavigator?.clipboard?.writeText) {
+      await maybeNavigator.clipboard.writeText(JSON.stringify(packet, null, 2));
+      setCopyStatus("Reviewer JSON packet copied to clipboard!");
+    } else {
+      setCopyStatus("Clipboard not available in this environment.");
+    }
+  };
 
   useEffect(() => {
     if (prefill === "codelab" && lessonId) {
@@ -169,6 +193,29 @@ export default function EvidenceLogScreen(): ReactElement {
         <MutedText>
           Your portfolio is evidence you can explain in an interview: repo links, passing test output, screenshots, and short notes about what you built and verified.
         </MutedText>
+        <Row style={{ marginVertical: spacing.xs, flexWrap: "wrap", gap: spacing.xs }}>
+          <ButtonShell
+            accessibilityHint="Copies a formatted Markdown packet of all portfolio evidence for reviewers or recruiters."
+            accessibilityLabel="Export Markdown Packet"
+            onPress={handleCopyMarkdownPacket}
+            size="compact"
+            tone="teal"
+            variant="secondary"
+          >
+            Export Markdown Packet
+          </ButtonShell>
+          <ButtonShell
+            accessibilityHint="Copies complete JSON evidence metadata packet for automated tools or portfolio imports."
+            accessibilityLabel="Export JSON Packet"
+            onPress={handleCopyJsonPacket}
+            size="compact"
+            tone="blue"
+            variant="secondary"
+          >
+            Export JSON Packet
+          </ButtonShell>
+        </Row>
+        {copyStatus ? <MutedText style={{ color: colors.teal, fontWeight: "600" }}>{copyStatus}</MutedText> : null}
         <SectionTitle>Add evidence</SectionTitle>
         {roleMissions.length > 0 ? (
           <Row>
