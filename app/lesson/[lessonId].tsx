@@ -153,6 +153,11 @@ export default function LessonDetailScreen(): ReactElement {
     setVisitedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
   }, [currentStep]);
 
+  // A sample lesson runs before a career path is chosen. The lesson is fully
+  // playable, so we surface an explanation and route the terminal action to
+  // path setup rather than a redirect the learner did not ask for.
+  const isPreview = needsOnboarding;
+
   const workflow = deriveLessonWorkflow({
     currentStep,
     visitedSteps,
@@ -162,7 +167,8 @@ export default function LessonDetailScreen(): ReactElement {
     lessonDone,
     hasQuiz: !!quiz,
     nextLessonId,
-    allQuestionsAnswered
+    allQuestionsAnswered,
+    previewMode: isPreview
   });
 
   const handleStickyPress = () => {
@@ -175,6 +181,8 @@ export default function LessonDetailScreen(): ReactElement {
       if (quiz) {
         submitQuiz(quiz, selectedChoiceIndexes);
       }
+    } else if (cta.action === "choose-path") {
+      router.push("/onboarding");
     } else if (cta.action === "next-lesson") {
       router.push({ pathname: "/lesson/[lessonId]", params: { lessonId: cta.lessonId } });
       setCurrentStep("understand");
@@ -255,6 +263,28 @@ export default function LessonDetailScreen(): ReactElement {
         ) : null}
         <ProgressBar label="Lesson progress" value={lessonProgressPercent} />
       </Panel>
+
+      {isPreview ? (
+        <Panel accessibilityLabel="Sample lesson preview">
+          <Row>
+            <Badge tone="amber">sample preview</Badge>
+          </Row>
+          <SectionTitle>You are previewing a sample lesson</SectionTitle>
+          <BodyText>
+            You can finish this lesson without choosing a career path. Your progress is saved on this device. Choosing a
+            career path unlocks the full sequence, portfolio missions, and readiness tracking.
+          </BodyText>
+          <ButtonShell
+            accessibilityHint="Opens career path setup so this lesson leads into the full learning path."
+            onPress={() => router.push("/onboarding")}
+            size="compact"
+            tone="teal"
+            variant="secondary"
+          >
+            Choose a career path
+          </ButtonShell>
+        </Panel>
+      ) : null}
 
       {/* Understand Step Content */}
       {currentStep === "understand" && (
@@ -824,11 +854,22 @@ export default function LessonDetailScreen(): ReactElement {
               </SubPanel>
             ) : null}
 
-            <Link href={{ pathname: "/evidence", params: { lessonId: lesson.id, prefill: "codelab" } }} asChild>
-              <ButtonShell accessibilityHint="Go to evidence log and prefill Code Lab check output." tone="green" style={{ marginVertical: spacing.sm }}>
-                Go to Evidence Screen
+            {isPreview ? (
+              <ButtonShell
+                accessibilityHint="Opens career path setup. Portfolio evidence needs a chosen path."
+                onPress={() => router.push("/onboarding")}
+                tone="green"
+                style={{ marginVertical: spacing.sm }}
+              >
+                Choose a career path to save portfolio evidence
               </ButtonShell>
-            </Link>
+            ) : (
+              <Link href={{ pathname: "/evidence", params: { lessonId: lesson.id, prefill: "codelab" } }} asChild>
+                <ButtonShell accessibilityHint="Go to evidence log and prefill Code Lab check output." tone="green" style={{ marginVertical: spacing.sm }}>
+                  Go to Evidence Screen
+                </ButtonShell>
+              </Link>
+            )}
 
             {/* Stepper Navigation */}
             <Row style={styles.navRow}>
