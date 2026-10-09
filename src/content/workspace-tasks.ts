@@ -75,6 +75,7 @@ the app. This script is the checker — do not edit it.
 """
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 WORKFLOW = Path(".github/workflows/ci.yml")
@@ -109,7 +110,11 @@ def checks_on(checks, text):
 
 def main():
     if not WORKFLOW.exists():
-        print(json.dumps({**MANIFEST, "results": [{"commandId": "verify", "passed": False}]}))
+        print(json.dumps({
+            **MANIFEST,
+            "ranAt": datetime.now(timezone.utc).isoformat(),
+            "results": [{"commandId": "verify", "passed": False}],
+        }))
         sys.exit(1)
 
     text = WORKFLOW.read_text(encoding="utf-8")
@@ -127,7 +132,11 @@ def main():
 
     checks_on(checks, text)
 
-    manifest = {**MANIFEST, "results": [{"commandId": c["commandId"], "passed": c["passed"]} for c in checks]}
+    manifest = {
+        **MANIFEST,
+        "ranAt": datetime.now(timezone.utc).isoformat(),
+        "results": [{"commandId": c["commandId"], "passed": c["passed"]} for c in checks],
+    }
     for check in checks:
         mark = "PASS" if check["passed"] else "FAIL"
         print(f"[{mark}] {check['name']}: {check['detail']}", file=sys.stderr)
@@ -170,93 +179,173 @@ export function buildCiWorkflowDiagnosisTask(): WorkspaceTask {
   return { ...ciWorkflowDiagnosisTask, files };
 }
 
+
 /**
- * End-to-End Learning Journey Workspace (PR D):
- * Connects Python backend logic -> SQLite persistence -> TypeScript frontend contract -> Git verification.
- * Learners can export this workspace, run `python verify_journey.py`, and paste the signed manifest.
+ * Full-Stack Study Tracker workspace.
+ *
+ * Ties Python validation + persistence, SQLite weekly aggregation, a TypeScript
+ * data contract, and Git habits into one local project. The learner exports the
+ * files, repairs the intentionally-broken weekly aggregation, runs the real
+ * verifier, and pastes the result manifest back into the app.
+ *
+ * The result manifest is self-reported by the learner's own machine. It is a
+ * JSON record, not a signature, and does not prove independent execution.
  */
 export const studyTrackerFullJourneyTask: WorkspaceTask = {
   id: "task-study-tracker-full-journey",
-  version: "1.0.0",
+  version: "2.0.0",
   title: "Full-Stack Study Tracker: Python, SQL, TypeScript & Git",
   requirements: [
-    "Python 3.9+ installed on your computer",
-    "sqlite3 CLI or standard python sqlite3 module",
+    "Python 3.9+ on your PATH (python3 or python)",
+    "Node.js 18+ with `npm install` for the TypeScript contract check",
     "A terminal in the extracted workspace folder",
-    "No external network dependencies required"
+    "No network access is required once npm install has run"
   ],
+  linkedMissionId: "mission-cli-study-tracker",
   setupInstructions: [
-    "Extract all workspace files preserving folder hierarchy.",
-    "Review README.md, schema.sql, backend.py, and types.ts.",
-    "Run `python verify_journey.py` to confirm verification pipeline."
+    "Reconstruct every file below, preserving its path.",
+    "Run `npm install` once to fetch the TypeScript compiler.",
+    "Read README.md, then run `python3 verify_journey.py`.",
+    "Repair the weekly_summary view in schema.sql so it aggregates by week.",
+    "Re-run the verifier until every check passes, then paste the printed JSON manifest back into ProofPath."
   ],
   files: [
     {
       path: "README.md",
-      content: `# Full-Stack Study Tracker: Complete Learning Journey
+      content: `# Full-Stack Study Tracker
 
-Connects four foundational skills into one coherent real-world project:
-1. **Python**: Business logic, data models, input validation.
-2. **SQL (SQLite)**: Relational schema, session storage, and weekly aggregation query.
-3. **TypeScript**: Shared UI types matching the API/SQLite session data contract.
-4. **Git**: Clean commit history, honest README notes, and reproducible verifier output.
+One small project that ties four skills together:
 
-## Verification
-Run \`python verify_journey.py\` to test backend SQLite integration and data contract parity.
-Paste the resulting JSON manifest back into ProofPath to document portfolio evidence.
+- **Python** - validate session input, persist it, and compute deterministic summaries.
+- **SQL (SQLite)** - a schema with real constraints and a weekly aggregation view.
+- **TypeScript** - a data contract that must match the JSON the backend emits.
+- **Git** - a clean history and reproducible verification commands.
+
+## Your task (required)
+
+\`schema.sql\` ships with a \`weekly_summary\` view that groups by topic only, so it
+can never answer "how many minutes did I study each week?". Repair the view so it
+groups by ISO week:
+
+\`\`\`sql
+CREATE VIEW IF NOT EXISTS weekly_summary AS
+SELECT
+  strftime('%Y-W%W', date) AS week,
+  topic,
+  COUNT(*) AS session_count,
+  SUM(minutes) AS total_minutes
+FROM study_sessions
+GROUP BY week, topic
+ORDER BY week, topic;
+\`\`\`
+
+## Verify
+
+    python3 verify_journey.py
+
+The verifier runs the Python checks, the SQLite weekly-aggregation check, and a
+real \`tsc --noEmit\` type check of the TypeScript contract. It prints a JSON
+result manifest on stdout; paste that manifest back into ProofPath.
+
+The manifest is self-reported by your machine. It is not signed and does not
+prove independent execution.
+
+## Toolchain
+
+    npm install        # installs the TypeScript compiler
+    npx tsc --noEmit   # type-check the contract on its own
+
+## Git
+
+    git init
+    git add .
+    git commit -m "Repair weekly aggregation in study tracker"
+
+Commit the repaired schema alongside the code so a reviewer can see exactly what
+changed.
 `
     },
     {
       path: "schema.sql",
-      content: `-- Study Tracker Persistence Schema
+      content: `-- Study Tracker persistence schema.
+-- The learner must repair the weekly_summary view so it aggregates by week,
+-- not by topic alone. See README.md.
+
 CREATE TABLE IF NOT EXISTS study_sessions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  topic TEXT NOT NULL,
+  topic TEXT NOT NULL CHECK (length(trim(topic)) > 0),
   date TEXT NOT NULL,
   minutes INTEGER NOT NULL CHECK (minutes > 0),
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Weekly Aggregation View
+-- BUG: this groups every session for a topic together and ignores the date,
+-- so it can never report per-week totals. Repair it to group by week using
+-- strftime('%Y-W%W', date).
 CREATE VIEW IF NOT EXISTS weekly_summary AS
 SELECT
   topic,
-  COUNT(*) as session_count,
-  SUM(minutes) as total_minutes
+  COUNT(*) AS session_count,
+  SUM(minutes) AS total_minutes
 FROM study_sessions
 GROUP BY topic;
 `
     },
     {
       path: "backend.py",
-      content: `import sqlite3
-from typing import Dict, Any, List
+      content: `"""Study tracker backend: validation, persistence, deterministic summaries."""
+import sqlite3
+from pathlib import Path
+from typing import Any, Dict, List
+
+SCHEMA_PATH = Path(__file__).with_name("schema.sql")
+
 
 def init_db(db_path: str = "tracker.db") -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
-    with open("schema.sql", "r", encoding="utf-8") as f:
-        conn.executescript(f.read())
+    conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     return conn
 
-def log_session(conn: sqlite3.Connection, topic: str, date: str, minutes: int) -> int:
-    if not topic.strip():
+
+def validate_session(topic: str, date: str, minutes: int) -> None:
+    if not isinstance(topic, str) or not topic.strip():
         raise ValueError("Topic cannot be empty")
-    if minutes <= 0:
-        raise ValueError("Minutes must be positive")
-    cur = conn.cursor()
-    cur.execute("INSERT INTO study_sessions (topic, date, minutes) VALUES (?, ?, ?)", (topic.strip(), date, minutes))
+    if isinstance(minutes, bool) or not isinstance(minutes, int) or minutes <= 0:
+        raise ValueError("Minutes must be a positive whole number")
+    if not isinstance(date, str) or len(date) != 10 or date[4] != "-" or date[7] != "-":
+        raise ValueError("Date must be an ISO date such as 2026-10-09")
+
+
+def log_session(conn: sqlite3.Connection, topic: str, date: str, minutes: int) -> int:
+    validate_session(topic, date, minutes)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO study_sessions (topic, date, minutes) VALUES (?, ?, ?)",
+        (topic.strip(), date, minutes),
+    )
     conn.commit()
-    return cur.lastrowid
+    return int(cursor.lastrowid)
+
 
 def get_weekly_summary(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
-    cur = conn.cursor()
-    cur.execute("SELECT topic, session_count, total_minutes FROM weekly_summary ORDER BY total_minutes DESC")
-    return [{"topic": r[0], "session_count": r[1], "total_minutes": r[2]} for r in cur.fetchall()]
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT week, topic, session_count, total_minutes FROM weekly_summary ORDER BY week, topic"
+    )
+    return [
+        {
+            "week": row[0],
+            "topic": row[1],
+            "sessionCount": row[2],
+            "totalMinutes": row[3],
+        }
+        for row in cursor.fetchall()
+    ]
 `
     },
     {
       path: "types.ts",
-      content: `/** TypeScript data contracts matching SQLite session rows */
+      content: `/** TypeScript data contracts matching the JSON rows the Python backend emits. */
 export interface StudySession {
   id: number;
   topic: string;
@@ -266,6 +355,7 @@ export interface StudySession {
 }
 
 export interface WeeklySummaryRow {
+  week: string;
   topic: string;
   sessionCount: number;
   totalMinutes: number;
@@ -273,46 +363,162 @@ export interface WeeklySummaryRow {
 `
     },
     {
-      path: "verify_journey.py",
-      content: `"""Full-stack journey verifier."""
-import json
-import os
-import sys
-from pathlib import Path
-import backend
+      path: "contract_check.ts",
+      content: `import type { WeeklySummaryRow } from "./types";
 
-MANIFEST = json.loads(Path(".proofpath-workspace.json").read_text(encoding="utf-8"))
+// A compile-time contract check. If the interface above drifts from the JSON
+// the Python backend emits, tsc --noEmit fails here and the verifier reports it.
+const sample: WeeklySummaryRow = {
+  week: "2026-W02",
+  topic: "python",
+  sessionCount: 2,
+  totalMinutes: 75
+};
+
+export default sample;
+`
+    },
+    {
+      path: "tsconfig.json",
+      content: `{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"]
+  },
+  "include": ["types.ts", "contract_check.ts"]
+}
+`
+    },
+    {
+      path: "package.json",
+      content: `{
+  "name": "proofpath-study-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}
+`
+    },
+    {
+      path: "verify_journey.py",
+      content: `"""ProofPath full-stack study tracker verifier.
+
+Run: python3 verify_journey.py
+
+Executes real checks against backend.py, schema.sql, and the TypeScript contract,
+then prints a JSON result manifest on stdout. Paste that manifest back into
+ProofPath. This script is the checker - do not edit it.
+"""
+import json
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+MANIFEST = json.loads((ROOT / ".proofpath-workspace.json").read_text(encoding="utf-8"))
+
+
+def record(checks, name, passed, detail):
+    checks.append({"name": name, "passed": bool(passed), "detail": detail})
+    print(f"[{'PASS' if passed else 'FAIL'}] {name}: {detail}", file=sys.stderr)
+
+
+def check_python_validation(checks):
+    try:
+        import backend
+
+        conn = backend.init_db(":memory:")
+        accepted_bad_input = []
+        for topic, date, minutes in (("", "2026-01-05", 30), ("python", "2026-01-05", 0), ("python", "2026-01-05", -5)):
+            try:
+                backend.log_session(conn, topic, date, minutes)
+                accepted_bad_input.append({"topic": topic, "minutes": minutes})
+            except ValueError:
+                pass
+        if accepted_bad_input:
+            record(checks, "python-input-validation", False,
+                   f"log_session accepted invalid input: {accepted_bad_input}")
+        else:
+            record(checks, "python-input-validation", True,
+                   "empty topics and non-positive minutes are rejected with ValueError")
+    except Exception as error:
+        record(checks, "python-input-validation", False, f"{type(error).__name__}: {error}")
+
+
+def check_sql_weekly(checks):
+    try:
+        import backend
+
+        conn = backend.init_db(":memory:")
+        backend.log_session(conn, "python", "2026-01-05", 30)
+        backend.log_session(conn, "python", "2026-01-07", 45)
+        backend.log_session(conn, "python", "2026-01-12", 60)
+        rows = [row for row in backend.get_weekly_summary(conn) if row["topic"] == "python"]
+        if len(rows) != 2:
+            record(checks, "sql-weekly-aggregation", False,
+                   f"the weekly_summary view must aggregate each week separately; python rows were {rows}")
+            return
+        totals = sorted(row["totalMinutes"] for row in rows)
+        weeks = sorted(row["week"] for row in rows)
+        if totals != [60, 75] or weeks[0] == weeks[1]:
+            record(checks, "sql-weekly-aggregation", False,
+                   f"weekly totals must be 75 and 60 for two distinct weeks; got {rows}")
+        else:
+            record(checks, "sql-weekly-aggregation", True,
+                   f"weekly aggregation groups by week: {weeks} gives totals {totals}")
+    except Exception as error:
+        record(checks, "sql-weekly-aggregation", False, f"{type(error).__name__}: {error}")
+
+
+def check_typescript(checks):
+    node = shutil.which("node")
+    tsc = ROOT / "node_modules" / "typescript" / "bin" / "tsc"
+    if not node or not tsc.exists():
+        record(checks, "ts-contract-typecheck", False,
+               "TypeScript toolchain not found. Install Node.js and run npm install in the workspace, then re-run.")
+        return
+    try:
+        completed = subprocess.run(
+            [node, str(tsc), "--noEmit", "-p", str(ROOT / "tsconfig.json")],
+            cwd=str(ROOT), capture_output=True, text=True, timeout=120,
+        )
+        if completed.returncode == 0:
+            record(checks, "ts-contract-typecheck", True,
+                   "tsc --noEmit type-checked types.ts against contract_check.ts")
+        else:
+            lines = (completed.stdout + completed.stderr).strip().splitlines()
+            detail = lines[0] if lines else "tsc reported a type error"
+            record(checks, "ts-contract-typecheck", False, f"tsc --noEmit failed: {detail}")
+    except Exception as error:
+        record(checks, "ts-contract-typecheck", False, f"{type(error).__name__}: {error}")
+
 
 def main():
     checks = []
-    # Test DB and logging
-    try:
-        conn = backend.init_db(":memory:")
-        s_id = backend.log_session(conn, "python", "2026-10-09", 45)
-        backend.log_session(conn, "python", "2026-10-09", 30)
-        backend.log_session(conn, "sql", "2026-10-09", 60)
-        summary = backend.get_weekly_summary(conn)
-        
-        py_summary = next((s for s in summary if s["topic"] == "python"), None)
-        assert py_summary and py_summary["total_minutes"] == 75, "Weekly total calculation mismatch"
-        checks.append({"commandId": "verify", "name": "backend-persistence", "passed": True, "detail": "SQLite backend persistence verified"})
-    except Exception as e:
-        checks.append({"commandId": "verify", "name": "backend-persistence", "passed": False, "detail": str(e)})
+    check_python_validation(checks)
+    check_sql_weekly(checks)
+    check_typescript(checks)
 
-    # Test TypeScript contract presence
-    ts_file = Path("types.ts")
-    if ts_file.exists() and "StudySession" in ts_file.read_text(encoding="utf-8"):
-        checks.append({"commandId": "verify", "name": "ts-contract", "passed": True, "detail": "TypeScript types present and valid"})
-    else:
-        checks.append({"commandId": "verify", "name": "ts-contract", "passed": False, "detail": "types.ts missing StudySession interface"})
-
-    manifest = {**MANIFEST, "results": [{"commandId": c["commandId"], "passed": c["passed"]} for c in checks]}
-    for c in checks:
-        mark = "PASS" if c["passed"] else "FAIL"
-        print(f"[{mark}] {c['name']}: {c['detail']}", file=sys.stderr)
-
+    manifest = {
+        **MANIFEST,
+        "ranAt": datetime.now(timezone.utc).isoformat(),
+        "results": [{"commandId": "verify", "passed": check["passed"]} for check in checks],
+    }
     print(json.dumps(manifest))
-    sys.exit(0 if all(c["passed"] for c in checks) else 1)
+    sys.exit(0 if all(check["passed"] for check in checks) else 1)
+
 
 if __name__ == "__main__":
     main()
@@ -326,9 +532,9 @@ if __name__ == "__main__":
   commands: [
     {
       id: "verify",
-      label: "Verify Full-Stack Journey",
-      command: "python verify_journey.py",
-      purpose: "Validates Python logic, SQLite schema/queries, and TypeScript contract alignment."
+      label: "Verify full-stack journey",
+      command: "python3 verify_journey.py",
+      purpose: "Runs the Python, SQL and TypeScript checks and prints the JSON result manifest."
     }
   ]
 };
@@ -345,4 +551,3 @@ export function buildStudyTrackerFullJourneyTask(): WorkspaceTask {
   );
   return { ...studyTrackerFullJourneyTask, files };
 }
-
