@@ -33,7 +33,19 @@ export default function OnboardingScreen(): ReactElement {
         </Row>
         <SectionTitle>Your next screen becomes a focused dashboard.</SectionTitle>
         <BodyText>Pick the career path that should shape your next lesson, first portfolio mission, weekly plan, and readiness score.</BodyText>
-        <MutedText>First action: choose a path below, then start from the dashboard plan. You can change paths later in Settings without erasing saved work.</MutedText>
+        <MutedText>First action: choose a path below, or try a sample interactive lesson right away with zero setup. You can change paths later in Settings without erasing saved work.</MutedText>
+        <Row style={{ marginTop: spacing.xs }}>
+          <ButtonShell
+            accessibilityHint="Jumps straight into a hands-on Python lesson without configuring a path first."
+            accessibilityLabel="Try a sample Python lesson immediately"
+            onPress={() => router.push("/lesson/lesson-python-zero-first-script")}
+            size="compact"
+            tone="teal"
+            variant="secondary"
+          >
+            Try a sample Python lesson
+          </ButtonShell>
+        </Row>
         {profile.onboardingCompletedAt ? <MutedText>Last career path setup {new Date(profile.onboardingCompletedAt).toLocaleString()}</MutedText> : null}
       </Panel>
 

@@ -123,4 +123,11 @@ describe("invalid submissions", () => {
     expect((screen.getByLabelText("Evidence note") as HTMLInputElement).value).toContain("Automatically verified");
     expect(screen.getByRole("button", { name: "Save evidence" })).toBeEnabled();
   });
+
+  it("permits opening sample python lesson directly without mandatory onboarding setup", async () => {
+    clearStoredProgress();
+    // Do not seed onboarding; should still render sample lesson without redirection
+    renderLessonScreen("lesson-python-zero-first-script");
+    expect(await screen.findByText("Running Your First Script")).toBeInTheDocument();
+  });
 });
