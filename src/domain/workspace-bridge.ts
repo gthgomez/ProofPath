@@ -30,11 +30,15 @@ export interface WorkspaceTask {
   /** Disclosed before the learner commits: what the workspace requires. */
   requirements: string[];
   setupInstructions: string[];
+  /** Optional portfolio mission this workspace's evidence belongs to. */
+  linkedMissionId?: string;
   files: WorkspaceTaskFile[];
   commands: WorkspaceTaskCommand[];
 }
 
 export interface WorkspaceBundle {
+  taskId: string;
+  title: string;
   fileName: string;
   taskVersion: string;
   instructions: string[];
@@ -101,7 +105,9 @@ export function createWorkspaceBundle(task: WorkspaceTask): WorkspaceBundle {
   }
 
   return {
-    fileName: `${task.id}-v${task.version}.workspace.txt`,
+    taskId: task.id,
+    title: task.title,
+    fileName: `${task.id}-v${task.version}.workspace.json`,
     taskVersion: task.version,
     instructions: [
       ...task.requirements.map((requirement) => `Requires: ${requirement}`),
@@ -111,6 +117,40 @@ export function createWorkspaceBundle(task: WorkspaceTask): WorkspaceBundle {
     ],
     files: task.files.map((file) => ({ ...file }))
   };
+}
+
+/**
+ * Serialize a bundle to a self-contained, machine-readable file. Every file's
+ * path and contents are preserved so the project can be reconstructed exactly
+ * from this export (a human-readable Markdown rendering is also available).
+ */
+export function serializeWorkspaceBundle(bundle: WorkspaceBundle): string {
+  return `${JSON.stringify({
+    taskId: bundle.taskId,
+    taskVersion: bundle.taskVersion,
+    title: bundle.title,
+    instructions: bundle.instructions,
+    files: bundle.files
+  }, null, 2)}\n`;
+}
+
+/** Human-readable rendering with file delimiters, for copy/paste review. */
+export function workspaceBundleMarkdown(bundle: WorkspaceBundle): string {
+  const sections = [
+    `# ProofPath workspace: ${bundle.title}`,
+    ``,
+    `Task: \`${bundle.taskId}\` (version ${bundle.taskVersion})`,
+    ``,
+    `## Setup`,
+    ...bundle.instructions.map((instruction) => `- ${instruction}`),
+    ``
+  ];
+
+  for (const file of bundle.files) {
+    sections.push(`## File: \`${file.path}\``, "", "```", file.content.replace(/\n$/, ""), "```", "");
+  }
+
+  return sections.join("\n");
 }
 
 export function parseResultManifest(raw: string): { manifest?: WorkspaceResultManifest; error?: string } {

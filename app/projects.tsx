@@ -36,6 +36,19 @@ export default function ProjectMissionsScreen(): ReactElement {
         <BodyText>{roleTarget.summary}</BodyText>
       </Panel>
 
+      <Panel>
+        <SectionTitle>Local workspaces</SectionTitle>
+        <BodyText>
+          Export a runnable project, run its real verifier on your own machine, and bring honest, self-reported evidence
+          back into ProofPath.
+        </BodyText>
+        <Link href="/workspace" asChild>
+          <ButtonShell accessibilityHint="Opens the local workspace projects." tone="teal" variant="secondary">
+            Open local workspaces
+          </ButtonShell>
+        </Link>
+      </Panel>
+
       {missions.length === 0 ? (
         <Panel>
           <SectionTitle>No missions for this path</SectionTitle>
