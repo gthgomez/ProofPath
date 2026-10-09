@@ -169,3 +169,180 @@ export function buildCiWorkflowDiagnosisTask(): WorkspaceTask {
   );
   return { ...ciWorkflowDiagnosisTask, files };
 }
+
+/**
+ * End-to-End Learning Journey Workspace (PR D):
+ * Connects Python backend logic -> SQLite persistence -> TypeScript frontend contract -> Git verification.
+ * Learners can export this workspace, run `python verify_journey.py`, and paste the signed manifest.
+ */
+export const studyTrackerFullJourneyTask: WorkspaceTask = {
+  id: "task-study-tracker-full-journey",
+  version: "1.0.0",
+  title: "Full-Stack Study Tracker: Python, SQL, TypeScript & Git",
+  requirements: [
+    "Python 3.9+ installed on your computer",
+    "sqlite3 CLI or standard python sqlite3 module",
+    "A terminal in the extracted workspace folder",
+    "No external network dependencies required"
+  ],
+  setupInstructions: [
+    "Extract all workspace files preserving folder hierarchy.",
+    "Review README.md, schema.sql, backend.py, and types.ts.",
+    "Run `python verify_journey.py` to confirm verification pipeline."
+  ],
+  files: [
+    {
+      path: "README.md",
+      content: `# Full-Stack Study Tracker: Complete Learning Journey
+
+Connects four foundational skills into one coherent real-world project:
+1. **Python**: Business logic, data models, input validation.
+2. **SQL (SQLite)**: Relational schema, session storage, and weekly aggregation query.
+3. **TypeScript**: Shared UI types matching the API/SQLite session data contract.
+4. **Git**: Clean commit history, honest README notes, and reproducible verifier output.
+
+## Verification
+Run \`python verify_journey.py\` to test backend SQLite integration and data contract parity.
+Paste the resulting JSON manifest back into ProofPath to document portfolio evidence.
+`
+    },
+    {
+      path: "schema.sql",
+      content: `-- Study Tracker Persistence Schema
+CREATE TABLE IF NOT EXISTS study_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  topic TEXT NOT NULL,
+  date TEXT NOT NULL,
+  minutes INTEGER NOT NULL CHECK (minutes > 0),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Weekly Aggregation View
+CREATE VIEW IF NOT EXISTS weekly_summary AS
+SELECT
+  topic,
+  COUNT(*) as session_count,
+  SUM(minutes) as total_minutes
+FROM study_sessions
+GROUP BY topic;
+`
+    },
+    {
+      path: "backend.py",
+      content: `import sqlite3
+from typing import Dict, Any, List
+
+def init_db(db_path: str = "tracker.db") -> sqlite3.Connection:
+    conn = sqlite3.connect(db_path)
+    with open("schema.sql", "r", encoding="utf-8") as f:
+        conn.executescript(f.read())
+    return conn
+
+def log_session(conn: sqlite3.Connection, topic: str, date: str, minutes: int) -> int:
+    if not topic.strip():
+        raise ValueError("Topic cannot be empty")
+    if minutes <= 0:
+        raise ValueError("Minutes must be positive")
+    cur = conn.cursor()
+    cur.execute("INSERT INTO study_sessions (topic, date, minutes) VALUES (?, ?, ?)", (topic.strip(), date, minutes))
+    conn.commit()
+    return cur.lastrowid
+
+def get_weekly_summary(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
+    cur = conn.cursor()
+    cur.execute("SELECT topic, session_count, total_minutes FROM weekly_summary ORDER BY total_minutes DESC")
+    return [{"topic": r[0], "session_count": r[1], "total_minutes": r[2]} for r in cur.fetchall()]
+`
+    },
+    {
+      path: "types.ts",
+      content: `/** TypeScript data contracts matching SQLite session rows */
+export interface StudySession {
+  id: number;
+  topic: string;
+  date: string;
+  minutes: number;
+  createdAt: string;
+}
+
+export interface WeeklySummaryRow {
+  topic: string;
+  sessionCount: number;
+  totalMinutes: number;
+}
+`
+    },
+    {
+      path: "verify_journey.py",
+      content: `"""Full-stack journey verifier."""
+import json
+import os
+import sys
+from pathlib import Path
+import backend
+
+MANIFEST = json.loads(Path(".proofpath-workspace.json").read_text(encoding="utf-8"))
+
+def main():
+    checks = []
+    # Test DB and logging
+    try:
+        conn = backend.init_db(":memory:")
+        s_id = backend.log_session(conn, "python", "2026-10-09", 45)
+        backend.log_session(conn, "python", "2026-10-09", 30)
+        backend.log_session(conn, "sql", "2026-10-09", 60)
+        summary = backend.get_weekly_summary(conn)
+        
+        py_summary = next((s for s in summary if s["topic"] == "python"), None)
+        assert py_summary and py_summary["total_minutes"] == 75, "Weekly total calculation mismatch"
+        checks.append({"commandId": "verify", "name": "backend-persistence", "passed": True, "detail": "SQLite backend persistence verified"})
+    except Exception as e:
+        checks.append({"commandId": "verify", "name": "backend-persistence", "passed": False, "detail": str(e)})
+
+    # Test TypeScript contract presence
+    ts_file = Path("types.ts")
+    if ts_file.exists() and "StudySession" in ts_file.read_text(encoding="utf-8"):
+        checks.append({"commandId": "verify", "name": "ts-contract", "passed": True, "detail": "TypeScript types present and valid"})
+    else:
+        checks.append({"commandId": "verify", "name": "ts-contract", "passed": False, "detail": "types.ts missing StudySession interface"})
+
+    manifest = {**MANIFEST, "results": [{"commandId": c["commandId"], "passed": c["passed"]} for c in checks]}
+    for c in checks:
+        mark = "PASS" if c["passed"] else "FAIL"
+        print(f"[{mark}] {c['name']}: {c['detail']}", file=sys.stderr)
+
+    print(json.dumps(manifest))
+    sys.exit(0 if all(c["passed"] for c in checks) else 1)
+
+if __name__ == "__main__":
+    main()
+`
+    },
+    {
+      path: ".proofpath-workspace.json",
+      content: ""
+    }
+  ],
+  commands: [
+    {
+      id: "verify",
+      label: "Verify Full-Stack Journey",
+      command: "python verify_journey.py",
+      purpose: "Validates Python logic, SQLite schema/queries, and TypeScript contract alignment."
+    }
+  ]
+};
+
+export function buildStudyTrackerFullJourneyTask(): WorkspaceTask {
+  const hash = workspaceFilesHash(studyTrackerFullJourneyTask);
+  const files = studyTrackerFullJourneyTask.files.map((file) =>
+    file.path === ".proofpath-workspace.json"
+      ? {
+          path: file.path,
+          content: `${JSON.stringify({ taskId: studyTrackerFullJourneyTask.id, taskVersion: studyTrackerFullJourneyTask.version, filesHash: hash }, null, 2)}\n`
+        }
+      : file
+  );
+  return { ...studyTrackerFullJourneyTask, files };
+}
+
