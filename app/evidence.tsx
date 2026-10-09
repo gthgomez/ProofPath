@@ -1,7 +1,7 @@
 import { Redirect, useLocalSearchParams } from "expo-router";
 import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { contentPack } from "@/content/seed";
 import { findLesson } from "@/domain/content";
 import { formatTerminalTranscript } from "@/domain/code-run";
@@ -13,6 +13,7 @@ import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTit
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
 import { generateReviewerPortfolioExport } from "@/domain/evidence-export";
+import { copyToClipboard, downloadTextFile, shareText } from "@/ui/file-transfer";
 import { colors, radius, spacing } from "@/ui/theme";
 
 export default function EvidenceLogScreen(): ReactElement {
@@ -40,26 +41,32 @@ export default function EvidenceLogScreen(): ReactElement {
   ));
   const [linkedLessonId, setLinkedLessonId] = useState<string | undefined>(lessonId);
 
-  const handleCopyMarkdownPacket = async (): Promise<void> => {
+  const packetContents = (format: "markdown" | "json"): { fileName: string; content: string; mimeType: string } => {
     const packet = generateReviewerPortfolioExport(contentPack, progress);
-    const maybeNavigator = globalThis.navigator as ({ clipboard?: { writeText?: (value: string) => Promise<void> } } | undefined);
-    if (maybeNavigator?.clipboard?.writeText) {
-      await maybeNavigator.clipboard.writeText(packet.markdownPacket);
-      setCopyStatus("Reviewer Markdown packet copied to clipboard!");
+    return format === "markdown"
+      ? { fileName: "proofpath-portfolio.md", content: packet.markdownPacket, mimeType: "text/markdown" }
+      : { fileName: "proofpath-portfolio.json", content: JSON.stringify(packet, null, 2), mimeType: "application/json" };
+  };
+
+  const handleExportPacket = async (format: "markdown" | "json"): Promise<void> => {
+    const { fileName, content, mimeType } = packetContents(format);
+    const outcome = Platform.OS === "web"
+      ? await downloadTextFile(fileName, content, mimeType)
+      : await shareText("ProofPath portfolio", content);
+
+    if (outcome === "downloaded") {
+      setCopyStatus(`Downloaded ${fileName}.`);
+    } else if (outcome === "shared") {
+      setCopyStatus("Opened the share sheet. Save the file to keep your packet.");
     } else {
-      setCopyStatus("Clipboard not available in this environment.");
+      setCopyStatus("This platform cannot save files directly. Use Copy instead.");
     }
   };
 
-  const handleCopyJsonPacket = async (): Promise<void> => {
-    const packet = generateReviewerPortfolioExport(contentPack, progress);
-    const maybeNavigator = globalThis.navigator as ({ clipboard?: { writeText?: (value: string) => Promise<void> } } | undefined);
-    if (maybeNavigator?.clipboard?.writeText) {
-      await maybeNavigator.clipboard.writeText(JSON.stringify(packet, null, 2));
-      setCopyStatus("Reviewer JSON packet copied to clipboard!");
-    } else {
-      setCopyStatus("Clipboard not available in this environment.");
-    }
+  const handleCopyPacket = async (format: "markdown" | "json"): Promise<void> => {
+    const { content } = packetContents(format);
+    const outcome = await copyToClipboard(content);
+    setCopyStatus(outcome === "clipped" ? "Copied to clipboard." : "Clipboard is not available in this environment.");
   };
 
   useEffect(() => {
@@ -196,24 +203,44 @@ export default function EvidenceLogScreen(): ReactElement {
         </MutedText>
         <Row style={{ marginVertical: spacing.xs, flexWrap: "wrap", gap: spacing.xs }}>
           <ButtonShell
-            accessibilityHint="Copies a formatted Markdown packet of all portfolio evidence for reviewers or recruiters."
+            accessibilityHint={Platform.OS === "web" ? "Downloads a Markdown packet of all portfolio evidence." : "Shares a Markdown packet of all portfolio evidence."}
             accessibilityLabel="Export Markdown Packet"
-            onPress={handleCopyMarkdownPacket}
+            onPress={() => handleExportPacket("markdown")}
             size="compact"
             tone="teal"
             variant="secondary"
           >
-            Export Markdown Packet
+            {Platform.OS === "web" ? "Download Markdown packet" : "Share Markdown packet"}
           </ButtonShell>
           <ButtonShell
-            accessibilityHint="Copies complete JSON evidence metadata packet for automated tools or portfolio imports."
+            accessibilityHint={Platform.OS === "web" ? "Downloads the JSON evidence packet for portfolio imports." : "Shares the JSON evidence packet for portfolio imports."}
             accessibilityLabel="Export JSON Packet"
-            onPress={handleCopyJsonPacket}
+            onPress={() => handleExportPacket("json")}
             size="compact"
             tone="blue"
             variant="secondary"
           >
-            Export JSON Packet
+            {Platform.OS === "web" ? "Download JSON packet" : "Share JSON packet"}
+          </ButtonShell>
+          <ButtonShell
+            accessibilityHint="Copies the Markdown packet to the clipboard. This is a copy, not a file export."
+            accessibilityLabel="Copy Markdown Packet"
+            onPress={() => handleCopyPacket("markdown")}
+            size="compact"
+            tone="ink"
+            variant="tertiary"
+          >
+            Copy Markdown packet
+          </ButtonShell>
+          <ButtonShell
+            accessibilityHint="Copies the JSON packet to the clipboard. This is a copy, not a file export."
+            accessibilityLabel="Copy JSON Packet"
+            onPress={() => handleCopyPacket("json")}
+            size="compact"
+            tone="ink"
+            variant="tertiary"
+          >
+            Copy JSON packet
           </ButtonShell>
         </Row>
         {copyStatus ? <MutedText style={{ color: colors.teal, fontWeight: "600" }}>{copyStatus}</MutedText> : null}

@@ -11,6 +11,7 @@ export type LessonWorkflowCta =
   | { action: "open-evidence"; label: string; tone: "blue" | "green" | "amber" | "ink"; disabled: boolean }
   | { action: "next-lesson"; label: string; lessonId: string; tone: "blue" | "green" | "amber" | "ink"; disabled: boolean }
   | { action: "module-complete"; label: string; tone: "blue" | "green" | "amber" | "ink"; disabled: boolean }
+  | { action: "choose-path"; label: string; tone: "blue" | "green" | "amber" | "ink"; disabled: boolean }
   | { action: "idle"; label: string; tone: "blue" | "green" | "amber" | "ink"; disabled: boolean };
 
 export interface LessonWorkflowResult {
@@ -44,8 +45,14 @@ export function deriveLessonWorkflow(input: {
   visitedSteps?: LessonWorkflowStep[];
   /** True when the learner ran practice code at least once (the Experiment activity, not just a visit). */
   experimentAttempted?: boolean;
+  /**
+   * True for a sample lesson opened before a career path is chosen. The lesson
+   * is fully playable, but the terminal action routes to path setup instead of
+   * a later lesson that would silently redirect there anyway.
+   */
+  previewMode?: boolean;
 }): LessonWorkflowResult {
-  const { currentStep, miniProjectDone, quizDone, lessonDone, hasQuiz, nextLessonId, allQuestionsAnswered = false, visitedSteps = [], experimentAttempted = false } = input;
+  const { currentStep, miniProjectDone, quizDone, lessonDone, hasQuiz, nextLessonId, allQuestionsAnswered = false, visitedSteps = [], experimentAttempted = false, previewMode = false } = input;
   const stepIndex = STEPS.indexOf(currentStep);
 
   // Determine unlocked steps
@@ -105,7 +112,11 @@ export function deriveLessonWorkflow(input: {
     }
   } else if (currentStep === "evidence") {
     if (lessonDone) {
-      if (nextLessonId) {
+      if (previewMode) {
+        // A sample lesson has no career path yet; route to setup with an
+        // explicit label instead of pushing a lesson that would redirect.
+        cta = { action: "choose-path", label: "Choose a career path to continue", tone: "green", disabled: false };
+      } else if (nextLessonId) {
         cta = { action: "next-lesson", label: "Next lesson", lessonId: nextLessonId, tone: "green", disabled: false };
       } else {
         cta = { action: "module-complete", label: "Module complete", tone: "green", disabled: false };
