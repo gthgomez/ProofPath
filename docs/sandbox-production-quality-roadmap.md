@@ -70,9 +70,11 @@ Tasks:
 - Add a canonical transcript formatter that converts `TerminalEvent[]` into copyable text.
 - Replace `formatRunOutput` in web/native Code Lab with the canonical transcript formatter.
 - Add an evidence trust field or display classification:
-  - `auto_verified_code_lab`
+  - `auto_verified_code_lab` (ProofPath executed the check)
+  - `reproduction_package_supplied` (repo + revision + command supplied, not executed)
   - `manual_verifier_output`
   - `manual_note`
+  - `independently_verified` (reserved; not awarded until external work can be re-run)
 - Keep manual evidence, but never visually equate it with auto-captured Code Lab proof.
 
 Acceptance criteria:

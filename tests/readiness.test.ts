@@ -95,6 +95,9 @@ describe("calculateReadinessScore", () => {
           testStatus: "passing" as const,
           readmeStatus: "complete" as const,
           verifierOutput: "npm run verify",
+          // What normalizeEvidenceItem assigns these fields: repo + revision +
+          // command with no ProofPath execution.
+          trust: "reproduction_package_supplied" as const,
           createdAt: "2026-05-04T12:00:00.000Z"
         }
       ]
@@ -150,6 +153,9 @@ describe("calculateReadinessScore", () => {
           testStatus: "passing" as const,
           readmeStatus: "complete" as const,
           verifierOutput: "npm run verify",
+          // What normalizeEvidenceItem assigns these fields: repo + revision +
+          // command with no ProofPath execution.
+          trust: "reproduction_package_supplied" as const,
           createdAt: "2026-05-04T12:00:00.000Z"
         }
       ]

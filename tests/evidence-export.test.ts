@@ -56,13 +56,13 @@ describe("evidence export packet generator", () => {
 
     expect(packet.summary.totalEvidenceCount).toBe(3);
     expect(packet.summary.autoVerifiedCount).toBe(1);
-    expect(packet.summary.externallyReproducibleCount).toBe(1);
+    expect(packet.summary.reproductionPackageCount).toBe(1);
     expect(packet.summary.selfReportedCount).toBe(1);
 
     expect(packet.markdownPacket).toContain("# ProofPath Reviewer-Ready Portfolio Evidence Packet");
-    expect(packet.markdownPacket).toContain("- **Auto-Verified Code Lab Checks:** 1");
-    expect(packet.markdownPacket).toContain("- **Externally Reproducible Projects:** 1");
-    expect(packet.markdownPacket).toContain("- **Self-Reported Checks & Notes:** 1");
+    expect(packet.markdownPacket).toContain("- **Locally verified (Code Lab):** 1");
+    expect(packet.markdownPacket).toContain("- **Reproduction packages supplied (not executed by ProofPath):** 1");
+    expect(packet.markdownPacket).toContain("- **Self-reported checks & notes:** 1");
     expect(packet.markdownPacket).toContain("https://github.com/learner/cli-tracker");
     expect(packet.markdownPacket).toContain("a1b2c3d4e5");
     expect(packet.markdownPacket).toContain("pytest passed 4 tests");
