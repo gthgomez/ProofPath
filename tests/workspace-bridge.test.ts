@@ -129,4 +129,20 @@ describe("result manifest validation", () => {
     });
     expect(validateResultManifest(task, withMissing).status).toBe("malformed");
   });
+
+  it("exports and validates the study tracker full-stack journey task (Python -> SQL -> TypeScript -> Git)", async () => {
+    const { buildStudyTrackerFullJourneyTask } = await import("@/content/workspace-tasks");
+    const journeyTask = buildStudyTrackerFullJourneyTask();
+    const bundle = createWorkspaceBundle(journeyTask);
+
+    expect(bundle.files.map((f) => f.path)).toContain("backend.py");
+    expect(bundle.files.map((f) => f.path)).toContain("schema.sql");
+    expect(bundle.files.map((f) => f.path)).toContain("types.ts");
+    expect(bundle.files.map((f) => f.path)).toContain("README.md");
+    expect(bundle.files.map((f) => f.path)).toContain("verify_journey.py");
+
+    const passedValidation = validateResultManifest(journeyTask, manifestJson(journeyTask, true));
+    expect(passedValidation.status).toBe("valid");
+    expect(passedValidation.passed).toBe(true);
+  });
 });
