@@ -49,11 +49,10 @@ export const supportingConceptAllowList: readonly string[] = [
   // Level 6: project/packaging supporting concepts
   "py.module.local",
   "py.package.init",
-  // Git/GitHub track: these non-Python lessons carry no curriculum metadata
-  // block, so they cannot teach or reference registry concepts yet.
-  "git.repo.local",
-  "git.stage.add",
-  "git.commit.local",
+  // Git/GitHub track: lessons other than lesson-git-stage-commit-inspect carry
+  // no curriculum metadata block, so they cannot teach or reference registry
+  // concepts yet. The three concepts that lesson teaches are intentionally
+  // absent here: an allowlisted entry that an active lesson teaches is stale.
   "github.repo.url",
   "git.branch.create",
   "git.branch.switch",

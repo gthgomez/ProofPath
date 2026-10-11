@@ -58,6 +58,17 @@ function outputPaths(root: string): string[] {
   );
 }
 
+// Windows cannot represent POSIX file modes (every writable file reports 0666
+// and chmod is advisory), so mode equality is only assertable where chmod is
+// real. Content and idempotency stay asserted on every platform.
+const MODE_ASSERTABLE = process.platform !== "win32";
+
+function expectAssetMode(path: string): void {
+  if (MODE_ASSERTABLE) {
+    expect(statSync(path).mode & 0o777).toBe(ASSET_MODE);
+  }
+}
+
 describe("copy-sandbox-assets", () => {
   it("copies every asset into both output roots with mode 644", () => {
     const root = makeFixture();
@@ -68,7 +79,8 @@ describe("copy-sandbox-assets", () => {
 
     expect(outputs.length).toBeGreaterThan(0);
     for (const output of outputs) {
-      expect(statSync(output).mode & 0o777).toBe(ASSET_MODE);
+      expectAssetMode(output);
+      expect(readFileSync(output, "utf8")).toBe("// fixture asset");
     }
   });
 
@@ -82,12 +94,14 @@ describe("copy-sandbox-assets", () => {
     copySandboxAssets(root);
 
     for (const [index, output] of outputs.entries()) {
-      expect(statSync(output).mode & 0o777).toBe(ASSET_MODE);
+      expectAssetMode(output);
       expect(readFileSync(output, "utf8")).toBe(before[index]);
     }
   });
 
-  it("replaces a pre-existing symlink at the destination with a real 644 file", () => {
+  // Creating a file symlink requires admin/developer mode on Windows; the
+  // replace-through-symlink safety property is exercised on POSIX and CI.
+  it.skipIf(process.platform === "win32")("replaces a pre-existing symlink at the destination with a real 644 file", () => {
     const root = makeFixture();
 
     const outside = join(root, "outside-secret.txt");

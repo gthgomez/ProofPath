@@ -60,7 +60,13 @@ function isSupportedLearnerLine(line: string): boolean {
 }
 
 function isSupportedVerifierLine(line: string): boolean {
+  // Comment-only checks are supported: the verifier executes them as no-ops
+  // and passes/fails on the captured learner stdout via expectedOutputIncludes.
+  // Excluding them forced every comment-checked level-0/1 lesson (including the
+  // sample lesson) off the offline regex runner onto the WebView Pyodide path,
+  // whose cold boot can exceed the startup allowance on slow offline devices.
   return !line
+    || line.startsWith("#")
     || line.startsWith("assert isinstance(")
     || /^assert\s+.+?\s+in\s+.+/.test(line)
     || /^assert\s+.+?\s+is\s+(True|False|None)/.test(line)

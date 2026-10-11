@@ -33,8 +33,10 @@ function materialize(task: WorkspaceTask, edit?: (files: Map<string, string>) =>
   }
 
   // Give the workspace the real TypeScript compiler without a network install.
+  // Windows dir symlinks need admin/developer mode; a junction needs neither
+  // and resolves modules identically.
   if (HAS_TYPESCRIPT) {
-    symlinkSync(NODE_MODULES, join(dir, "node_modules"), "dir");
+    symlinkSync(NODE_MODULES, join(dir, "node_modules"), process.platform === "win32" ? "junction" : "dir");
   }
 
   return dir;

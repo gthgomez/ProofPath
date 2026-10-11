@@ -360,7 +360,7 @@ export const contentPack: ContentPack = {
       slug: "git-core",
       title: "GitHub Evidence",
       summary: "Turn local work into proof a reviewer can inspect.",
-      lessonIds: ["lesson-git-evidence", "lesson-github-review-flow"],
+      lessonIds: ["lesson-git-stage-commit-inspect", "lesson-git-evidence", "lesson-github-review-flow"],
       projectMissionIds: ["mission-portfolio-readme"],
       skillIds: ["skill-git-workflow", "skill-portfolio-evidence"],
       sortOrder: 1

@@ -118,9 +118,9 @@
 
 ## 12. Android Build (native)
 
-- [ ] `npx expo export --platform android` succeeds
-- [ ] `android/gradlew :app:assembleDebug` produces `app-debug.apk`
-- [ ] Runtime device testing executed — **or** documented as blocked when no KVM/device is available (see STATUS.md Blockers)
+- [x] `npx expo export --platform android` succeeds (2026-10-11)
+- [x] `android/gradlew :app:assembleDebug` produces `app-debug.apk` (2026-10-11, `-PreactNativeArchitectures=x86_64`; `:app:assembleStandalone` also builds with the JS bundle embedded)
+- [x] Runtime device testing executed where the environment allows — 2026-10-11 on an offline Android 16 x86_64 emulator (WHPX): level-0 Python offline regex runner verified end to end (wrong answer fails instantly with guidance; corrected answer passes in 1 ms; attempt history survives force-stop/reinstall). WebView WASM cold boots (Pyodide, sql.js) exceed the 20 s startup allowance under software rendering — recorded in STATUS.md; physical-hardware timing still pending (see STATUS.md Blockers)
 
 **Pass criteria: 2 required, device step documented either way**
 

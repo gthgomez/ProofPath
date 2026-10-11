@@ -58,7 +58,12 @@ describe("copy-typescript-assets", () => {
 
     expect(outputs.length).toBeGreaterThan(0);
     for (const output of outputs) {
-      expect(statSync(output).mode & 0o777).toBe(ASSET_MODE);
+      // Windows cannot represent POSIX file modes (every writable file reports
+      // 0666), so mode equality is only assertable where chmod is real.
+      if (process.platform !== "win32") {
+        expect(statSync(output).mode & 0o777).toBe(ASSET_MODE);
+      }
+      expect(statSync(output).size).toBeGreaterThan(0);
     }
   });
 
