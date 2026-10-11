@@ -1,7 +1,7 @@
 # ProofPath Status
 
-**Last verified:** 2026-10-09
-**Final verified main commit:** `abbbea10d820045c10ad3913dba13a2f8d016d2a`
+**Last verified:** 2026-10-11
+**Final verified main commit:** `7b5cd5d5acc245dad2062d1ef5bf971e79f9b420` (this branch `codex/reliability-native-evidence` sits on top; see Recent Evidence)
 **Status:** active development
 **Confidence:** high
 
@@ -11,11 +11,11 @@ Offline-first technical career-readiness and learning app for software engineeri
 
 ## Current State
 
-Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite local-first persistence, Zod schemas, and Pyodide/sql.js WASM sandbox execution. The content pack ships 110 lessons (107 active plus 3 deprecated) across 11 tracks — 71 of the active lessons are Python — with 110 quizzes, 17 modules, and 20 portfolio missions, all validated by the `npm run verify` pipeline.
+Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite local-first persistence, Zod schemas, and Pyodide/sql.js WASM sandbox execution. The content pack ships 111 lessons (108 active plus 3 deprecated) across 11 tracks — 71 of the active lessons are Python — with 111 quizzes, 17 modules, and 20 portfolio missions, all validated by the `npm run verify` pipeline.
 
 ## Verified Capabilities
 
-- Content pack: 11 tracks, 17 modules, 110 lessons (107 active + 3 deprecated Python lessons), 110 quizzes, and 20 proof-required missions (`npm run report:content`). SQL was deepened to 8 lessons; TypeScript (3) and Git tracks exist with runnable mini-projects. The tracks currently reported as thin (2 lessons) are Git, AI tools, AI apps, ML, and testing/debugging.
+- Content pack: 11 tracks, 17 modules, 111 lessons (108 active + 3 deprecated Python lessons), 111 quizzes, and 20 proof-required missions (`npm run report:content`). SQL was deepened to 8 lessons; TypeScript (3) and Git (3, one concept-registered) tracks exist with runnable mini-projects. The tracks currently reported as thin (2 lessons) are AI tools, AI apps, ML, and testing/debugging.
 - **Evidence provenance (PR #39):** every evidence item is classified as `auto_verified_code_lab` (ProofPath executed the check), `reproduction_package_supplied`, `manual_verifier_output`, or `manual_note`. `independently_verified` is reserved and never awarded. Legacy persisted `externally_reproducible` rows are remapped on load without being promoted or dropped.
 - **Mission proof coherence (PR #39):** repository, revision, check output, README, and artifact requirements must co-occur on one evidence record; only reflection may be a separate linked note. `summarizeMissionProof` separates documentation-complete, verification-supplied, and mission-complete.
 - **Readiness provenance weighting (PR #39):** evidence quality is scaled by provenance confidence (1.0 / 0.7 / 0.45 / 0.25), so fully-typed self-reported evidence cannot reach a fully credited score.
@@ -34,6 +34,9 @@ Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite lo
 - `npm run verify` on 2026-10-09 at `abbbea1`: content validation SUCCESS, `tsc --noEmit` clean, **47 test files / 455 tests pass**.
 - `npx expo export --platform web` and `--platform android` both succeed.
 - Android debug APK assembled with Gradle (`:app:assembleDebug`), including CMake native libraries for all ABIs (`android/app/build/outputs/apk/debug/app-debug.apk`).
+- **2026-10-11 (branch `codex/reliability-native-evidence`):** `npm run verify` green on Windows — content validation SUCCESS, redaction scan passed, `tsc --noEmit` clean, **48 test files / 458 passed + 1 platform-gated skip (459 total)**. `npx expo export --platform web` exit 0. Android `:app:assembleDebug` and `:app:assembleStandalone` (embedded JS bundle, `-PreactNativeArchitectures=x86_64`) both BUILD SUCCESSFUL; the standalone APK was installed on an offline Android 16 emulator (airplane mode on) and completed onboarding and lesson navigation with no Metro connection.
+- **2026-10-11 device runtime finding (fixed):** `canRunNativePythonProof` rejected comment-only verifier checks, so every comment-checked level-0/1 Python lesson — including the sample lesson — silently bypassed the offline regex runner and mounted the WebView Pyodide runner. On the offline emulator that produced three consecutive 24000 ms timeouts (4000 ms limit + 20000 ms startup allowance) before any learner saw feedback. The selection gate now accepts comment-only checks (they execute as no-ops and pass/fail on captured stdout), with a regression test sweeping all runnable level-0 Python lessons. On-device after the fix: the wrong starter answer fails instantly with learner guidance, the corrected `print("first run")` passes in **1 ms**, and attempt history survives force-stop and app reinstall (SQLite persistence).
+- **2026-10-11 device runtime residual (open):** on the software-rendered (SwiftShader/WHPX) emulator, WebView WASM cold boots exceed the 20 s flat `NATIVE_RUNTIME_STARTUP_ALLOWANCE_MS` even with the preload handshake in flight — Pyodide 3×24000 ms timeouts pre-fix, and sql.js 1×24000 ms timeout on the SQL joins lesson despite a ready bridge. The timeout path itself behaved correctly (honest feedback, WebView recreated, allowance re-granted on the next attempt). Physical-hardware timing is still required before tuning the allowance (per its documented constraint).
 
 ## Rebrand
 
@@ -41,12 +44,13 @@ The CareerForge -> ProofPath rename is complete. Package `proofpath`, `app.json`
 
 ## In Progress
 
-- Deepening the remaining thin tracks (Git, AI tools, AI apps, ML, testing/debugging) toward the Python standard.
+- Deepening the remaining thin tracks (AI tools, AI apps, ML, testing/debugging) toward the Python standard — the Git track now has a third, concept-registered lesson.
 - Broader device/browser runtime coverage for the sandbox surfaces.
 
 ## Blockers
 
-- **Android device/emulator testing is not possible in the current environment.** The Android SDK, emulator binary, AVDs, and JDK are present and a native debug APK builds, but there is no `/dev/kvm` and the CPU exposes no virtualization flags, so the x86_64 AVD cannot boot. Runtime device tests (cold/warm Python, SQL, TypeScript on Android) remain pending on real hardware. They are not substituted with mocked React tests.
+- **Android runtime testing on this host works only through the emulator, and its WebView WASM boots are too slow for the current startup allowance.** The earlier "no virtualization / AVD cannot boot" blocker no longer holds here: WHPX acceleration is usable, the API 36 x86_64 AVD boots, and offline app navigation was exercised. What remains blocked on this host is measuring real cold-boot timings for Pyodide/sql.js/TypeScript inside the WebView (every measured boot exceeded the 20 s allowance under software rendering), so tuning `NATIVE_RUNTIME_STARTUP_ALLOWANCE_MS` and the full TypeScript/SQL pass matrix still need real hardware. They are not substituted with mocked React tests.
+- Native Gradle builds require a short checkout path on Windows: CMake object filenames embed the absolute source path, and long worktree names trip the 260-character limit (see `docs` note in the 2026-10-11 branch; keep ProofPath worktrees ≤ ~40 characters).
 
 ## Risks and Unknowns
 

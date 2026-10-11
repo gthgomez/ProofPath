@@ -793,4 +793,52 @@ describe("progress-store", () => {
     const loaded = await loadProgress(db);
     expect(loaded.profile.dashboardTourDismissed).toBe(true);
   });
+
+  it("routes normalized saves through the driver's exclusive transaction (atomicity itself is the driver's guarantee)", async () => {
+    const fakeDb = new FakeSQLiteDatabase();
+    const originalTransaction = fakeDb.withExclusiveTransactionAsync.bind(fakeDb);
+    const transactionCalls: number[] = [];
+    fakeDb.withExclusiveTransactionAsync = async (task) => {
+      transactionCalls.push(1);
+      return originalTransaction(task);
+    };
+
+    await migrateProgressDb(fakeDb as unknown as SQLiteDatabase);
+    transactionCalls.length = 0;
+
+    const progress = setLessonCompletion(
+      createInitialProgress("2026-05-04T16:45:00.000Z"),
+      "lesson-python-functions",
+      true,
+      "2026-05-04T16:46:00.000Z"
+    );
+    await saveProgress(fakeDb as unknown as SQLiteDatabase, progress);
+
+    // The delete-then-insert save batch must run inside the driver's
+    // exclusive transaction: outside one, a mid-save interruption after the
+    // row deletion would leave the database empty.
+    expect(transactionCalls.length).toBeGreaterThan(0);
+  });
+
+  it("still persists when the SQLite driver lacks exclusive-transaction support", async () => {
+    const db = createDb();
+    // The fake declares the method on its prototype; shadow it with undefined
+    // on this instance so the store's typeof check takes the fallback path.
+    const legacyDriver = db as unknown as {
+      withExclusiveTransactionAsync?: unknown;
+    };
+    legacyDriver.withExclusiveTransactionAsync = undefined;
+
+    await migrateProgressDb(db);
+    const progress = setLessonCompletion(
+      createInitialProgress("2026-05-04T16:45:00.000Z"),
+      "lesson-python-functions",
+      true,
+      "2026-05-04T16:46:00.000Z"
+    );
+    await saveProgress(db, progress);
+
+    const loaded = await loadProgress(db);
+    expect(loaded.completedLessonIds).toEqual(["lesson-python-functions"]);
+  });
 });
