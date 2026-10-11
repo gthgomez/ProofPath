@@ -156,6 +156,15 @@ function splitTopLevel(value: string, delimiter: string): string[] {
 function evaluateExpression(expression: string, scope: PythonScope): PythonValue {
   const value = expression.trim();
 
+  // The gate accepts print/assert lines whose string arguments may be broken
+  // (the level-0 syntax-error lesson ships one on purpose). Report the
+  // Python-shaped error so diagnostics classify it as a syntax error with the
+  // right line, not as an unsupported-expression gap.
+  const firstChar = value[0];
+  if ((firstChar === '"' || firstChar === "'") && (value.length < 2 || value[value.length - 1] !== firstChar)) {
+    throw new Error("SyntaxError: unterminated string literal");
+  }
+
   if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
     return unquote(value);
   }
