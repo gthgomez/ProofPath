@@ -239,6 +239,10 @@ export const gitLessons: Lesson[] = [
 ];
 
 export const gitQuizzes: Quiz[] = [
+      // checkpointQuiz, not codeReadingQuiz: the code-reading builder emits
+      // Python/Study-Tracker questions, which would be wrong for a Git lesson.
+      // Question-level conceptIds stay unset: Rule Group F validates them
+      // against the python track's taught-so-far set only.
       checkpointQuiz(
         "quiz-git-stage-commit-inspect",
         "lesson-git-stage-commit-inspect",

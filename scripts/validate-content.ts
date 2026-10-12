@@ -555,6 +555,27 @@ for (const lesson of contentPack.lessons) {
     errors.push(`lesson ${lesson.id} Python sandbox needs at least one hidden test`);
   }
 
+  if (lesson.workshop.miniProject.runnerSpec.language === "python") {
+    const runnerTests = [
+      ...lesson.workshop.miniProject.runnerSpec.visibleTests,
+      ...lesson.workshop.miniProject.runnerSpec.hiddenTests
+    ];
+    for (const test of runnerTests) {
+      // The offline verifier auto-passes a check with no expectations (empty
+      // includes match everything), so every check must either grade captured
+      // output or be able to fail on its own (assert / raise lines).
+      const hasExpectation = (test.expectedOutputIncludes?.length ?? 0) > 0
+        || (test.expectedOutputExactLines?.length ?? 0) > 0;
+      const selfChecking = test.code.split(/\r?\n/).some((line) => {
+        const trimmed = line.trim();
+        return trimmed.startsWith("assert ") || trimmed.startsWith("raise ");
+      });
+      if (!hasExpectation && !selfChecking) {
+        errors.push(`lesson ${lesson.id} runner test ${test.id} needs an output expectation or an assert/raise line (an expectation-less comment-only check would auto-pass the offline verifier)`);
+      }
+    }
+  }
+
   if (nonPythonDepthRepLessonIds.includes(lesson.id)) {
     if ((lesson.workshop.practiceReps?.length ?? 0) < 3) {
       errors.push(`lesson ${lesson.id} needs at least three non-Python depth practice reps`);
