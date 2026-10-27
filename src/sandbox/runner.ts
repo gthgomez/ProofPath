@@ -22,11 +22,6 @@ import {
   type TypeScriptTypeCheckResult
 } from "@/sandbox/typescript-typecheck";
 
-interface CapturedConsole {
-  stdout: string[];
-  stderr: string[];
-}
-
 type SqlJsModule = {
   Database: new () => {
     run: (sql: string) => void;
