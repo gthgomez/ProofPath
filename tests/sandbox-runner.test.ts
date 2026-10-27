@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
 import { contentPack } from "@/content/seed";
 import type { LessonRunnerSpec, LessonRunnerTest } from "@/domain/types";
@@ -59,6 +59,35 @@ describe("lesson sandbox runner", () => {
     expect(result.passed).toBe(false);
     expect(result.stderr).toContain("Network calls are disabled");
     expect(result.testResults[0]?.id).toContain("policy");
+  });
+
+  it("fails closed when a browser cannot provide Worker isolation", async () => {
+    const spec: LessonRunnerSpec = {
+      language: "javascript",
+      instructions: "Print the expected line.",
+      starterCode: "console.log('safe output');",
+      visibleTests: [{
+        id: "visible-safe-output",
+        name: "Safe output",
+        code: "",
+        expectedOutputIncludes: ["safe output"]
+      }],
+      hiddenTests: [],
+      expectedOutput: ["safe output"],
+      timeoutMs: 1000,
+      allowNetwork: false
+    };
+
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("Worker", undefined);
+    try {
+      const result = await runLessonSandbox(spec, "worker-unavailable", spec.starterCode);
+      expect(result.passed).toBe(false);
+      expect(result.stderr).toContain("does not support Web Workers");
+      expect(result.stdout).toBe("");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("blocks destructive SQL before execution", async () => {
