@@ -450,14 +450,7 @@ self.onmessage = (event) => {
 
 async function runJavaScriptInWorker(spec: LessonRunnerSpec, runtimeCode: string, runMode: CodeRunMode): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
   if (typeof Worker === "undefined" || typeof Blob === "undefined" || typeof URL === "undefined") {
-    // Browser submissions must never fall back into the page's global realm:
-    // new Function there can reach DOM, storage, app globals, and host bridges.
-    // Keep the in-process path only for non-browser tooling (for example the
-    // Node-based offline test suite), which has no application page to expose.
-    if (typeof window !== "undefined") {
-      throw new Error("JavaScript sandbox isolation is unavailable because this browser does not support Web Workers.");
-    }
-    return runJavaScriptInProcess(spec, runtimeCode, runMode);
+    throw new Error("JavaScript sandbox isolation is unavailable because this environment does not support Web Workers.");
   }
 
   return new Promise((resolve, reject) => {
@@ -491,57 +484,6 @@ async function runJavaScriptInWorker(spec: LessonRunnerSpec, runtimeCode: string
       visibleCount: spec.visibleTests.length
     });
   });
-}
-
-async function runJavaScriptInProcess(spec: LessonRunnerSpec, runtimeCode: string, runMode: CodeRunMode): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
-  const captured: CapturedConsole = { stdout: [], stderr: [] };
-  const testResults: CodeRunTestResult[] = [];
-  const sandboxConsole = {
-    log: (...values: unknown[]) => captured.stdout.push(values.map(normalizeOutput).join(" ")),
-    error: (...values: unknown[]) => captured.stderr.push(values.map(normalizeOutput).join(" "))
-  };
-
-  if (runMode === "run_file") {
-    try {
-      const runner = new Function("console", `"use strict";\n${runtimeCode}`);
-      runner(sandboxConsole);
-    } catch (error) {
-      captured.stderr.push(error instanceof Error ? error.message : String(error));
-    }
-    return {
-      stdout: captured.stdout.join("\n"),
-      stderr: captured.stderr.join("\n"),
-      testResults
-    };
-  }
-
-  for (const [index, test] of [...spec.visibleTests, ...spec.hiddenTests].entries()) {
-    const visible = index < spec.visibleTests.length;
-    const stdoutStart = captured.stdout.length;
-
-    try {
-      const runner = new Function("console", `"use strict";\n${runtimeCode}\n${test.code}`);
-      runner(sandboxConsole);
-      const output = captured.stdout.slice(stdoutStart).join("\n");
-      if (!passesOutputCheck(output, test)) {
-        throw new Error("Output missing");
-      }
-      testResults.push(passResult(test, visible));
-    } catch (error) {
-      testResults.push(failResult(test, visible, error, spec.language));
-    } finally {
-      // Hidden check output must never reach learner-visible stdout.
-      if (!visible) {
-        captured.stdout.length = stdoutStart;
-      }
-    }
-  }
-
-  return {
-    stdout: captured.stdout.join("\n"),
-    stderr: captured.stderr.join("\n"),
-    testResults
-  };
 }
 
 function loadScriptAsset(src: string, label: string): Promise<void> {
