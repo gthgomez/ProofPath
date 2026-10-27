@@ -10,6 +10,7 @@ import { formatPolicyViolationFeedback } from "@/sandbox/feedback";
 import {
   createNativeWebViewRunnerHtml,
   NATIVE_ANDROID_SANDBOX_BASE_URL,
+  NATIVE_SANDBOX_WEBVIEW_SECURITY_PROPS,
   nativeRunTimeoutMs,
   parseNativeWebViewRunnerMessage,
   type NativeWebViewRunnerRequest
@@ -333,6 +334,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   return (
     <View style={styles.codeLab}>
       <WebView
+        {...NATIVE_SANDBOX_WEBVIEW_SECURITY_PROPS}
         cacheEnabled={false}
         incognito
         javaScriptCanOpenWindowsAutomatically={false}
@@ -348,8 +350,6 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
         originWhitelist={["*"]}
         setSupportMultipleWindows={false}
         allowFileAccess
-        allowFileAccessFromFileURLs
-        allowUniversalAccessFromFileURLs
         source={{ html: runnerHtml, baseUrl: NATIVE_ANDROID_SANDBOX_BASE_URL }}
         style={styles.runnerFrame}
       />

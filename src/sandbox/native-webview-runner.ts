@@ -25,6 +25,12 @@ export const SANDBOX_ASSET_PATHS = {
 
 export const NATIVE_ANDROID_SANDBOX_BASE_URL = "file:///android_asset/";
 
+/** Keep file-origin documents from reading other file origins or bypassing CORS. */
+export const NATIVE_SANDBOX_WEBVIEW_SECURITY_PROPS = {
+  allowFileAccessFromFileURLs: false,
+  allowUniversalAccessFromFileURLs: false
+} as const;
+
 const NATIVE_RUNTIME_ASSET_LANGUAGES = ["python", "sql", "typescript"] as const;
 
 /**

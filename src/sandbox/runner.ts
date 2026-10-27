@@ -450,6 +450,13 @@ self.onmessage = (event) => {
 
 async function runJavaScriptInWorker(spec: LessonRunnerSpec, runtimeCode: string, runMode: CodeRunMode): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
   if (typeof Worker === "undefined" || typeof Blob === "undefined" || typeof URL === "undefined") {
+    // Browser submissions must never fall back into the page's global realm:
+    // new Function there can reach DOM, storage, app globals, and host bridges.
+    // Keep the in-process path only for non-browser tooling (for example the
+    // Node-based offline test suite), which has no application page to expose.
+    if (typeof window !== "undefined") {
+      throw new Error("JavaScript sandbox isolation is unavailable because this browser does not support Web Workers.");
+    }
     return runJavaScriptInProcess(spec, runtimeCode, runMode);
   }
 
