@@ -213,9 +213,10 @@ const javascriptRules: PatternRule[] = [
   { rule: "dynamic-import", pattern: /\bimport\s*\(/i, message: "Dynamic imports are disabled in beginner sandboxes.", sanitize: stripJsCommentsAndStrings },
   { rule: "eval", pattern: /\beval\b/i, message: "eval is disabled in the sandbox.", sanitize: stripJsCommentsAndStrings },
   { rule: "function-constructor", pattern: /\bFunction\b/, message: "The Function constructor is disabled in learner code.", sanitize: stripJsCommentsAndStrings },
-  // Constructor escape is matched on the raw source: the bracket form encodes the
-  // property name as a string literal, which the sanitizer would otherwise blank.
-  { rule: "constructor-escape", pattern: /\.constructor\b|\["constructor"\]|\['constructor'\]/, message: "Constructor escape patterns are disabled." },
+  // Constructor escapes are matched on raw source because computed property
+  // names are string literals that the sanitizer would otherwise blank. Also
+  // reject the common concatenated spelling used to evade the direct check.
+  { rule: "constructor-escape", pattern: /\.constructor\b|\[\s*["']constructor["']\s*\]|\[\s*["']con["']\s*\+\s*["']structor["']\s*\]/i, message: "Constructor escape patterns are disabled." },
   { rule: "global-object", pattern: /\b(globalThis|self|window|document|process|require)\b/, message: "Global host objects are not available to learner code.", sanitize: stripJsCommentsAndStrings },
   { rule: "browser-storage", pattern: /\b(localStorage|sessionStorage|indexedDB)\b/i, message: "Browser storage is disabled in beginner sandboxes.", sanitize: stripJsCommentsAndStrings },
   { rule: "browser-network", pattern: /\b(XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b/i, message: "Browser network APIs are disabled in beginner sandboxes.", sanitize: stripJsCommentsAndStrings },

@@ -210,6 +210,8 @@ describe("sandbox policy keyword matching", () => {
       ["self['fetch']('https://example.com')", "global-object"],
       ["self['eval']('1')", "global-object"],
       ["globalThis['Function']('return 1')", "global-object"],
+      ["[]['filter']['con' + 'structor']('return this')()", "constructor-escape"],
+      ["[]['filter']['con' + 'structor']('return this')().ReactNativeWebView.postMessage('{}')", "constructor-escape"],
       ["window.fetch('https://example.com')", "global-object"]
     ])("blocks an aliased or bracket-quoted global call: %s", (code, rule) => {
       expect(rulesTriggered("javascript", code)).toContain(rule);
