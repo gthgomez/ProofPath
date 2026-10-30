@@ -1,0 +1,63 @@
+{
+  "sourceRevision": "c3c82079efa0b7763d35af274f590e081279d338",
+  "capturedAt": "2026-10-30T12:10:47.103Z",
+  "browserClockStartedAt": "2026-10-30T12:00:00Z",
+  "browser": "154.0.8037.57",
+  "viewport": {
+    "width": 540,
+    "height": 960
+  },
+  "origin": "http://localhost:4314",
+  "externalRequestsBlocked": true,
+  "blockedHosts": [],
+  "sampleData": "Fresh local browser learner profile, original shipped curriculum. No AI mentor or backend calls; no manufactured completion or external verification evidence.",
+  "workflow": "Open fresh career-path setup; preview the first Python lesson; run starter code; fail the empty starter check; correct print output and pass the real local checks.",
+  "videoSeconds": 16.666667,
+  "gifPlaybackSpeed": 1.0416666875,
+  "pageErrors": [],
+  "consoleErrors": [],
+  "screenshots": [
+    {
+      "file": "01-choose-path.jpg",
+      "description": "Career-path onboarding from a fresh local learner profile."
+    },
+    {
+      "file": "02-lesson.jpg",
+      "description": "First Python lesson: original authored curriculum and guided stepper."
+    },
+    {
+      "file": "03-failing-check.jpg",
+      "description": "Actual Code Lab check rejects the incomplete shipped starter."
+    },
+    {
+      "file": "04-passing-check.jpg",
+      "description": "Corrected print statement passes the real local Python checks; no fabricated evidence."
+    }
+  ],
+  "files": {
+    "01-choose-path.jpg": {
+      "bytes": 67961,
+      "sha256": "e4ef3099a5dae63fe4c967e9984ebb8787c4a46355faf982738536ce1b9550e4"
+    },
+    "02-lesson.jpg": {
+      "bytes": 82965,
+      "sha256": "915978aa693dea9bdb3bb168b3f01541c71d5ad283a12a2c217cc866a6751ceb"
+    },
+    "03-failing-check.jpg": {
+      "bytes": 73392,
+      "sha256": "ba376a15919f1a8c0dd2725c297c9a6d7f37e786bec9e88f2ab39a0d8db5202e"
+    },
+    "04-passing-check.jpg": {
+      "bytes": 74227,
+      "sha256": "eb277c28e7d25d2f1a560381d98b12ab0357ddf5857663d170fd49341f39ff78"
+    },
+    "workflow.mp4": {
+      "bytes": 272318,
+      "sha256": "5626ecc3ed0f1eeed96eee9fe2948d4b72f068e77e02717279038e0b56b99406"
+    },
+    "preview.gif": {
+      "bytes": 997997,
+      "sha256": "718d2b173460b3b7d9af4cd19a4ed2542dc728fc8e1cd67d3e6810594a2527b0"
+    }
+  }
+}
