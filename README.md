@@ -6,6 +6,31 @@ An offline-first React Native learning system that helps beginner CS students co
 > transparency. It is **not open source** — there is no license grant to reuse,
 > modify, or redistribute this code. See [LICENSE](LICENSE).
 
+## See it in action
+
+Start with a fresh learner profile, try the first Python lesson, run its starter code, inspect a real failed check, then fix the program and pass the local checks.
+
+<a href="docs/showcase/media/workflow.mp4"><img src="docs/showcase/media/preview.gif" alt="Recorded local workflow: Start with a fresh learner profile, try the first Python lesson, run its starter code, inspect a real failed check, then fix the program and pass the local checks." width="420"></a>
+
+[Watch or download the MP4](docs/showcase/media/workflow.mp4) · [Capture notes and reproduction](docs/showcase/README.md)
+
+**What you are seeing:** Actual Expo web UI and local Python check results from original shipped curriculum. No mock runner or fabricated completion records were used. Browser behavior shown here does not establish native Android/device behavior.
+
+**Demo status:** No hosted demo is claimed. Run the Expo web preview locally using the [capture instructions](docs/showcase/README.md). This recording uses a fresh local learner profile and makes no AI mentor or backend calls.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/showcase/media/01-choose-path.jpg" alt="Career-path onboarding from a fresh local learner profile." width="100%"><br><strong>1. Choose a path</strong><br>Career-path onboarding from a fresh local learner profile.</td>
+<td width="50%"><img src="docs/showcase/media/02-lesson.jpg" alt="First Python lesson: original authored curriculum and guided stepper." width="100%"><br><strong>2. Preview the lesson</strong><br>First Python lesson: original authored curriculum and guided stepper.</td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/showcase/media/03-failing-check.jpg" alt="Actual Code Lab check rejects the incomplete shipped starter." width="100%"><br><strong>3. Incomplete code fails</strong><br>Actual Code Lab check rejects the incomplete shipped starter.</td>
+<td width="50%"><img src="docs/showcase/media/04-passing-check.jpg" alt="Corrected print statement passes the real local Python checks; no fabricated evidence." width="100%"><br><strong>4. Corrected code passes</strong><br>Corrected print statement passes the real local Python checks; no fabricated evidence.</td>
+</tr>
+</table>
+
+Captured from [`c3c82079efa0`](https://github.com/gthgomez/ProofPath/tree/c3c82079efa0b7763d35af274f590e081279d338) on 2026-10-30. The GIF is a compact preview; the MP4 preserves the recorded workflow timing.
+
 ---
 
 ## 1. Product Summary
