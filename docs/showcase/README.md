@@ -44,3 +44,7 @@ Source surfaces inspected: `app/onboarding.tsx`, `app/lesson/[lessonId].tsx`, `s
 `npm run verify` passed content, redaction, and type checks. Its initial test run had two 20-second journey timeouts under concurrent builds. `npm run test -- --maxWorkers=2` then passed all 48 files / 461 tests without changing app code or increasing test timeouts. The capture separately exercised the actual browser runner, not the mocked journey-test runner.
 
 Every screenshot and sampled video frames were visually inspected. Browser capture reported no uncaught page errors. README links, media checksums, encodings, file sizes, and final Git diff were reviewed. Public hosted links, when listed, received a read-only HTTP 200 check only; no production UI interaction, account setup, cloud sync, deployment, or paid inference was performed.
+
+## Capture startup regression check
+
+Run `npm test --prefix docs/showcase` without an application server. The focused check starts the real capture entry point with a missing Chromium executable and with a missing recording helper. Both cases must exit with the expected startup error, remove their task-created recording directory, and preserve an unrelated sentinel file. Browser initialization is covered by `try/finally`; temporary-directory cleanup still runs if browser shutdown throws. No application code, screenshots, or recorded media are changed by this check.
