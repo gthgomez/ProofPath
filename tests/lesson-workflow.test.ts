@@ -184,4 +184,37 @@ describe("deriveLessonWorkflow", () => {
     expect(workflow.cta.action).toBe("module-complete");
     expect(workflow.cta.disabled).toBe(false);
   });
+
+  it("does not mark the Evidence step complete from lesson achievement alone", () => {
+    const workflow = deriveLessonWorkflow({
+      currentStep: "evidence",
+      miniProjectDone: true,
+      quizDone: true,
+      lessonDone: true,
+      hasQuiz: true,
+      nextLessonId: "lesson-2",
+      portfolioEvidenceSaved: false
+    });
+
+    // The lesson is achieved, but no portfolio artifact was saved yet.
+    expect(workflow.completedSteps).toContain("apply");
+    expect(workflow.completedSteps).toContain("checkpoint");
+    expect(workflow.completedSteps).not.toContain("evidence");
+    expect(workflow.portfolioEvidenceSaved).toBe(false);
+  });
+
+  it("marks the Evidence step complete once a portfolio artifact is saved", () => {
+    const workflow = deriveLessonWorkflow({
+      currentStep: "evidence",
+      miniProjectDone: true,
+      quizDone: true,
+      lessonDone: true,
+      hasQuiz: true,
+      nextLessonId: "lesson-2",
+      portfolioEvidenceSaved: true
+    });
+
+    expect(workflow.completedSteps).toContain("evidence");
+    expect(workflow.portfolioEvidenceSaved).toBe(true);
+  });
 });

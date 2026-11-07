@@ -55,15 +55,18 @@ export function formatSandboxFailureFeedback({
 
   if (kind === "missing-output") {
     return [
-      "Not yet. The test ran, but it did not see all of the proof it was looking for.",
+      "Not yet. The program ran, but a visible check did not see the result it expects.",
+      "What failed: output or logic. The syntax was accepted; the produced values did not match the lesson goal.",
       `Think through your ${label} flow: where is the required value produced, and where is it printed or returned?`,
-      "Before changing a lot, compare your output with the expected lines. Check for starter values left unchanged, quotes around numbers, empty summaries, and missing print calls."
+      "Before changing a lot, compare your output with the expected lines. Check for starter values left unchanged, quotes around numbers, empty summaries, and missing print calls.",
+      "Next: inspect the visible check message above and the latest terminal output. Hidden checks are not shown, so fix the visible mismatch first."
     ].join("\n");
   }
 
   if (kind === "policy") {
     return [
       "The sandbox stopped this before running because it uses something outside the beginner lesson boundary.",
+      "What failed: sandbox policy, not lesson logic. None of your code was executed.",
       policyQuestion(policyRule),
       detail ? `Clue from the sandbox: ${detail}` : "Clue from the sandbox: stay inside the starter data, visible inputs, and local code."
     ].join("\n");
@@ -72,6 +75,7 @@ export function formatSandboxFailureFeedback({
   if (kind === "timeout") {
     return [
       "The runner stopped because the code took too long.",
+      "What failed: execution time. The sandbox terminated the run instead of leaving it in the background.",
       "This lesson may not need a loop, input(), recursion, or repeated query. Remove any code that keeps waiting or repeating after the answer is already known.",
       "If the lesson does ask for a loop, name the stopping condition in plain English, then make the code match that condition."
     ].join("\n");
@@ -80,14 +84,21 @@ export function formatSandboxFailureFeedback({
   if (kind === "runner") {
     return [
       "The sandbox runner could not finish this attempt.",
+      "What failed: the runner, not your lesson logic.",
       "Is this lesson supported by the current runner on this device, or should it be tried in the web preview for now?",
       detail ? `Runner note: ${detail}` : "Runner note: no extra detail was reported."
     ].join("\n");
   }
 
+  const looksLikeSyntax = Boolean(detail && /SyntaxError|Unexpected token|Unexpected end|Parse error|syntax error|near \".*\": syntax error|TS\d+/i.test(detail));
   const pythonClue = language === "python" && detail ? getPythonBeginnerClue(detail) : undefined;
   const lines = [
-    "The code crashed before the test could finish checking it.",
+    looksLikeSyntax
+      ? `The code could not be parsed, so the checks never ran.`
+      : "The code crashed before the test could finish checking it.",
+    looksLikeSyntax
+      ? `What failed: ${label} syntax or structure.`
+      : `What failed: ${label} runtime error (not the check result).`,
     `Read the first ${label} error clue, then ask: which name, value, or line is the program complaining about?`,
     detail ? `Error clue: ${detail}` : "Error clue: no extra detail was reported."
   ];

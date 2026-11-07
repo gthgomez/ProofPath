@@ -8,12 +8,28 @@ import {
   PYTHON_IMPORT_RUN_NAME,
   SQL_HARNESS_PATTERN,
   createJavaScriptWorkerSource,
+  formatSandboxTimeoutFeedback,
   isTrustedSqlHarness,
   preloadSandbox,
   runLessonSandbox
 } from "@/sandbox/runner";
 
 describe("lesson sandbox runner", () => {
+  it("rejects an oversized submission before parsing it", async () => {
+    const lesson = contentPack.lessons.find((candidate) => candidate.id === "lesson-python-values")!;
+    const result = await runLessonSandbox(
+      lesson.workshop.miniProject.runnerSpec,
+      lesson.id,
+      "x".repeat(20_001),
+      "2026-11-07T12:00:00.000Z"
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.stderr).toMatch(/too large/i);
+    expect(result.testResults[0]?.id).toBe("policy-max-code-length");
+    expect(result.runtimeMs).toBeLessThan(2000);
+  });
+
   beforeAll(() => {
     // The TypeScript runner imports its compiler through the same Node test seam
     // the Python and SQL runners use; the sandbox's `new Function` dynamic import
@@ -305,12 +321,13 @@ describe("lesson sandbox runner", () => {
         "2026-05-07T20:40:00.000Z"
       );
 
-      // The visible check passes (score 50 = 1 of 2 checks), so the "Output
-      // missing" failure comes from the hidden check that inserted the unseen sql
-      // topic. Only a harness-seeded hidden check can distinguish the forgery.
+      // The visible check passes (score 50 = 1 of 2 checks), so the failure comes
+      // from the hidden check that inserted the unseen sql topic. Only a
+      // harness-seeded hidden check can distinguish the forgery. The hidden
+      // check's failure text must not leak to the learner's stderr.
       expect(forged.passed).toBe(false);
       expect(forged.score).toBe(50);
-      expect(forged.stderr).toContain("Output missing");
+      expect(forged.stderr).not.toContain("Output missing");
 
       // Revert sensitivity (#9): the hidden check only discriminates because the
       // runner actually executes the trusted harness INSERT. The honest aggregate
@@ -583,5 +600,254 @@ describe("sandbox runners honor expectedOutputExactSet", () => {
     };
     const subset = runNativePythonProof(subsetSpec, "lesson-python-subset", 'print("alpha")\nprint("beta")\nprint("gamma")', "2026-05-08T22:26:00.000Z");
     expect(subset.passed).toBe(true);
+  });
+});
+
+describe("sandbox hidden check isolation and output limits", () => {
+  it("redacts hidden check stderr and messages from learner-visible output in Web Worker", () => {
+    const workerSource = createJavaScriptWorkerSource();
+    let posted: { stdout: string; stderr: string; testResults: Array<{ id: string; passed: boolean; visible: boolean; message: string }> } | undefined;
+    const selfStub: { postMessage: (message: unknown) => void; onmessage?: (event: unknown) => void } = {
+      postMessage: (message) => {
+        posted = message as typeof posted;
+      }
+    };
+
+    new Function("self", workerSource)(selfStub);
+    selfStub.onmessage?.({
+      data: {
+        language: "javascript",
+        runMode: "run_checks",
+        runtimeCode: 'console.log("visible output"); console.error("visible stderr");',
+        tests: [
+          { id: "visible-1", name: "Visible Check", code: 'console.log("visible check log");', expectedOutputIncludes: ["visible output"] },
+          { id: "hidden-1", name: "Hidden Check", code: 'console.error("BENIGN_HIDDEN_SENTINEL_STDERR"); throw new Error("HIDDEN_FAILURE_DETAIL");', expectedOutputIncludes: [] }
+        ],
+        visibleCount: 1
+      }
+    });
+
+    expect(posted).toBeDefined();
+    expect(posted?.stdout).toContain("visible output");
+    expect(posted?.stderr).toContain("visible stderr");
+    expect(posted?.stderr).not.toContain("BENIGN_HIDDEN_SENTINEL_STDERR");
+    expect(posted?.stderr).not.toContain("HIDDEN_FAILURE_DETAIL");
+    expect(posted?.testResults[0]?.passed).toBe(true);
+    expect(posted?.testResults[1]?.passed).toBe(false);
+  });
+
+  it("truncates excessive console output to prevent memory exhaustion", () => {
+    const workerSource = createJavaScriptWorkerSource();
+    let posted: { stdout: string; stderr: string } | undefined;
+    const selfStub: { postMessage: (message: unknown) => void; onmessage?: (event: unknown) => void } = {
+      postMessage: (message) => {
+        posted = message as typeof posted;
+      }
+    };
+
+    new Function("self", workerSource)(selfStub);
+    selfStub.onmessage?.({
+      data: {
+        language: "javascript",
+        runMode: "run_file",
+        runtimeCode: 'for (var i = 0; i < 20000; i++) console.log("line " + i + ": repeating long string output padding data");',
+        tests: [],
+        visibleCount: 0
+      }
+    });
+
+    expect(posted).toBeDefined();
+    expect(posted?.stdout).toContain("[output truncated: exceeded 512KB limit]");
+    expect(posted?.stdout.length).toBeLessThanOrEqual(530000);
+  });
+
+  it("prevents learner code from emitting misleading forged results to host via postMessage", () => {
+    const workerSource = createJavaScriptWorkerSource();
+    const messages: unknown[] = [];
+    const selfStub: { postMessage: (message: unknown) => void; onmessage?: (event: unknown) => void } = {
+      postMessage: (message) => {
+        messages.push(message);
+      }
+    };
+
+    new Function("self", workerSource)(selfStub);
+    selfStub.onmessage?.({
+      data: {
+        nonce: "legit-nonce-123",
+        language: "javascript",
+        runMode: "run_checks",
+        // Learner code attempts to emit a fake passing result before checks run
+        runtimeCode: 'try { postMessage({ nonce: "stolen", stdout: "forged", testResults: [{ id: "1", passed: true, visible: true }] }); } catch (e) {} try { self.postMessage({ nonce: "fake", stdout: "forged" }); } catch (e) {}',
+        tests: [
+          { id: "actual-check", name: "Actual Check", code: 'throw new Error("actual check failed");', expectedOutputIncludes: [] }
+        ],
+        visibleCount: 1
+      }
+    });
+
+    // Exactly one message was posted to the host (the authentic final completion message),
+    // carrying the authentic nonce and truthful failing test result.
+    expect(messages).toHaveLength(1);
+    const finalResult = messages[0] as { nonce: string; testResults: Array<{ id: string; passed: boolean }> };
+    expect(finalResult.nonce).toBe("legit-nonce-123");
+    expect(finalResult.testResults[0]?.passed).toBe(false);
+  });
+
+  it("truncates runaway SQL query output to the 512KB cap", async () => {
+    const spec: LessonRunnerSpec = {
+      language: "sql",
+      instructions: "Generate large output.",
+      starterCode: "WITH RECURSIVE cnt(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM cnt WHERE x < 12000) SELECT 'repeating long string text to fill up the buffer ' || x FROM cnt;",
+      visibleTests: [],
+      hiddenTests: [],
+      expectedOutput: [],
+      timeoutMs: 30000,
+      allowNetwork: false
+    };
+
+    const result = await runLessonSandbox(spec, "lesson-sql-big", spec.starterCode, new Date().toISOString(), "run_file");
+    expect(result.stdout).toContain("[output truncated: exceeded 512KB limit]");
+    expect(result.stdout.length).toBeLessThanOrEqual(530000);
+  });
+});
+
+describe("sandbox privacy and truncation truth (A01/A02)", () => {
+  it("never publishes a hidden Python stderr sentinel, even when the hidden expectation fails", async () => {
+    const spec: LessonRunnerSpec = {
+      language: "python",
+      instructions: "Print the visible answer.",
+      starterCode: 'print("DONE")',
+      visibleTests: [
+        { id: "visible", name: "Visible check", code: "# comment-only checker", expectedOutputIncludes: ["DONE"] }
+      ],
+      hiddenTests: [
+        {
+          id: "hidden",
+          name: "Hidden check",
+          // Emits a private sentinel to stderr, then fails its output expectation.
+          code: [
+            "import sys",
+            "sys.stderr.write('HIDDEN_ONLY_SENTINEL_2026\\n')",
+            "print('not the expected row')"
+          ].join("\n"),
+          expectedOutputIncludes: ["SECRET_EXPECTED_ROW_2026"]
+        }
+      ],
+      expectedOutput: ["DONE"],
+      timeoutMs: 30000,
+      allowNetwork: false
+    };
+
+    const result = await runLessonSandbox(
+      spec,
+      "lesson-python-hidden-sentinel",
+      spec.starterCode,
+      "2026-11-07T21:00:00.000Z",
+      "run_checks"
+    );
+
+    // Grading still reflects the hidden failure (1 of 2 checks passed).
+    expect(result.passed).toBe(false);
+    expect(result.score).toBe(50);
+    expect(result.testResults.map((testResult) => testResult.id)).toEqual(["visible"]);
+
+    // The sentinel and hidden expectation never reach any learner-visible field.
+    const serialized = JSON.stringify(result);
+    for (const secret of ["HIDDEN_ONLY_SENTINEL_2026", "SECRET_EXPECTED_ROW_2026", "Output missing"]) {
+      expect(serialized).not.toContain(secret);
+      expect(result.stdout).not.toContain(secret);
+      expect(result.stderr).not.toContain(secret);
+    }
+    expect(result.terminalTranscript.some((event) => JSON.stringify(event).includes("HIDDEN_ONLY_SENTINEL_2026"))).toBe(false);
+  }, 60000);
+
+  it("reports a Python run_file as failed when stdout is truncated before it raises", async () => {
+    const spec: LessonRunnerSpec = {
+      language: "python",
+      instructions: "Produce output, then fail.",
+      starterCode: "",
+      visibleTests: [],
+      hiddenTests: [],
+      expectedOutput: [],
+      timeoutMs: 30000,
+      allowNetwork: false
+    };
+    const code = [
+      "for i in range(20000):",
+      "    print('filler ' + str(i) + ' ' + 'x' * 60)",
+      "raise RuntimeError('boom-after-truncation')"
+    ].join("\n");
+
+    const result = await runLessonSandbox(spec, "lesson-python-truncation-throw", code, "2026-11-07T21:01:00.000Z", "run_file");
+
+    expect(result.passed).toBe(false);
+    expect(result.stdout).toContain("[output truncated: exceeded 512KB limit]");
+    // The bounded error summary survives the truncation.
+    expect(result.stderr).toContain("boom-after-truncation");
+    expect(result.terminalTranscript.some((event) => event.type === "result" && event.status === "failed")).toBe(true);
+  }, 60000);
+
+  it("reports a JavaScript run_file as failed when output truncates before a throw", async () => {
+    const spec: LessonRunnerSpec = {
+      language: "javascript",
+      instructions: "Produce output, then fail.",
+      starterCode: "",
+      visibleTests: [],
+      hiddenTests: [],
+      expectedOutput: [],
+      timeoutMs: 10000,
+      allowNetwork: false
+    };
+    const code = [
+      "for (let i = 0; i < 20000; i += 1) { console.log('padding ' + i + ' ' + 'x'.repeat(60)); }",
+      "throw new Error('boom-after-truncation');"
+    ].join("\n");
+
+    const result = await runLessonSandbox(spec, "lesson-js-truncation-throw", code, "2026-11-07T21:02:00.000Z", "run_file");
+
+    expect(result.passed).toBe(false);
+    expect(result.stdout).toContain("[output truncated: exceeded 512KB limit]");
+    expect(result.stderr).toContain("boom-after-truncation");
+  });
+
+  it("reports a SQL run_file as failed when the statement errors", async () => {
+    const spec: LessonRunnerSpec = {
+      language: "sql",
+      instructions: "Query the seeded table.",
+      starterCode: "SELECT topic FROM sessions;",
+      setupCode: "CREATE TABLE sessions (topic TEXT); INSERT INTO sessions (topic) VALUES ('python');",
+      visibleTests: [],
+      hiddenTests: [],
+      expectedOutput: [],
+      timeoutMs: 30000,
+      allowNetwork: false
+    };
+
+    const result = await runLessonSandbox(
+      spec,
+      "lesson-sql-run-file-error",
+      "SELECT topic FROM sessions; SELECT missing_column FROM sessions;",
+      "2026-11-07T21:03:00.000Z",
+      "run_file"
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.stderr.toLowerCase()).toContain("no such column");
+  });
+});
+
+describe("timeout feedback honesty (A03)", () => {
+  it("distinguishes a terminated run from a boundary that only stopped waiting", () => {
+    const terminated = formatSandboxTimeoutFeedback("javascript", 4000, true);
+    expect(terminated).toContain("stopped because the code took too long");
+    expect(terminated).not.toContain("cannot force it to stop");
+
+    const waiting = formatSandboxTimeoutFeedback("python", 4000, false);
+    expect(waiting).toContain("stopped waiting after 4000ms");
+    expect(waiting).toContain("cannot force it to stop");
+    expect(waiting).not.toContain("stopped because");
+
+    const sql = formatSandboxTimeoutFeedback("sql", 5000, false);
+    expect(sql).toContain("SQL in this browser sandbox runs synchronously");
   });
 });

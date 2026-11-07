@@ -48,7 +48,8 @@ describe("persistence + reload", () => {
     await continueForward();
     await continueForward();
     expect(screen.getByText("Step 3 of 5: CODE LAB")).toBeInTheDocument();
-    expect(await screen.findAllByText("Check passed")).toHaveLength(2);
+    expect(await screen.findAllByText("Check passed")).toHaveLength(1);
+    expect(screen.getByText("Previously passed")).toBeInTheDocument();
   });
 
   it("restores quiz completion after a page reload", async () => {

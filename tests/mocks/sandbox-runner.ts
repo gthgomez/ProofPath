@@ -1,3 +1,4 @@
+import { CURRENT_SANDBOX_DISCLOSURE_VERSION } from "@/domain/code-run";
 import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec } from "@/domain/types";
 
 /**
@@ -84,6 +85,7 @@ export async function runLessonSandbox(
       line: 1,
       confidence: "known"
     }],
+    sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
     terminalTranscript: [
       { type: "command", text: runMode === "run_file" ? "$ python main.py" : "$ verify" },
       { type: "stdout", text: stdout },

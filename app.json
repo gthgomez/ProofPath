@@ -3,6 +3,9 @@
     "name": "ProofPath",
     "slug": "proofpath",
     "version": "0.1.0",
-    "icon": "./assets/proofpath-icon.png"
+    "icon": "./assets/proofpath-icon.png",
+    "plugins": [
+      "expo-sharing"
+    ]
   }
 }

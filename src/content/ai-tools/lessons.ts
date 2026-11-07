@@ -1,9 +1,39 @@
-import type { Lesson, Quiz } from "@/domain/types";
+import type { Lesson, LessonPracticeBlock, Quiz } from "@/domain/types";
 import { shuffleQuizChoices, workshop } from "../python/shared";
 
 // AI-Assisted Coding track. Mirrors the python/level-N.ts split: this file owns the
 // track's lessons and quizzes, and the shared builders in
 // src/content/python/shared.ts do the rest.
+
+const aiTestLoopPracticeReps: LessonPracticeBlock[] = [
+  {
+    tier: "diagnose",
+    starterCode: "AI diff:\n+ if (user == null) return 'Unknown user';\n\nChecks run: none",
+    expectedOutput: "The suggestion may be reasonable, but it is not accepted until a case fails without it and passes with it.",
+    checkYourAnswer: "Name the missing regression case. A plausible null check is still an unverified claim until a check exercises it."
+  },
+  {
+    tier: "transfer",
+    starterCode: "function formatProject(project) {\n  return project.name.trim();\n}\n\n// New input to test: project with name '   '",
+    expectedOutput: "A case for blank names that expects a fallback instead of an empty string, plus check output.",
+    checkYourAnswer: "The same reproduce-then-verify loop applies to a different function. What behavior should blank input have?"
+  }
+];
+
+const aiDiffReviewPracticeReps: LessonPracticeBlock[] = [
+  {
+    tier: "diagnose",
+    starterCode: "Diff summary:\n- bug: one label typo\n- change: add moment.js dependency\n- tests: existing suite passes",
+    expectedOutput: "Reject or isolate the dependency change; a one-line typo fix does not justify widening the dependency surface.",
+    checkYourAnswer: "Scope and blast radius matter more than a green test. Which part of the diff is unrelated to the reported bug?"
+  },
+  {
+    tier: "transfer",
+    starterCode: "Diff summary:\n+ export type User = { id: string; email?: string };\n- size: 12 lines\n- note: 'small cleanup'",
+    expectedOutput: "Flag the contract change explicitly, even if the diff is small, and check every caller or type consumer.",
+    checkYourAnswer: "Small diffs can still change contracts. Which consumers would notice that optional field?"
+  }
+];
 
 export const aiToolsLessons: Lesson[] = [
     {
@@ -71,7 +101,8 @@ export const aiToolsLessons: Lesson[] = [
             hiddenTests: [],
             expectedOutput: ["passed"]
           }
-        }
+        },
+        aiTestLoopPracticeReps
       )
     },
     {
@@ -139,7 +170,8 @@ export const aiToolsLessons: Lesson[] = [
             hiddenTests: [],
             expectedOutput: ["accepted", "rejected", "passed"]
           }
-        }
+        },
+        aiDiffReviewPracticeReps
       )
     },
 ];

@@ -1,5 +1,5 @@
-import { normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
-import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec, RunnerLanguage } from "@/domain/types";
+import { CURRENT_SANDBOX_DISCLOSURE_VERSION, normalizeCodeRunAttempt } from "@/domain/code-run";
+import type { CodeRunAttempt, CodeRunMode, CodeRunTestResult, LessonRunnerSpec, RunnerLanguage } from "@/domain/types";
 import {
   PYTHON_DIRECT_RUN_NAME,
   PYTHON_IMPORT_RUN_NAME,
@@ -10,6 +10,7 @@ import {
 import { TYPESCRIPT_MAX_SOURCE_CHARS, TYPESCRIPT_TYPE_CHECK_SOURCE } from "./typescript-typecheck";
 
 export interface NativeWebViewRunnerRequest {
+  requestId?: string;
   lessonId: string;
   spec: LessonRunnerSpec;
   code: string;
@@ -85,6 +86,7 @@ export interface NativeWebViewRunnerReadyMessage {
 
 export interface NativeWebViewRunnerResultMessage {
   type: "sandbox-result";
+  requestId?: string;
   attempt: CodeRunAttempt;
 }
 
@@ -201,6 +203,38 @@ export function createNativeWebViewRunnerHtml(): string {
       window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
     }
 
+    var MAX_OUTPUT_CHARS = 524288;
+    var MAX_ERROR_SUMMARY_CHARS = 2000;
+    var OUTPUT_TRUNCATION_MARKER = "[output truncated: exceeded 512KB limit]";
+    var totalOutputChars = 0;
+    var isOutputTruncated = false;
+    function appendOutput(target, text) {
+      if (isOutputTruncated) return;
+      var normalized = normalizeOutput(text);
+      var addedLen = normalized.length + 1;
+      var remaining = MAX_OUTPUT_CHARS - totalOutputChars;
+      if (addedLen >= remaining) {
+        var sliceLen = Math.max(0, remaining - OUTPUT_TRUNCATION_MARKER.length - 1);
+        var prefix = sliceLen > 0 ? normalized.slice(0, sliceLen) + "\\n" : "";
+        target.push(prefix + OUTPUT_TRUNCATION_MARKER);
+        isOutputTruncated = true;
+        totalOutputChars = MAX_OUTPUT_CHARS;
+      } else {
+        target.push(normalized);
+        totalOutputChars += addedLen;
+      }
+    }
+    function appendError(target, text) {
+      // Failure detail bypasses the output budget: a stdout flood must never be
+      // able to erase the line that explains why execution failed.
+      var normalized = normalizeOutput(text) || "Unknown error";
+      target.push(
+        normalized.length > MAX_ERROR_SUMMARY_CHARS
+          ? normalized.slice(0, MAX_ERROR_SUMMARY_CHARS) + "\\n[error summary truncated]"
+          : normalized
+      );
+    }
+
     function normalizeOutput(value) {
       if (value === undefined || value === null) return "";
       if (typeof value === "string") return value;
@@ -296,16 +330,19 @@ export function createNativeWebViewRunnerHtml(): string {
       ].join("\\n");
     }
 
-    function buildAttempt(request, startedAt, stdout, stderr, testResults) {
+    function buildAttempt(request, startedAt, stdout, stderr, testResults, executionError) {
       const passedTests = testResults.filter((result) => result.passed).length;
       const score = testResults.length === 0 ? 0 : Math.round((passedTests / testResults.length) * 100);
-      // Mirror the web runner: a run_file attempt is only passed when it produced
-      // no error output (a raised exception lands in stderr). Checks still require
-      // every result to pass.
+      // Mirror the web runner: a run_file attempt is only passed when execution
+      // did not throw AND no error output was produced. executionError is set by
+      // the catch path independently of the output buffer, so truncation cannot
+      // turn a failed run into a pass. Checks still require every result to pass.
       const passed = request.runMode === "run_file"
-        ? stderr.join("\\n").trim().length === 0
+        ? !executionError && stderr.join("\\n").trim().length === 0
         : testResults.length > 0 && testResults.every((result) => result.passed);
       const redacted = redactCheckResults(testResults);
+      // Public policy: no hidden-check counts are exposed. The aggregate below is
+      // deliberately zeroed so names, counts, seeds, and messages stay private.
       const learnerSafeHiddenSummary = { total: 0, passed: 0, failed: 0 };
 
       return {
@@ -321,6 +358,7 @@ export function createNativeWebViewRunnerHtml(): string {
         runtimeMs: Date.now() - startedAt,
         testResults: redacted.visibleCheckResults,
         hiddenCheckSummary: learnerSafeHiddenSummary,
+        sandboxDisclosureVersion: ${CURRENT_SANDBOX_DISCLOSURE_VERSION},
         createdAt: request.now
       };
     }
@@ -377,9 +415,10 @@ export function createNativeWebViewRunnerHtml(): string {
       const stderr = [];
       const testResults = [];
       const tests = spec.visibleTests.concat(spec.hiddenTests || []);
+      let executionError = null;
       const sandboxConsole = {
-        log: (...values) => stdout.push(values.map(normalizeOutput).join(" ")),
-        error: (...values) => stderr.push(values.map(normalizeOutput).join(" "))
+        log: (...values) => appendOutput(stdout, values.map(normalizeOutput).join(" ")),
+        error: (...values) => appendOutput(stderr, values.map(normalizeOutput).join(" "))
       };
 
       // TypeScript lessons must fail on type errors, which stripping and running
@@ -394,9 +433,9 @@ export function createNativeWebViewRunnerHtml(): string {
         }
         const typeCheck = await runTypeScriptTypeCheck(request.code);
         if (typeCheck.diagnostics.length > 0) {
-          stderr.push(typeCheck.stderr);
+          appendError(stderr, typeCheck.stderr);
           if (request.runMode === "run_file") {
-            return buildAttempt(request, startedAt, stdout, stderr, testResults);
+            return buildAttempt(request, startedAt, stdout, stderr, testResults, typeCheck.stderr || "TypeScript type check failed.");
           }
           for (let index = 0; index < tests.length; index += 1) {
             testResults.push({
@@ -407,7 +446,7 @@ export function createNativeWebViewRunnerHtml(): string {
               message: typeCheck.learnerMessage
             });
           }
-          return buildAttempt(request, startedAt, stdout, stderr, testResults);
+          return buildAttempt(request, startedAt, stdout, stderr, testResults, null);
         }
       }
 
@@ -415,28 +454,34 @@ export function createNativeWebViewRunnerHtml(): string {
 
       if (request.runMode === "run_file") {
         try {
-          const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode);
-          runner(sandboxConsole);
+          const runner = new Function("console", "ReactNativeWebView", "window", "postMessage", "ProofPathSandbox", "\\"use strict\\";\\n" + runtimeCode);
+          runner(sandboxConsole, undefined, undefined, undefined, undefined);
         } catch (error) {
-          stderr.push(error instanceof Error ? error.message : String(error));
+          executionError = error instanceof Error ? error.message : String(error);
+          // Bypass the output budget so truncation cannot hide the failure.
+          appendError(stderr, executionError);
         }
-        return buildAttempt(request, startedAt, stdout, stderr, testResults);
+        return buildAttempt(request, startedAt, stdout, stderr, testResults, executionError);
       }
 
       for (let index = 0; index < tests.length; index += 1) {
         const test = tests[index];
         const visible = index < spec.visibleTests.length;
         const stdoutStart = stdout.length;
+        const stderrStart = stderr.length;
 
         try {
-          const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code);
-          runner(sandboxConsole);
+          const runner = new Function("console", "ReactNativeWebView", "window", "postMessage", "ProofPathSandbox", "\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code);
+          runner(sandboxConsole, undefined, undefined, undefined, undefined);
           const output = stdout.slice(stdoutStart).join("\\n");
           if (!passesOutputCheck(output, test)) {
             throw new Error("Output missing");
           }
           testResults.push({ id: test.id, name: test.name, passed: true, visible, message: "Passed" });
         } catch (error) {
+          if (visible) {
+            appendError(stderr, error instanceof Error ? error.message : String(error || "Test failed"));
+          }
           testResults.push({
             id: test.id,
             name: test.name,
@@ -445,14 +490,17 @@ export function createNativeWebViewRunnerHtml(): string {
             message: formatSandboxFailureMessage(error, spec.language)
           });
         } finally {
-          // Hidden check output must never reach learner-visible stdout.
+          // Hidden check output must never reach learner-visible stdout or stderr.
+          // Roll back both buffers unconditionally; a generic "Output missing"
+          // failure must not preserve an earlier private sentinel.
           if (!visible) {
             stdout.length = stdoutStart;
+            stderr.length = stderrStart;
           }
         }
       }
 
-      return buildAttempt(request, startedAt, stdout, stderr, testResults);
+      return buildAttempt(request, startedAt, stdout, stderr, testResults, null);
     }
 
     const scriptPromises = {};
@@ -530,23 +578,27 @@ export function createNativeWebViewRunnerHtml(): string {
       // checks use an import-style sentinel that guarantees a non-__main__ name.
       const moduleName = request.runMode === "run_file" ? PYTHON_DIRECT_RUN_NAME : PYTHON_IMPORT_RUN_NAME;
 
-      pyodide.setStdout({ batched: (text) => stdout.push(text) });
-      pyodide.setStderr({ batched: (text) => stderr.push(text) });
+      pyodide.setStdout({ batched: (text) => appendOutput(stdout, text) });
+      pyodide.setStderr({ batched: (text) => appendOutput(stderr, text) });
       pyodide.globals.set("__name__", moduleName);
 
       if (request.runMode === "run_file") {
+        let executionError = null;
         try {
           await pyodide.runPythonAsync(request.code);
         } catch (error) {
-          stderr.push(error instanceof Error ? error.message : String(error));
+          executionError = error instanceof Error ? error.message : String(error);
+          // Bypass the output budget so truncation cannot hide the failure.
+          appendError(stderr, executionError);
         }
-        return buildAttempt(request, startedAt, stdout, stderr, testResults);
+        return buildAttempt(request, startedAt, stdout, stderr, testResults, executionError);
       }
 
       for (let index = 0; index < tests.length; index += 1) {
         const test = tests[index];
         const visible = index < spec.visibleTests.length;
         const stdoutStart = stdout.length;
+        const stderrStart = stderr.length;
 
         try {
           const wrappedCode = [
@@ -562,7 +614,9 @@ export function createNativeWebViewRunnerHtml(): string {
           }
           testResults.push({ id: test.id, name: test.name, passed: true, visible, message: "Passed" });
         } catch (error) {
-          stderr.push(error instanceof Error ? error.message : String(error || "Test failed"));
+          if (visible) {
+            appendError(stderr, error instanceof Error ? error.message : String(error || "Test failed"));
+          }
           testResults.push({
             id: test.id,
             name: test.name,
@@ -571,15 +625,17 @@ export function createNativeWebViewRunnerHtml(): string {
             message: formatSandboxFailureMessage(error, spec.language)
           });
         } finally {
-          // Hidden checks must never contribute to learner-visible stdout: their
-          // harness can reveal the anti-forgery seed. Keep only visible output.
+          // Hidden checks must never contribute to learner-visible stdout or stderr: their
+          // harness can reveal the anti-forgery seed. Roll back both buffers
+          // unconditionally so a generic failure cannot preserve earlier output.
           if (!visible) {
             stdout.length = stdoutStart;
+            stderr.length = stderrStart;
           }
         }
       }
 
-      return buildAttempt(request, startedAt, stdout, stderr, testResults);
+      return buildAttempt(request, startedAt, stdout, stderr, testResults, null);
     }
 
     let sqlRuntime = null;
@@ -624,6 +680,7 @@ export function createNativeWebViewRunnerHtml(): string {
 
       if (request.runMode === "run_file") {
         const fileDb = new SQL.Database();
+        let executionError = null;
         try {
           if (spec.setupCode) {
             fileDb.run(spec.setupCode);
@@ -631,18 +688,21 @@ export function createNativeWebViewRunnerHtml(): string {
 
           const result = fileDb.exec(request.code);
           const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\\n");
-          stdout.push(output);
+          appendOutput(stdout, output);
         } catch (error) {
-          stderr.push(error instanceof Error ? error.message : String(error));
+          executionError = error instanceof Error ? error.message : String(error);
+          appendError(stderr, executionError);
         } finally {
           fileDb.close();
         }
-        return buildAttempt(request, startedAt, stdout.filter(Boolean), stderr, testResults);
+        return buildAttempt(request, startedAt, stdout.filter(Boolean), stderr, testResults, executionError);
       }
 
       for (let index = 0; index < tests.length; index += 1) {
         const test = tests[index];
         const visible = index < spec.visibleTests.length;
+        const stdoutStart = stdout.length;
+        const stderrStart = stderr.length;
         // Each check gets a fresh database seeded by setupCode so learner
         // scripts cannot leak state (for example a CREATE TABLE) into later
         // checks, and so a hidden harness seed cannot affect a visible check.
@@ -665,7 +725,7 @@ export function createNativeWebViewRunnerHtml(): string {
           // Hidden checks must never contribute to learner-visible stdout: their
           // output reveals the anti-forgery seed inserted by the harness.
           if (visible) {
-            stdout.push(output);
+            appendOutput(stdout, output);
           }
 
           if (!passesOutputCheck(output, test)) {
@@ -673,7 +733,12 @@ export function createNativeWebViewRunnerHtml(): string {
           }
           testResults.push({ id: test.id, name: test.name, passed: true, visible, message: output || "Query ran" });
         } catch (error) {
-          stderr.push(error instanceof Error ? error.message : String(error || "Test failed"));
+          const message = error instanceof Error ? error.message : String(error || "Test failed");
+          // Only a visible check may publish failure text; a hidden harness error
+          // can name seeded rows or expected values.
+          if (visible) {
+            appendError(stderr, message);
+          }
           testResults.push({
             id: test.id,
             name: test.name,
@@ -682,11 +747,15 @@ export function createNativeWebViewRunnerHtml(): string {
             message: formatSandboxFailureMessage(error, spec.language)
           });
         } finally {
+          if (!visible) {
+            stdout.length = stdoutStart;
+            stderr.length = stderrStart;
+          }
           db.close();
         }
       }
 
-      return buildAttempt(request, startedAt, stdout.filter(Boolean), stderr, testResults);
+      return buildAttempt(request, startedAt, stdout.filter(Boolean), stderr, testResults, null);
     }
 
     function runnerErrorAttempt(request, error) {
@@ -709,6 +778,8 @@ export function createNativeWebViewRunnerHtml(): string {
     }
 
     async function handleRun(request) {
+      totalOutputChars = 0;
+      isOutputTruncated = false;
       let attempt;
       try {
         if (request.spec.language === "python") {
@@ -722,7 +793,7 @@ export function createNativeWebViewRunnerHtml(): string {
         attempt = runnerErrorAttempt(request, error);
       }
 
-      post({ type: "sandbox-result", attempt });
+      post({ type: "sandbox-result", requestId: request.requestId, attempt });
     }
 
     function preloadRuntime(language) {
@@ -779,12 +850,188 @@ export function createNativeWebViewRunnerHtml(): string {
 </html>`;
 }
 
+const RUNNER_LANGUAGES: readonly RunnerLanguage[] = ["python", "sql", "javascript", "typescript"];
+
+function isRunnerLanguage(value: unknown): value is RunnerLanguage {
+  return typeof value === "string" && (RUNNER_LANGUAGES as readonly string[]).includes(value);
+}
+
+/**
+ * Reconstruct a result message from known fields only.
+ *
+ * This is a shape validator, not an authentication mechanism: the webview is
+ * the trust boundary for `passed`/`score` because hidden check results are
+ * stripped before the message leaves the webview. The request correlation ID
+ * (checked by the Code Lab host) prevents a timed-out or stale run from being
+ * crossed with a newer one; it does not make a forged same-run message
+ * impossible. See docs/sandbox-runtime-limits.md.
+ */
+function sanitizeNativeAttempt(raw: unknown): CodeRunAttempt | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const attempt = raw as Record<string, unknown>;
+  if (
+    typeof attempt.id !== "string"
+    || typeof attempt.lessonId !== "string"
+    || !isRunnerLanguage(attempt.language)
+    || typeof attempt.codeSnapshot !== "string"
+    || typeof attempt.stdout !== "string"
+    || typeof attempt.stderr !== "string"
+    || typeof attempt.passed !== "boolean"
+    || typeof attempt.score !== "number"
+    || typeof attempt.runtimeMs !== "number"
+    || typeof attempt.createdAt !== "string"
+    || !Array.isArray(attempt.testResults)
+  ) {
+    return null;
+  }
+
+  const testResults: CodeRunTestResult[] = [];
+  for (const candidate of attempt.testResults) {
+    if (!candidate || typeof candidate !== "object") {
+      return null;
+    }
+    const result = candidate as Record<string, unknown>;
+    if (
+      typeof result.id !== "string"
+      || typeof result.name !== "string"
+      || typeof result.passed !== "boolean"
+      || typeof result.visible !== "boolean"
+    ) {
+      return null;
+    }
+    testResults.push({
+      id: result.id,
+      name: result.name,
+      passed: result.passed,
+      visible: result.visible,
+      message: typeof result.message === "string" ? result.message : ""
+    });
+  }
+
+  const runMode: CodeRunMode = attempt.runMode === "run_file" ? "run_file" : "run_checks";
+  // A check run cannot be a pass if a visible check in the same message failed.
+  // Hidden results are absent here by design; their pass/fail is reflected in the
+  // webview-computed `passed` flag, which is trusted only within this boundary.
+  const passed = attempt.passed === true
+    && !(runMode === "run_checks" && testResults.some((result) => result.visible && !result.passed));
+  const score = Math.max(0, Math.min(100, Math.round(attempt.score)));
+
+  return normalizeCodeRunAttempt({
+    id: attempt.id,
+    lessonId: attempt.lessonId,
+    language: attempt.language,
+    runMode,
+    ...(typeof attempt.command === "string" ? { command: attempt.command } : {}),
+    codeSnapshot: attempt.codeSnapshot,
+    stdout: attempt.stdout,
+    stderr: attempt.stderr,
+    passed,
+    score,
+    runtimeMs: attempt.runtimeMs,
+    testResults,
+    diagnostics: [],
+    // The host marks this attempt trusted because it was produced by the current
+    // bundled WebView runner, which sanitizes hidden output at the source. The
+    // version is not accepted from the message, so a forged field cannot promote
+    // an untrusted payload.
+    sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
+    createdAt: attempt.createdAt
+  });
+}
+
+export type NativeResultIntegrity =
+  | { ok: true }
+  | { ok: false; reason: string };
+
+/**
+ * Bind a structurally valid result to the exact run that is still active.
+ *
+ * A request ID proves the message belongs to the current request, but it does
+ * not prove the payload describes the code the learner actually ran. This check
+ * rejects context mismatches and internally contradictory success claims so a
+ * stale, cross-lesson, or malformed message cannot create durable proof.
+ *
+ * The remaining trust boundary is explicit: the bundled WebView executor
+ * computes hidden-check pass/fail. The host verifies consistency, not the
+ * executor's honesty about private checks it alone can see.
+ */
+export function validateNativeWebViewResult(
+  attempt: CodeRunAttempt,
+  request: NativeWebViewRunnerRequest,
+  receivedRequestId?: string
+): NativeResultIntegrity {
+  if (request.requestId !== undefined && receivedRequestId !== request.requestId) {
+    return { ok: false, reason: "request-id-mismatch" };
+  }
+
+  if (attempt.lessonId !== request.lessonId) {
+    return { ok: false, reason: "lesson-id-mismatch" };
+  }
+
+  if (attempt.language !== request.spec.language) {
+    return { ok: false, reason: "language-mismatch" };
+  }
+
+  if (attempt.runMode !== request.runMode) {
+    return { ok: false, reason: "run-mode-mismatch" };
+  }
+
+  if (attempt.codeSnapshot !== request.code) {
+    return { ok: false, reason: "code-snapshot-mismatch" };
+  }
+
+  if (!Number.isFinite(attempt.runtimeMs) || attempt.runtimeMs < 0) {
+    return { ok: false, reason: "invalid-runtime" };
+  }
+
+  if (Number.isNaN(Date.parse(attempt.createdAt))) {
+    return { ok: false, reason: "invalid-timestamp" };
+  }
+
+  if (!Number.isFinite(attempt.score)) {
+    return { ok: false, reason: "invalid-score" };
+  }
+
+  const resultIds = attempt.testResults.map((result) => result.id);
+  if (new Set(resultIds).size !== resultIds.length) {
+    return { ok: false, reason: "duplicate-results" };
+  }
+
+  if (attempt.runMode === "run_checks" && attempt.passed) {
+    if (attempt.testResults.length === 0) {
+      return { ok: false, reason: "empty-results" };
+    }
+    if (attempt.testResults.some((result) => result.visible && !result.passed)) {
+      return { ok: false, reason: "contradictory-visible-failure" };
+    }
+    // The webview strips hidden results before sending. A passing message must
+    // therefore contain exactly the visible checks the host asked for; a
+    // missing, extra, or relabelled result is not the run we requested.
+    const visibleResults = attempt.testResults.filter((result) => result.visible);
+    if (visibleResults.length === 0) {
+      return { ok: false, reason: "empty-visible-results" };
+    }
+    if (visibleResults.length !== request.spec.visibleTests.length) {
+      return { ok: false, reason: "visible-result-count-mismatch" };
+    }
+    if (attempt.score !== 100) {
+      return { ok: false, reason: "contradictory-score" };
+    }
+  }
+
+  return { ok: true };
+}
+
 export function parseNativeWebViewRunnerMessage(payload: string): NativeWebViewRunnerMessage | null {
   try {
     const parsed = JSON.parse(payload) as {
       type?: string;
       assets?: typeof SANDBOX_ASSET_PATHS;
-      attempt?: CodeRunAttempt;
+      requestId?: string;
+      attempt?: unknown;
       language?: RunnerLanguage;
     };
 
@@ -796,15 +1043,15 @@ export function parseNativeWebViewRunnerMessage(payload: string): NativeWebViewR
       return { type: "sandbox-warm", language: parsed.language };
     }
 
-    if (parsed.type === "sandbox-result" && parsed.attempt) {
-      const redacted = redactCheckResults(parsed.attempt.testResults ?? []);
+    if (parsed.type === "sandbox-result") {
+      const attempt = sanitizeNativeAttempt(parsed.attempt);
+      if (!attempt) {
+        return null;
+      }
       return {
         type: "sandbox-result",
-        attempt: normalizeCodeRunAttempt({
-          ...parsed.attempt,
-          testResults: redacted.visibleCheckResults,
-          hiddenCheckSummary: redacted.hiddenCheckSummary
-        })
+        requestId: typeof parsed.requestId === "string" ? parsed.requestId : undefined,
+        attempt
       };
     }
 

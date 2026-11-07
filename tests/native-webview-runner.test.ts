@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as tsModule from "typescript";
-import { normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
+import { CURRENT_SANDBOX_DISCLOSURE_VERSION, normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
 import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec } from "@/domain/types";
 import {
   createNativeWebViewRunnerHtml,
@@ -181,10 +181,12 @@ describe("native WebView sandbox runner bridge", () => {
   it("derives run_file pass from error output, matching the web runner", () => {
     const html = createNativeWebViewRunnerHtml();
 
-    // The web runner only passes a run_file attempt when no error diagnostic was
-    // produced. The native script has no diagnostic parser, so it uses the signal
-    // it does have (a raised exception lands in stderr) instead of hardcoding true.
-    expect(html).toContain('? stderr.join("\\n").trim().length === 0');
+    // The web runner only passes a run_file attempt when execution did not throw
+    // and no error diagnostic was produced. The native script has no diagnostic
+    // parser, so it combines its explicit executionError signal with the error
+    // output signal instead of hardcoding true.
+    expect(html).toContain("? !executionError && stderr.join");
+    expect(html).toContain('.trim().length === 0');
     expect(html).not.toContain('request.runMode === "run_file" ? true');
   });
 
@@ -216,6 +218,7 @@ describe("native WebView sandbox runner bridge", () => {
       score: 100,
       runtimeMs: 4,
       testResults: [{ id: "visible", name: "Visible", passed: true, visible: true, message: "Passed" }],
+      sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
       createdAt: "2026-05-07T20:30:00.000Z"
     });
     const resultPayload = JSON.stringify({ type: "sandbox-result", attempt });
@@ -689,5 +692,308 @@ describe("native WebView runner behavior (embedded script executed with stubs)",
 
     expect(attempt.passed).toBe(true);
     expect(attempt.stdout).toContain("2");
+  });
+
+  it("resets output character capping between consecutive runs on the same runner", async () => {
+    const { windowStub, sandbox } = createEmbeddedNativeRunnerWindow({});
+    const results: EmbeddedAttempt[] = [];
+    let resolveRun!: () => void;
+
+    windowStub.ReactNativeWebView.postMessage = (payload: string) => {
+      const message = JSON.parse(payload) as { type?: string; attempt?: EmbeddedAttempt };
+      if (message.type === "sandbox-result" && message.attempt) {
+        results.push(message.attempt);
+        resolveRun?.();
+      }
+    };
+
+    // First run emits huge output that triggers truncation
+    const firstRunPromise = new Promise<void>((resolve) => {
+      resolveRun = resolve;
+    });
+    sandbox.run({
+      type: "run",
+      request: {
+        lessonId: "lesson-output-1",
+        code: 'for (var i = 0; i < 25000; i++) console.log("line " + i + " padding text data");',
+        now: "2026-11-06T20:00:00.000Z",
+        runMode: "run_file",
+        spec: {
+          language: "javascript",
+          instructions: "Test big output.",
+          starterCode: "",
+          visibleTests: [],
+          hiddenTests: [],
+          expectedOutput: [],
+          timeoutMs: 4000,
+          allowNetwork: false
+        }
+      }
+    });
+    await firstRunPromise;
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.stdout).toContain("[output truncated: exceeded 512KB limit]");
+
+    // Second run on the same window emits normal output
+    const secondRunPromise = new Promise<void>((resolve) => {
+      resolveRun = resolve;
+    });
+    sandbox.run({
+      type: "run",
+      request: {
+        lessonId: "lesson-output-2",
+        code: 'console.log("second run output line");',
+        now: "2026-11-06T20:00:01.000Z",
+        runMode: "run_file",
+        spec: {
+          language: "javascript",
+          instructions: "Test second run output.",
+          starterCode: "",
+          visibleTests: [],
+          hiddenTests: [],
+          expectedOutput: [],
+          timeoutMs: 4000,
+          allowNetwork: false
+        }
+      }
+    });
+    await secondRunPromise;
+
+    expect(results).toHaveLength(2);
+    // The second run's output must not be empty or truncated by the previous run
+    expect(results[1]?.stdout).toBe("second run output line");
+  });
+
+  it("includes requestId in results and correlates active runs", async () => {
+    const { windowStub, sandbox } = createEmbeddedNativeRunnerWindow({});
+    let capturedResult: { type?: string; requestId?: string; attempt?: unknown } | undefined;
+    let resolveResult!: () => void;
+    const resultPromise = new Promise<void>((resolve) => {
+      resolveResult = resolve;
+    });
+
+    windowStub.ReactNativeWebView.postMessage = (payload: string) => {
+      capturedResult = JSON.parse(payload);
+      resolveResult?.();
+    };
+
+    sandbox.run({
+      type: "run",
+      request: {
+        requestId: "req-xyz-999",
+        lessonId: "lesson-test",
+        code: "console.log('hello');",
+        now: "2026-11-06T20:00:00.000Z",
+        runMode: "run_file",
+        spec: {
+          language: "javascript",
+          instructions: "Say hello",
+          starterCode: "",
+          visibleTests: [],
+          hiddenTests: [],
+          expectedOutput: [],
+          timeoutMs: 4000,
+          allowNetwork: false
+        }
+      }
+    });
+    await resultPromise;
+
+    expect(capturedResult).toBeDefined();
+    expect(capturedResult?.type).toBe("sandbox-result");
+    expect(capturedResult?.requestId).toBe("req-xyz-999");
+  });
+});
+
+describe("native runner privacy and truncation truth (A01/A02/A04)", () => {
+  function createScriptedPyodide(script: (code: string, emitOut: (text: string) => void, emitErr: (text: string) => void) => Promise<void>) {
+    let emitOut: (text: string) => void = () => {};
+    let emitErr: (text: string) => void = () => {};
+    return {
+      setStdout: ({ batched }: { batched: (text: string) => void }) => {
+        emitOut = batched;
+      },
+      setStderr: ({ batched }: { batched: (text: string) => void }) => {
+        emitErr = batched;
+      },
+      globals: { set: () => {} },
+      runPythonAsync: async (code: string) => script(code, emitOut, emitErr)
+    };
+  }
+
+  it("does not leak a hidden Python stderr sentinel and still grades the hidden failure", async () => {
+    const pyodide = createScriptedPyodide(async (code, emitOut, emitErr) => {
+      if (code.includes("HIDDEN_ONLY_SENTINEL_2026")) {
+        emitErr("HIDDEN_ONLY_SENTINEL_2026\n");
+        emitOut("not the expected row\n");
+        return;
+      }
+      emitOut("DONE\n");
+    });
+
+    const attempt = await runEmbeddedNativeRunner({
+      request: {
+        lessonId: "lesson-native-python-hidden",
+        code: 'print("DONE")',
+        now: "2026-11-07T21:10:00.000Z",
+        runMode: "run_checks",
+        spec: {
+          language: "python",
+          instructions: "Print the visible answer.",
+          starterCode: 'print("DONE")',
+          visibleTests: [{ id: "visible", name: "Visible", code: "# comment-only", expectedOutputIncludes: ["DONE"] }],
+          hiddenTests: [{
+            id: "hidden",
+            name: "Hidden",
+            code: "import sys\nsys.stderr.write('HIDDEN_ONLY_SENTINEL_2026\\n')\nprint('wrong')",
+            expectedOutputIncludes: ["SECRET_EXPECTED_ROW_2026"]
+          }],
+          expectedOutput: ["DONE"],
+          timeoutMs: 30000,
+          allowNetwork: false
+        }
+      },
+      loadPyodide: async () => pyodide
+    });
+
+    expect(attempt.passed).toBe(false);
+    expect(attempt.score).toBe(50);
+    const serialized = JSON.stringify(attempt);
+    for (const secret of ["HIDDEN_ONLY_SENTINEL_2026", "SECRET_EXPECTED_ROW_2026", "Output missing"]) {
+      expect(serialized).not.toContain(secret);
+      expect(attempt.stdout).not.toContain(secret);
+      expect(attempt.stderr).not.toContain(secret);
+    }
+    expect(attempt.testResults.map((result) => result.id)).toEqual(["visible"]);
+  });
+
+  it("fails a native Python run_file when output truncates before an exception", async () => {
+    const pyodide = createScriptedPyodide(async (_code, emitOut) => {
+      for (let index = 0; index < 20000; index += 1) {
+        emitOut(`filler ${index} ${"x".repeat(60)}\n`);
+      }
+      throw new Error("boom-after-truncation");
+    });
+
+    const attempt = await runEmbeddedNativeRunner({
+      request: {
+        lessonId: "lesson-native-python-truncation",
+        code: "print('anything')",
+        now: "2026-11-07T21:11:00.000Z",
+        runMode: "run_file",
+        spec: {
+          language: "python",
+          instructions: "Produce output, then fail.",
+          starterCode: "",
+          visibleTests: [],
+          hiddenTests: [],
+          expectedOutput: [],
+          timeoutMs: 30000,
+          allowNetwork: false
+        }
+      },
+      loadPyodide: async () => pyodide
+    });
+
+    expect(attempt.passed).toBe(false);
+    expect(attempt.stdout).toContain("[output truncated: exceeded 512KB limit]");
+    expect(attempt.stderr).toContain("boom-after-truncation");
+  });
+
+  it("rejects malformed native results and never upgrades a contradictory pass", () => {
+    // Missing required fields is not a result.
+    expect(parseNativeWebViewRunnerMessage(JSON.stringify({
+      type: "sandbox-result",
+      requestId: "req-1",
+      attempt: { id: "x", lessonId: "y" }
+    }))).toBeNull();
+
+    // A non-string stdout is not a result.
+    const base = {
+      id: "code-run-x-1",
+      lessonId: "lesson-x",
+      language: "javascript",
+      runMode: "run_checks",
+      codeSnapshot: "console.log('ok')",
+      stdout: "ok",
+      stderr: "",
+      passed: true,
+      score: 100,
+      runtimeMs: 1,
+      testResults: [{ id: "visible", name: "Visible", passed: false, visible: true, message: "failed" }],
+      createdAt: "2026-11-07T21:12:00.000Z"
+    };
+    expect(parseNativeWebViewRunnerResult(JSON.stringify({
+      type: "sandbox-result",
+      requestId: "req-2",
+      attempt: { ...base, stdout: 42 }
+    }))).toBeNull();
+
+    // passed:true contradicts a failed visible check, so it is coerced to false.
+    const parsed = parseNativeWebViewRunnerResult(JSON.stringify({ type: "sandbox-result", requestId: "req-3", attempt: base }));
+    expect(parsed).not.toBeNull();
+    expect(parsed?.passed).toBe(false);
+    expect(parsed?.hiddenCheckSummary).toEqual({ total: 0, passed: 0, failed: 0 });
+  });
+});
+
+describe("native runner per-run output budget", () => {
+  it("gives each sequential run a fresh output budget", async () => {
+    const pyodide = {
+      setStdout: (options: { batched: (text: string) => void }) => {
+        (pyodide as unknown as { emit: (text: string) => void }).emit = options.batched;
+      },
+      setStderr: () => {},
+      globals: { set: () => {} },
+      runPythonAsync: async () => {
+        const emit = (pyodide as unknown as { emit?: (text: string) => void }).emit ?? (() => {});
+        for (let index = 0; index < 20000; index += 1) {
+          emit(`line ${index} ${"x".repeat(60)}\n`);
+        }
+      }
+    };
+
+    const { windowStub, sandbox } = createEmbeddedNativeRunnerWindow({ loadPyodide: async () => pyodide });
+    const results: EmbeddedAttempt[] = [];
+    windowStub.ReactNativeWebView.postMessage = (payload: string) => {
+      const message = JSON.parse(payload) as { type?: string; attempt?: EmbeddedAttempt };
+      if (message.type === "sandbox-result" && message.attempt) {
+        results.push(message.attempt);
+      }
+    };
+
+    const request = (now: string) => ({
+      lessonId: "lesson-native-budget",
+      code: "print('hello')",
+      now,
+      runMode: "run_file" as const,
+      spec: {
+        language: "python" as const,
+        instructions: "Produce a lot of output.",
+        starterCode: "",
+        visibleTests: [],
+        hiddenTests: [],
+        expectedOutput: [],
+        timeoutMs: 30000,
+        allowNetwork: false
+      }
+    });
+
+    const waitFor = async (count: number) => {
+      for (let attempt = 0; attempt < 200 && results.length < count; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    };
+
+    sandbox.run({ type: "run", request: request("2026-11-07T21:30:00.000Z") });
+    await waitFor(1);
+    sandbox.run({ type: "run", request: request("2026-11-07T21:31:00.000Z") });
+    await waitFor(2);
+
+    expect(results).toHaveLength(2);
+    for (const attempt of results) {
+      expect(attempt.stdout).toContain("[output truncated: exceeded 512KB limit]");
+    }
   });
 });

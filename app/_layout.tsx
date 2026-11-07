@@ -1,13 +1,18 @@
 import type { ReactElement } from "react";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { Text, View } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ProgressShell } from "@/state/progress-shell";
+import { registerProofPathServiceWorker } from "@/ui/register-service-worker";
 import { colors } from "@/ui/theme";
 
 export default function RootLayout(): ReactElement {
+  useEffect(() => {
+    registerProofPathServiceWorker();
+  }, []);
+
   return (
     <>
       <Suspense fallback={<LoadingState />}>

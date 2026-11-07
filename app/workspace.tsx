@@ -11,10 +11,11 @@ import {
   type WorkspaceManifestValidation,
   type WorkspaceTask
 } from "@/domain/workspace-bridge";
+import type { ReadmeStatus } from "@/domain/types";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
-import { copyToClipboard, downloadTextFile, shareText } from "@/ui/file-transfer";
+import { copyToClipboard, downloadTextFile, shareFile, shareText } from "@/ui/file-transfer";
 import { colors, radius, spacing } from "@/ui/theme";
 
 const WORKSPACE_TASKS: WorkspaceTask[] = [
@@ -85,6 +86,8 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
   const [validation, setValidation] = useState<WorkspaceManifestValidation | null>(null);
   const [transferStatus, setTransferStatus] = useState<string | null>(null);
   const [savedStatus, setSavedStatus] = useState<string | null>(null);
+  const [readmeStatus, setReadmeStatus] = useState<ReadmeStatus>("missing");
+  const [reflection, setReflection] = useState("");
 
   const bundle = createWorkspaceBundle(task);
   const relatedEvidence = task.linkedMissionId
@@ -93,16 +96,23 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
 
   async function handleExport(): Promise<void> {
     const content = serializeWorkspaceBundle(bundle);
-    const outcome = Platform.OS === "web"
+    let outcome = Platform.OS === "web"
       ? await downloadTextFile(bundle.fileName, content, "application/json")
-      : await shareText(task.title, content);
+      : await shareFile(bundle.fileName, content, "application/json");
+    if (Platform.OS !== "web" && outcome === "unsupported") {
+      outcome = await shareText(task.title, content);
+    }
 
     if (outcome === "downloaded") {
       setTransferStatus(`Downloaded ${bundle.fileName}. Reconstruct the files, preserving paths.`);
     } else if (outcome === "shared") {
-      setTransferStatus("Opened the share sheet. Save the file, then reconstruct it preserving paths.");
+      setTransferStatus(`Opened the share sheet with ${bundle.fileName}. Choose a destination to save the workspace file; closing the sheet cancels it.`);
+    } else if (outcome === "dismissed") {
+      setTransferStatus("Share cancelled. Nothing was exported; use Copy workspace text instead.");
+    } else if (outcome === "failed") {
+      setTransferStatus("Sharing failed. Use Copy workspace text instead.");
     } else {
-      setTransferStatus("This platform cannot save files directly. Use Copy workspace text instead.");
+      setTransferStatus("This platform cannot share files directly. Use Copy workspace text instead.");
     }
   }
 
@@ -133,10 +143,13 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
       linkedProjectMissionId: task.linkedMissionId,
       testStatus: "passing",
       verifierOutput: manifestText.trim(),
-      reflection: undefined
+      readmeStatus,
+      reflection: reflection.trim() || undefined
     });
 
-    setSavedStatus(saved ? "Saved as self-reported evidence linked to this project." : "Could not save evidence.");
+    setSavedStatus(saved
+      ? "Saved as self-reported evidence linked to this project. Next: open the mission to see which evidence requirements are still missing before it can complete."
+      : "Could not save evidence.");
   }
 
   return (
@@ -174,8 +187,12 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
           The JSON export carries every file path and its contents, so the project can be reconstructed exactly.
         </MutedText>
         <Row>
-          <ButtonShell accessibilityHint="Downloads or shares the workspace files." onPress={handleExport} tone="teal">
-            {Platform.OS === "web" ? "Download workspace file" : "Share workspace file"}
+          <ButtonShell
+            accessibilityHint={Platform.OS === "web" ? "Downloads the workspace bundle file." : "Shares the workspace bundle text. This build does not attach a named file."}
+            onPress={handleExport}
+            tone="teal"
+          >
+            {Platform.OS === "web" ? "Download workspace file" : "Share workspace text"}
           </ButtonShell>
           <ButtonShell
             accessibilityHint="Copies the full workspace as text with file delimiters."
@@ -209,6 +226,33 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
           style={[styles.input, styles.manifestInput]}
           value={manifestText}
         />
+        <MutedText>
+          Save the documentation on this same record so linked mission requirements describe one submission. A mission does not complete from unrelated evidence snippets.
+        </MutedText>
+        <Row>
+          {(["missing", "basic", "complete"] as const).map((status) => (
+            <ButtonShell
+              accessibilityHint={`Marks the project README as ${status}.`}
+              accessibilityLabel={`README status ${status}`}
+              key={status}
+              onPress={() => setReadmeStatus(status)}
+              selected={readmeStatus === status}
+              tone={readmeStatus === status ? "ink" : status === "missing" ? "rose" : "amber"}
+            >
+              README {status}
+            </ButtonShell>
+          ))}
+        </Row>
+        <TextInput
+          accessibilityHint="Explain how this project proves the skill and what still remains."
+          accessibilityLabel="Workspace reflection"
+          multiline
+          onChangeText={setReflection}
+          placeholder="Explain how this project proves the skill and what still remains."
+          placeholderTextColor={colors.muted}
+          style={[styles.input, styles.noteInput]}
+          value={reflection}
+        />
         <Row>
           <ButtonShell accessibilityHint="Checks the manifest against the task and workspace hash." onPress={handleValidate} tone="blue" variant="secondary">
             Validate manifest
@@ -235,6 +279,9 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
         <Panel>
           <SectionTitle>Linked project evidence</SectionTitle>
           <MutedText>{relatedEvidence.length} saved evidence item{relatedEvidence.length === 1 ? "" : "s"} for this project.</MutedText>
+          <MutedText>
+            The mission completes only when its own checklist is satisfied by coherent evidence from one submission. A verifier success on this screen is a record, not a signature.
+          </MutedText>
           <Link href={{ pathname: "/mission/[missionId]", params: { missionId: task.linkedMissionId } }} asChild>
             <ButtonShell accessibilityHint="Opens the linked project mission." tone="teal" variant="secondary">
               Open linked mission
@@ -269,6 +316,10 @@ const styles = StyleSheet.create({
   manifestInput: {
     fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
     minHeight: 140,
+    textAlignVertical: "top"
+  },
+  noteInput: {
+    minHeight: 100,
     textAlignVertical: "top"
   },
   code: {

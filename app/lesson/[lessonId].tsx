@@ -1,7 +1,7 @@
 import { Link, Redirect, router, useLocalSearchParams } from "expo-router";
 import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { contentPack } from "@/content/seed";
 import { findLesson } from "@/domain/content";
 import { CodeLab } from "@/ui/code-lab";
@@ -15,6 +15,9 @@ import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
 import { colors, radius, spacing } from "@/ui/theme";
 import { preloadSandbox, runLessonSandbox } from "@/sandbox/runner";
+import { canRunNativePythonProof, runNativePythonFile } from "@/sandbox/native-python-proof-runner";
+import { validateSandboxSubmission } from "@/sandbox/policy";
+import { formatPolicyViolationFeedback } from "@/sandbox/feedback";
 import { deriveLessonWorkflow, type LessonWorkflowStep, STEPS } from "@/domain/lesson-workflow";
 import { getMissionProofChecklist } from "@/domain/progress";
 
@@ -43,17 +46,54 @@ export default function LessonDetailScreen(): ReactElement {
   const [visitedSteps, setVisitedSteps] = useState<LessonWorkflowStep[]>(["understand"]);
   const [practiceOutputs, setPracticeOutputs] = useState<Record<string, { output: string; running: boolean }>>({});
   const [practiceCodes, setPracticeCodes] = useState<Record<string, string>>({});
+  const [practiceHandoff, setPracticeHandoff] = useState<{ code: string; token: number } | null>(null);
 
   const handleRunPractice = async (key: string, code: string) => {
     if (!lesson?.workshop.miniProject.runnerSpec) return;
+    const runnerSpec = lesson.workshop.miniProject.runnerSpec;
+    const finish = (output: string): void => {
+      setPracticeOutputs((prev) => ({
+        ...prev,
+        [key]: { output: output || "(No output printed)", running: false }
+      }));
+    };
     setPracticeOutputs((prev) => ({ ...prev, [key]: { output: "Executing code in sandbox...", running: true } }));
+
+    // Practice must use the platform-appropriate runner. The web runner cannot
+    // execute on Hermes/native (its dynamic imports fail closed), so native uses
+    // the same offline verifier family as the native Code Lab. Languages the
+    // offline runner cannot handle are directed to the Code Lab WebView instead
+    // of surfacing a misleading runtime error.
+    if (Platform.OS !== "web") {
+      const violations = validateSandboxSubmission(runnerSpec, code);
+      if (violations.length > 0) {
+        finish(violations.map((violation) => formatPolicyViolationFeedback(violation, runnerSpec.language)).join("\n\n"));
+        return;
+      }
+
+      if (runnerSpec.language === "python" && canRunNativePythonProof(runnerSpec)) {
+        const attempt = runNativePythonFile(`${lesson.id}-practice-${key}`, code);
+        finish(attempt.stdout + (attempt.stderr ? "\n" + attempt.stderr : ""));
+        return;
+      }
+
+      // Reuse the Code Lab's supported runtime instead of pretending the
+      // restricted offline runner can execute this language. The edited code
+      // is handed to the editor; nothing is graded until the learner runs
+      // checks there.
+      setPracticeHandoff({ code, token: Date.now() });
+      setCurrentStep("apply");
+      finish("This language runs in the Code Lab on this device. Your practice code is loaded there. Practice runs are not graded; use Run checks when you are ready.");
+      return;
+    }
+
     try {
       const attempt = await runLessonSandbox(
         {
-          language: lesson.workshop.miniProject.runnerSpec.language,
+          language: runnerSpec.language,
           instructions: "",
           starterCode: code,
-          setupCode: lesson.workshop.miniProject.runnerSpec.setupCode ?? "",
+          setupCode: runnerSpec.setupCode ?? "",
           visibleTests: [],
           hiddenTests: [],
           expectedOutput: [],
@@ -65,16 +105,9 @@ export default function LessonDetailScreen(): ReactElement {
         new Date().toISOString(),
         "run_file"
       );
-      const combinedOutput = attempt.stdout + (attempt.stderr ? "\n" + attempt.stderr : "");
-      setPracticeOutputs((prev) => ({
-        ...prev,
-        [key]: { output: combinedOutput || "(No output printed)", running: false }
-      }));
+      finish(attempt.stdout + (attempt.stderr ? "\n" + attempt.stderr : ""));
     } catch (err) {
-      setPracticeOutputs((prev) => ({
-        ...prev,
-        [key]: { output: String(err), running: false }
-      }));
+      finish(String(err));
     }
   };
 
@@ -97,6 +130,14 @@ export default function LessonDetailScreen(): ReactElement {
     });
     setPracticeCodes(initialCodes);
   }, [lesson]);
+
+  // Hook order must be stable: this effect previously sat after the early
+  // returns below, so the hook count changed when native SQLite hydration
+  // finished and React could throw "rendered more hooks than during the
+  // previous render". Keep every hook above the conditional returns.
+  useEffect(() => {
+    setVisitedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
+  }, [currentStep]);
 
   if (isCheckingOnboarding) {
     return (
@@ -136,6 +177,14 @@ export default function LessonDetailScreen(): ReactElement {
     && attempt.runMode === "run_checks"
     && attempt.passed
   ));
+  // Auto-captured Code Lab proofs have ids prefixed `evidence-proof-`; a saved
+  // portfolio artifact is a separate, learner-authored evidence record.
+  const portfolioEvidenceSaved = progress.evidenceItems.some((item) => (
+    item.linkedLessonId === lesson.id && !item.id.startsWith("evidence-proof-")
+  ));
+  const autoProofRecorded = progress.evidenceItems.some((item) => (
+    item.linkedLessonId === lesson.id && item.id.startsWith("evidence-proof-")
+  ));
   const allQuestionsAnswered = quiz ? quiz.questions.every((_, index) => selectedChoiceIndexes[index] !== undefined) : false;
   const answeredCount = quiz ? quiz.questions.filter((_, index) => selectedChoiceIndexes[index] !== undefined).length : 0;
   const moduleItem = contentPack.modules.find((candidate) => candidate.id === lesson.moduleId);
@@ -148,10 +197,6 @@ export default function LessonDetailScreen(): ReactElement {
   const hasUnfinishedPrerequisites = lessonPosition > 0 && moduleLessonIds.slice(0, lessonPosition).some((id) => !progress.completedLessonIds.includes(id));
   const fluencyRepTone = opensBeginnerPythonSupport ? "green" : "teal";
   const fluencyRepLabel = opensBeginnerPythonSupport ? "guided reps" : "optional reps";
-  
-  useEffect(() => {
-    setVisitedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
-  }, [currentStep]);
 
   // A sample lesson runs before a career path is chosen. The lesson is fully
   // playable, so we surface an explanation and route the terminal action to
@@ -168,6 +213,7 @@ export default function LessonDetailScreen(): ReactElement {
     hasQuiz: !!quiz,
     nextLessonId,
     allQuestionsAnswered,
+    portfolioEvidenceSaved,
     previewMode: isPreview
   });
 
@@ -379,6 +425,7 @@ export default function LessonDetailScreen(): ReactElement {
                   multiline
                   autoCapitalize="none"
                   autoCorrect={false}
+                  accessibilityLabel="Practice code editor"
                   style={[styles.codeBlock, styles.practiceInput]}
                   value={practiceCodes["main"] ?? ""}
                   onChangeText={(text) => setPracticeCodes((prev) => ({ ...prev, main: text }))}
@@ -394,6 +441,22 @@ export default function LessonDetailScreen(): ReactElement {
                   style={{ alignSelf: "flex-start", marginVertical: spacing.xs }}
                 >
                   {practiceOutputs["main"]?.running ? "Running..." : "▶ Run starter code"}
+                </ButtonShell>
+                <ButtonShell
+                  accessibilityHint="Copies the practice code into the Code Lab editor without running checks or granting an achievement."
+                  onPress={() => {
+                    setPracticeHandoff({
+                      code: practiceCodes["main"] ?? lesson.workshop.practice.starterCode,
+                      token: Date.now()
+                    });
+                    setCurrentStep("apply");
+                  }}
+                  size="compact"
+                  tone="blue"
+                  variant="secondary"
+                  style={{ alignSelf: "flex-start", marginVertical: spacing.xs }}
+                >
+                  Open this code in Code Lab
                 </ButtonShell>
                 {practiceOutputs["main"]?.output ? (
                   <View>
@@ -416,6 +479,7 @@ export default function LessonDetailScreen(): ReactElement {
                   multiline
                   autoCapitalize="none"
                   autoCorrect={false}
+                  accessibilityLabel="Practice code editor"
                   style={[styles.codeBlock, styles.practiceInput]}
                   value={practiceCodes["main"] ?? ""}
                   onChangeText={(text) => setPracticeCodes((prev) => ({ ...prev, main: text }))}
@@ -467,76 +531,77 @@ export default function LessonDetailScreen(): ReactElement {
                   ))}
                 </SubPanel>
               ) : null}
-
-              {lesson.workshop.practiceReps && lesson.workshop.practiceReps.length > 0 ? (
-                <SubPanel style={styles.repsPanel}>
-                  <Row>
-                    <Badge tone={fluencyRepTone}>{fluencyRepLabel}</Badge>
-                  </Row>
-                  <SectionTitle>Fluency reps</SectionTitle>
-                  <BodyText>
-                    {opensBeginnerPythonSupport
-                      ? "Do these small variations before the checkpoint so the syntax becomes familiar instead of one copied answer."
-                      : "Do these small variations when you want more confidence before the checkpoint."}
-                  </BodyText>
-                  <ButtonShell
-                    accessibilityHint={showFluencyReps ? "Hides fluency reps." : "Shows fluency reps."}
-                    accessibilityState={{ expanded: showFluencyReps }}
-                    onPress={() => setShowFluencyReps((current) => !current)}
-                    size="compact"
-                    tone="ink"
-                    variant="tertiary"
-                  >
-                    {showFluencyReps ? "Hide reps" : `Show ${lesson.workshop.practiceReps.length} reps`}
-                  </ButtonShell>
-                  {showFluencyReps ? lesson.workshop.practiceReps.map((practiceRep, repIndex) => {
-                    const repKey = `rep-${repIndex}`;
-                    return (
-                      <View key={`${lesson.id}-practice-rep-${repIndex}`} style={styles.repBlock}>
-                        <Row>
-                          <Badge tone="teal">rep {repIndex + 1}</Badge>
-                          <Badge tone="blue">same idea, new data</Badge>
-                        </Row>
-                        <SectionTitle>Starter code</SectionTitle>
-                        <TextInput
-                          multiline
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          style={[styles.codeBlock, styles.practiceInput]}
-                          value={practiceCodes[repKey] ?? ""}
-                          onChangeText={(text) => setPracticeCodes((prev) => ({ ...prev, [repKey]: text }))}
-                        />
-                        
-                        {/* Run example button */}
-                        <ButtonShell
-                          accessibilityHint={`Runs fluency rep ${repIndex + 1} starter code in the sandbox.`}
-                          disabled={practiceOutputs[repKey]?.running}
-                          onPress={() => handleRunPractice(repKey, practiceCodes[repKey] ?? practiceRep.starterCode)}
-                          size="compact"
-                          tone="teal"
-                          variant="secondary"
-                          style={{ alignSelf: "flex-start", marginVertical: spacing.xs }}
-                        >
-                          {practiceOutputs[repKey]?.running ? "Running..." : `▶ Run rep ${repIndex + 1} code`}
-                        </ButtonShell>
-                        {practiceOutputs[repKey]?.output ? (
-                          <View>
-                            <SectionTitle>Rep output</SectionTitle>
-                            <Text style={styles.codeBlock}>{practiceOutputs[repKey].output}</Text>
-                          </View>
-                        ) : null}
-                        
-                        <SectionTitle>Expected output</SectionTitle>
-                        <Text selectable style={styles.codeBlock}>{practiceRep.expectedOutput}</Text>
-                        <SectionTitle>Check your answer</SectionTitle>
-                        <BodyText>{practiceRep.checkYourAnswer}</BodyText>
-                      </View>
-                    );
-                  }) : null}
-                </SubPanel>
-              ) : null}
             </>
           )}
+
+          {lesson.workshop.practiceReps && lesson.workshop.practiceReps.length > 0 ? (
+            <SubPanel style={styles.repsPanel}>
+              <Row>
+                <Badge tone={fluencyRepTone}>{fluencyRepLabel}</Badge>
+              </Row>
+              <SectionTitle>Fluency reps</SectionTitle>
+              <BodyText>
+                {opensBeginnerPythonSupport
+                  ? "Do these small variations before the checkpoint so the syntax becomes familiar instead of one copied answer."
+                  : "Do these small variations when you want more confidence before the checkpoint."}
+              </BodyText>
+              <ButtonShell
+                accessibilityHint={showFluencyReps ? "Hides fluency reps." : "Shows fluency reps."}
+                accessibilityState={{ expanded: showFluencyReps }}
+                onPress={() => setShowFluencyReps((current) => !current)}
+                size="compact"
+                tone="ink"
+                variant="tertiary"
+              >
+                {showFluencyReps ? "Hide reps" : `Show ${lesson.workshop.practiceReps.length} reps`}
+              </ButtonShell>
+              {showFluencyReps ? lesson.workshop.practiceReps.map((practiceRep, repIndex) => {
+                const repKey = `rep-${repIndex}`;
+                return (
+                  <View key={`${lesson.id}-practice-rep-${repIndex}`} style={styles.repBlock}>
+                    <Row>
+                      <Badge tone="teal">rep {repIndex + 1}</Badge>
+                      <Badge tone="blue">same idea, new data</Badge>
+                    </Row>
+                    <SectionTitle>Starter code</SectionTitle>
+                    <TextInput
+                      multiline
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      style={[styles.codeBlock, styles.practiceInput]}
+                      value={practiceCodes[repKey] ?? ""}
+                      onChangeText={(text) => setPracticeCodes((prev) => ({ ...prev, [repKey]: text }))}
+                    />
+                    
+                    {/* Run example button */}
+                    <ButtonShell
+                      accessibilityHint={`Runs fluency rep ${repIndex + 1} starter code in the sandbox.`}
+                      disabled={practiceOutputs[repKey]?.running}
+                      onPress={() => handleRunPractice(repKey, practiceCodes[repKey] ?? practiceRep.starterCode)}
+                      size="compact"
+                      tone="teal"
+                      variant="secondary"
+                      style={{ alignSelf: "flex-start", marginVertical: spacing.xs }}
+                    >
+                      {practiceOutputs[repKey]?.running ? "Running..." : `▶ Run rep ${repIndex + 1} code`}
+                    </ButtonShell>
+                    {practiceOutputs[repKey]?.output ? (
+                      <View>
+                        <SectionTitle>Rep output</SectionTitle>
+                        <Text style={styles.codeBlock}>{practiceOutputs[repKey].output}</Text>
+                      </View>
+                    ) : null}
+                    
+                    <SectionTitle>Expected output</SectionTitle>
+                    <Text selectable style={styles.codeBlock}>{practiceRep.expectedOutput}</Text>
+                    <SectionTitle>Check your answer</SectionTitle>
+                    <BodyText>{practiceRep.checkYourAnswer}</BodyText>
+                  </View>
+                );
+              }) : null}
+            </SubPanel>
+          ) : null}
+
 
           {/* Stepper Navigation */}
           <Row style={styles.navRow}>
@@ -598,6 +663,8 @@ export default function LessonDetailScreen(): ReactElement {
           )}
           <CodeLab
             attemptHistory={lessonCodeRunHistory}
+            handoff={practiceHandoff}
+            historicalAchievement={(progress.durableLessonMiniProjectIds ?? []).includes(lesson.id)}
             isSaving={isSaving}
             latestRun={latestCodeRun}
             lessonId={lesson.id}
@@ -605,11 +672,12 @@ export default function LessonDetailScreen(): ReactElement {
             runnerSpec={lesson.workshop.miniProject.runnerSpec}
           />
           {latestPassingCheckRun ? (
-            <SubPanel accessibilityLabel="Code Lab check passed" accessibilityLiveRegion="polite">
+            <SubPanel accessibilityLabel="Code Lab check passed previously" accessibilityLiveRegion="polite">
               <Row>
-                <Badge tone="green">Check passed</Badge>
+                <Badge tone="green">Previously passed</Badge>
                 <Badge tone="amber">Mission closer</Badge>
               </Row>
+              <MutedText>This is an earlier passing run. The current editor may have changed since then; run checks again to verify the current version.</MutedText>
               <SectionTitle>Add evidence now</SectionTitle>
               <BodyText>{lesson.workshop.miniProject.expectedEvidence}</BodyText>
               <MutedText>{lesson.workshop.miniProject.projectConnection}</MutedText>
@@ -817,13 +885,21 @@ export default function LessonDetailScreen(): ReactElement {
 
         return (
           <Panel>
-            <Row>
+            <Row style={{ flexWrap: "wrap", gap: spacing.xs }}>
               <Badge tone="blue">Step 5</Badge>
-              <Badge tone={lessonDone ? "green" : "blue"}>{lessonDone ? "Lesson completed" : "Step 5: Portfolio extension"}</Badge>
+              <Badge tone={lessonDone ? "green" : "blue"}>{lessonDone ? "Lesson achievement complete" : "Lesson in progress"}</Badge>
+              <Badge tone={portfolioEvidenceSaved ? "green" : "amber"}>
+                {portfolioEvidenceSaved
+                  ? "Portfolio evidence saved"
+                  : autoProofRecorded
+                    ? "Code Lab proof recorded — portfolio artifact not saved"
+                    : "Portfolio evidence not saved"}
+              </Badge>
             </Row>
             <SectionTitle>Portfolio connection & proof</SectionTitle>
             <BodyText>
-              Your lesson practice and checkpoint are already complete! Step 5 helps you bridge this concept into real portfolio evidence for project missions.
+              Lesson achievement (practice and checkpoint) and portfolio evidence are different claims. Step 5 turns this lesson into a
+              separate portfolio artifact you can explain to a reviewer.
             </BodyText>
             
             <SubPanel>

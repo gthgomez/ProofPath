@@ -1,7 +1,8 @@
 import type { ContentPack, EvidenceItem, ProofArtifact, UserProgress } from "./types";
 import { calculateReadinessScore } from "./readiness";
-import { formatProofArtifactVerifierOutput } from "./code-run";
+import { formatProofArtifactVerifierOutput, sanitizeProofArtifactForDisclosure } from "./code-run";
 import { evidenceTrustLabel } from "./evidence-trust";
+import { getContentForRole } from "./role-routing";
 
 export interface ReviewedEvidenceEntry {
   id: string;
@@ -14,6 +15,8 @@ export interface ReviewedEvidenceEntry {
   commitHash?: string;
   verifierOutput?: string;
   reflection?: string;
+  /** Present when the record was restored from a learner-supplied backup. */
+  importedAt?: string;
   createdAt: string;
 }
 
@@ -56,17 +59,21 @@ function fenced(content: string): string[] {
 }
 
 function toEntry(item: EvidenceItem): ReviewedEvidenceEntry {
+  const safeProof = item.proofArtifact ? sanitizeProofArtifactForDisclosure(item.proofArtifact) : undefined;
   return {
     id: item.id,
     title: item.title,
     trust: item.trust ?? "manual_note",
-    trustLabel: evidenceTrustLabel(item.trust),
+    trustLabel: item.importedAt
+      ? `${evidenceTrustLabel(item.trust)} (restored from backup; not re-executed here)`
+      : evidenceTrustLabel(item.trust),
     testStatus: item.testStatus,
-    command: item.proofArtifact?.command,
+    command: safeProof?.command,
     repoUrl: item.repoUrl,
     commitHash: item.commitHash,
-    verifierOutput: item.proofArtifact ? formatProofArtifactVerifierOutput(item.proofArtifact) : item.verifierOutput,
+    verifierOutput: safeProof ? formatProofArtifactVerifierOutput(safeProof) : item.verifierOutput,
     reflection: item.reflection ?? item.body,
+    ...(item.importedAt ? { importedAt: item.importedAt } : {}),
     createdAt: item.createdAt
   };
 }
@@ -77,29 +84,40 @@ function toEntry(item: EvidenceItem): ReviewedEvidenceEntry {
  * riding along into a shared export.
  */
 function safeProofArtifact(proof: ProofArtifact): ProofArtifact {
+  const safe = sanitizeProofArtifactForDisclosure(proof);
   return {
-    sourceRunAttemptId: proof.sourceRunAttemptId,
-    lessonId: proof.lessonId,
-    ...(proof.lessonVersion ? { lessonVersion: proof.lessonVersion } : {}),
-    ...(proof.missionId ? { missionId: proof.missionId } : {}),
-    language: proof.language,
-    runMode: proof.runMode,
-    command: proof.command,
-    passed: proof.passed,
-    ...(proof.score !== undefined ? { score: proof.score } : {}),
-    runtimeMs: proof.runtimeMs,
-    createdAt: proof.createdAt,
-    stdout: proof.stdout,
-    stderr: proof.stderr,
-    visibleCheckResults: proof.visibleCheckResults,
-    hiddenCheckSummary: proof.hiddenCheckSummary,
-    codeHash: proof.codeHash,
-    ...(proof.codeSnapshot ? { codeSnapshot: proof.codeSnapshot } : {}),
-    terminalTranscript: proof.terminalTranscript
+    sourceRunAttemptId: safe.sourceRunAttemptId,
+    lessonId: safe.lessonId,
+    ...(safe.lessonVersion ? { lessonVersion: safe.lessonVersion } : {}),
+    ...(safe.missionId ? { missionId: safe.missionId } : {}),
+    language: safe.language,
+    runMode: safe.runMode,
+    command: safe.command,
+    passed: safe.passed,
+    ...(safe.score !== undefined ? { score: safe.score } : {}),
+    runtimeMs: safe.runtimeMs,
+    createdAt: safe.createdAt,
+    stdout: safe.stdout,
+    stderr: safe.stderr,
+    visibleCheckResults: safe.visibleCheckResults,
+    hiddenCheckSummary: safe.hiddenCheckSummary,
+    codeHash: safe.codeHash,
+    ...(safe.codeSnapshot ? { codeSnapshot: safe.codeSnapshot } : {}),
+    terminalTranscript: safe.terminalTranscript,
+    ...(safe.sandboxDisclosureVersion !== undefined ? { sandboxDisclosureVersion: safe.sandboxDisclosureVersion } : {}),
+    ...(safe.importedAt ? { importedAt: safe.importedAt } : {})
   };
 }
 
 function safeEvidenceItem(item: EvidenceItem): EvidenceItem {
+  const safeProof = item.proofArtifact ? safeProofArtifact(item.proofArtifact) : undefined;
+  // For a proof-backed item the verifier output must be derived from the
+  // sanitized proof. Legacy records also stored a raw copy in `verifierOutput`,
+  // which could still contain hidden buffer contents.
+  const safeVerifierOutput = safeProof
+    ? formatProofArtifactVerifierOutput(safeProof)
+    : item.verifierOutput;
+
   return {
     id: item.id,
     type: item.type,
@@ -116,10 +134,11 @@ function safeEvidenceItem(item: EvidenceItem): EvidenceItem {
     ...(item.commitHash ? { commitHash: item.commitHash } : {}),
     ...(item.artifactUri ? { artifactUri: item.artifactUri } : {}),
     ...(item.deploymentUrl ? { deploymentUrl: item.deploymentUrl } : {}),
-    ...(item.verifierOutput ? { verifierOutput: item.verifierOutput } : {}),
+    ...(safeVerifierOutput ? { verifierOutput: safeVerifierOutput } : {}),
     ...(item.reflection ? { reflection: item.reflection } : {}),
-    ...(item.proofArtifact ? { proofArtifact: safeProofArtifact(item.proofArtifact) } : {}),
-    ...(item.trust ? { trust: item.trust } : {})
+    ...(safeProof ? { proofArtifact: safeProof } : {}),
+    ...(item.trust ? { trust: item.trust } : {}),
+    ...(item.importedAt ? { importedAt: item.importedAt } : {})
   };
 }
 
@@ -147,7 +166,11 @@ export function generateReviewerPortfolioExport(
   progress: UserProgress,
   now = new Date().toISOString()
 ): ReviewerPortfolioExport {
-  const readiness = calculateReadinessScore(content, progress, now);
+  // Match the readiness scope the app's providers use (role-scoped content), so
+  // the on-screen score and the exported score agree for the same snapshot and
+  // time. Calculating against the full pack here was a documented mismatch.
+  const scopedContent = getContentForRole(content, progress.profile.roleTargetId);
+  const readiness = calculateReadinessScore(scopedContent, progress, now);
   const evidenceItems = progress.evidenceItems;
 
   const autoVerifiedCount = evidenceItems.filter((item) => item.trust === "auto_verified_code_lab").length;
@@ -178,13 +201,17 @@ export function generateReviewerPortfolioExport(
 
   const lessons = Array.from(lessonMap.entries()).map(([lessonId, items]) => ({
     lessonId,
-    lessonTitle: content.lessons.find((lesson) => lesson.id === lessonId)?.title ?? lessonId,
+    lessonTitle: scopedContent.lessons.find((lesson) => lesson.id === lessonId)?.title
+      ?? content.lessons.find((lesson) => lesson.id === lessonId)?.title
+      ?? lessonId,
     evidenceItems: items.map(toEntry)
   }));
 
   const missions = Array.from(missionMap.entries()).map(([missionId, items]) => ({
     missionId,
-    missionTitle: content.projectMissions.find((mission) => mission.id === missionId)?.title ?? missionId,
+    missionTitle: scopedContent.projectMissions.find((mission) => mission.id === missionId)?.title
+      ?? content.projectMissions.find((mission) => mission.id === missionId)?.title
+      ?? missionId,
     evidenceItems: items.map(toEntry)
   }));
 
@@ -244,6 +271,9 @@ export function generateReviewerPortfolioExport(
 
   markdownSections.push(
     `## Limitations`,
+    ...(evidenceItems.some((item) => item.importedAt)
+      ? [`- Some evidence was restored from a learner-supplied backup. ProofPath did not re-execute those checks on this device, so their local-verification claim was downgraded.`]
+      : []),
     `- Only entries classified as "Locally verified (Code Lab)" were executed by ProofPath.`,
     `- Reproduction packages, pasted check output, and notes are self-reported and have not been independently verified.`,
     `- The readiness score is a practice-progress heuristic, not a validated hiring prediction.`,

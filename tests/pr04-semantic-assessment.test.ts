@@ -95,8 +95,8 @@ describe("PR04/F05: workflow labels never mark unvisited steps completed", () =>
     expect(workflow.completedSteps).toEqual(["understand", "experiment"]);
   });
 
-  it("checked signals still mark apply/checkpoint/evidence completed", () => {
-    const workflow = deriveLessonWorkflow({
+  it("checked signals mark apply/checkpoint completed, and evidence only once a portfolio artifact is saved", () => {
+    const achieved = deriveLessonWorkflow({
       ...baseInput,
       currentStep: "evidence",
       miniProjectDone: true,
@@ -104,7 +104,19 @@ describe("PR04/F05: workflow labels never mark unvisited steps completed", () =>
       lessonDone: true,
       visitedSteps: ["understand", "experiment", "apply", "checkpoint", "evidence"]
     });
-    expect(workflow.completedSteps).toEqual(["understand", "experiment", "apply", "checkpoint", "evidence"]);
+    // Lesson achievement alone must not present the portfolio extension as done.
+    expect(achieved.completedSteps).toEqual(["understand", "experiment", "apply", "checkpoint"]);
+
+    const withPortfolioEvidence = deriveLessonWorkflow({
+      ...baseInput,
+      currentStep: "evidence",
+      miniProjectDone: true,
+      quizDone: true,
+      lessonDone: true,
+      portfolioEvidenceSaved: true,
+      visitedSteps: ["understand", "experiment", "apply", "checkpoint", "evidence"]
+    });
+    expect(withPortfolioEvidence.completedSteps).toEqual(["understand", "experiment", "apply", "checkpoint", "evidence"]);
   });
 });
 
