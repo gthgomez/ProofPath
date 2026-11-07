@@ -10,6 +10,7 @@ import {
 import { TYPESCRIPT_MAX_SOURCE_CHARS, TYPESCRIPT_TYPE_CHECK_SOURCE } from "./typescript-typecheck";
 
 export interface NativeWebViewRunnerRequest {
+  requestId?: string;
   lessonId: string;
   spec: LessonRunnerSpec;
   code: string;
@@ -85,6 +86,7 @@ export interface NativeWebViewRunnerReadyMessage {
 
 export interface NativeWebViewRunnerResultMessage {
   type: "sandbox-result";
+  requestId?: string;
   attempt: CodeRunAttempt;
 }
 
@@ -199,6 +201,21 @@ export function createNativeWebViewRunnerHtml(): string {
     /* typescript-typecheck:end */
     function post(payload) {
       window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+    }
+
+    var MAX_OUTPUT_CHARS = 524288;
+    var totalOutputChars = 0;
+    function appendOutput(target, text) {
+      if (totalOutputChars >= MAX_OUTPUT_CHARS) return;
+      var addedLen = text.length + 1;
+      var remaining = MAX_OUTPUT_CHARS - totalOutputChars;
+      if (addedLen > remaining) {
+        target.push(text.slice(0, Math.max(0, remaining - 45)) + "\\n[output truncated: exceeded 512KB limit]");
+        totalOutputChars = MAX_OUTPUT_CHARS;
+      } else {
+        target.push(text);
+        totalOutputChars += addedLen;
+      }
     }
 
     function normalizeOutput(value) {
@@ -378,8 +395,8 @@ export function createNativeWebViewRunnerHtml(): string {
       const testResults = [];
       const tests = spec.visibleTests.concat(spec.hiddenTests || []);
       const sandboxConsole = {
-        log: (...values) => stdout.push(values.map(normalizeOutput).join(" ")),
-        error: (...values) => stderr.push(values.map(normalizeOutput).join(" "))
+        log: (...values) => appendOutput(stdout, values.map(normalizeOutput).join(" ")),
+        error: (...values) => appendOutput(stderr, values.map(normalizeOutput).join(" "))
       };
 
       // TypeScript lessons must fail on type errors, which stripping and running
@@ -427,6 +444,7 @@ export function createNativeWebViewRunnerHtml(): string {
         const test = tests[index];
         const visible = index < spec.visibleTests.length;
         const stdoutStart = stdout.length;
+        const stderrStart = stderr.length;
 
         try {
           const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code);
@@ -445,9 +463,10 @@ export function createNativeWebViewRunnerHtml(): string {
             message: formatSandboxFailureMessage(error, spec.language)
           });
         } finally {
-          // Hidden check output must never reach learner-visible stdout.
+          // Hidden check output must never reach learner-visible stdout or stderr.
           if (!visible) {
             stdout.length = stdoutStart;
+            stderr.length = stderrStart;
           }
         }
       }
@@ -547,6 +566,7 @@ export function createNativeWebViewRunnerHtml(): string {
         const test = tests[index];
         const visible = index < spec.visibleTests.length;
         const stdoutStart = stdout.length;
+        const stderrStart = stderr.length;
 
         try {
           const wrappedCode = [
@@ -562,7 +582,9 @@ export function createNativeWebViewRunnerHtml(): string {
           }
           testResults.push({ id: test.id, name: test.name, passed: true, visible, message: "Passed" });
         } catch (error) {
-          stderr.push(error instanceof Error ? error.message : String(error || "Test failed"));
+          if (visible) {
+            stderr.push(error instanceof Error ? error.message : String(error || "Test failed"));
+          }
           testResults.push({
             id: test.id,
             name: test.name,
@@ -571,10 +593,11 @@ export function createNativeWebViewRunnerHtml(): string {
             message: formatSandboxFailureMessage(error, spec.language)
           });
         } finally {
-          // Hidden checks must never contribute to learner-visible stdout: their
+          // Hidden checks must never contribute to learner-visible stdout or stderr: their
           // harness can reveal the anti-forgery seed. Keep only visible output.
           if (!visible) {
             stdout.length = stdoutStart;
+            stderr.length = stderrStart;
           }
         }
       }
@@ -643,6 +666,8 @@ export function createNativeWebViewRunnerHtml(): string {
       for (let index = 0; index < tests.length; index += 1) {
         const test = tests[index];
         const visible = index < spec.visibleTests.length;
+        const stdoutStart = stdout.length;
+        const stderrStart = stderr.length;
         // Each check gets a fresh database seeded by setupCode so learner
         // scripts cannot leak state (for example a CREATE TABLE) into later
         // checks, and so a hidden harness seed cannot affect a visible check.
@@ -673,7 +698,10 @@ export function createNativeWebViewRunnerHtml(): string {
           }
           testResults.push({ id: test.id, name: test.name, passed: true, visible, message: output || "Query ran" });
         } catch (error) {
-          stderr.push(error instanceof Error ? error.message : String(error || "Test failed"));
+          const message = error instanceof Error ? error.message : String(error || "Test failed");
+          if (visible || message === "Output missing") {
+            stderr.push(message);
+          }
           testResults.push({
             id: test.id,
             name: test.name,
@@ -682,6 +710,12 @@ export function createNativeWebViewRunnerHtml(): string {
             message: formatSandboxFailureMessage(error, spec.language)
           });
         } finally {
+          if (!visible) {
+            stdout.length = stdoutStart;
+            if (stderr.length > stderrStart && stderr[stderr.length - 1] !== "Output missing") {
+              stderr.length = stderrStart;
+            }
+          }
           db.close();
         }
       }
@@ -722,7 +756,7 @@ export function createNativeWebViewRunnerHtml(): string {
         attempt = runnerErrorAttempt(request, error);
       }
 
-      post({ type: "sandbox-result", attempt });
+      post({ type: "sandbox-result", requestId: request.requestId, attempt });
     }
 
     function preloadRuntime(language) {
@@ -784,6 +818,7 @@ export function parseNativeWebViewRunnerMessage(payload: string): NativeWebViewR
     const parsed = JSON.parse(payload) as {
       type?: string;
       assets?: typeof SANDBOX_ASSET_PATHS;
+      requestId?: string;
       attempt?: CodeRunAttempt;
       language?: RunnerLanguage;
     };
@@ -800,6 +835,7 @@ export function parseNativeWebViewRunnerMessage(payload: string): NativeWebViewR
       const redacted = redactCheckResults(parsed.attempt.testResults ?? []);
       return {
         type: "sandbox-result",
+        requestId: typeof parsed.requestId === "string" ? parsed.requestId : undefined,
         attempt: normalizeCodeRunAttempt({
           ...parsed.attempt,
           testResults: redacted.visibleCheckResults,

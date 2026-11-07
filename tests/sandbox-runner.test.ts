@@ -585,3 +585,62 @@ describe("sandbox runners honor expectedOutputExactSet", () => {
     expect(subset.passed).toBe(true);
   });
 });
+
+describe("sandbox hidden check isolation and output limits", () => {
+  it("redacts hidden check stderr and messages from learner-visible output in Web Worker", () => {
+    const workerSource = createJavaScriptWorkerSource();
+    let posted: { stdout: string; stderr: string; testResults: Array<{ id: string; passed: boolean; visible: boolean; message: string }> } | undefined;
+    const selfStub: { postMessage: (message: unknown) => void; onmessage?: (event: unknown) => void } = {
+      postMessage: (message) => {
+        posted = message as typeof posted;
+      }
+    };
+
+    new Function("self", workerSource)(selfStub);
+    selfStub.onmessage?.({
+      data: {
+        language: "javascript",
+        runMode: "run_checks",
+        runtimeCode: 'console.log("visible output"); console.error("visible stderr");',
+        tests: [
+          { id: "visible-1", name: "Visible Check", code: 'console.log("visible check log");', expectedOutputIncludes: ["visible output"] },
+          { id: "hidden-1", name: "Hidden Check", code: 'console.error("BENIGN_HIDDEN_SENTINEL_STDERR"); throw new Error("HIDDEN_FAILURE_DETAIL");', expectedOutputIncludes: [] }
+        ],
+        visibleCount: 1
+      }
+    });
+
+    expect(posted).toBeDefined();
+    expect(posted?.stdout).toContain("visible output");
+    expect(posted?.stderr).toContain("visible stderr");
+    expect(posted?.stderr).not.toContain("BENIGN_HIDDEN_SENTINEL_STDERR");
+    expect(posted?.stderr).not.toContain("HIDDEN_FAILURE_DETAIL");
+    expect(posted?.testResults[0]?.passed).toBe(true);
+    expect(posted?.testResults[1]?.passed).toBe(false);
+  });
+
+  it("truncates excessive console output to prevent memory exhaustion", () => {
+    const workerSource = createJavaScriptWorkerSource();
+    let posted: { stdout: string; stderr: string } | undefined;
+    const selfStub: { postMessage: (message: unknown) => void; onmessage?: (event: unknown) => void } = {
+      postMessage: (message) => {
+        posted = message as typeof posted;
+      }
+    };
+
+    new Function("self", workerSource)(selfStub);
+    selfStub.onmessage?.({
+      data: {
+        language: "javascript",
+        runMode: "run_file",
+        runtimeCode: 'for (var i = 0; i < 20000; i++) console.log("line " + i + ": repeating long string output padding data");',
+        tests: [],
+        visibleCount: 0
+      }
+    });
+
+    expect(posted).toBeDefined();
+    expect(posted?.stdout).toContain("[output truncated: exceeded 512KB limit]");
+    expect(posted?.stdout.length).toBeLessThanOrEqual(530000);
+  });
+});

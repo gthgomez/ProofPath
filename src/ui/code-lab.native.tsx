@@ -47,7 +47,8 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const webViewRef = useRef<React.ElementRef<typeof WebView>>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [code, setCode] = useState(runnerSpec.starterCode);
+  const activeRequestIdRef = useRef<string | null>(null);
+  const [code, setCode] = useState(() => latestRun?.codeSnapshot ?? runnerSpec.starterCode);
   const [isBridgeReady, setIsBridgeReady] = useState(false);
   const [isRuntimeWarm, setIsRuntimeWarm] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -60,10 +61,10 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const runnerHtml = useMemo(() => createNativeWebViewRunnerHtml(), []);
 
   useEffect(() => {
-    setCode(runnerSpec.starterCode);
+    setCode(latestRun?.codeSnapshot ?? runnerSpec.starterCode);
     setRunError(null);
     setCopyStatus(null);
-  }, [runnerSpec.starterCode]);
+  }, [runnerSpec.starterCode, lessonId]);
 
   useEffect(() => {
     return () => {
@@ -77,6 +78,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+    activeRequestIdRef.current = null;
   };
 
   const clearPhaseTimeout = (): void => {
@@ -208,7 +210,11 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
       return;
     }
 
+    const requestId = `req-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    activeRequestIdRef.current = requestId;
+
     const request: NativeWebViewRunnerRequest = {
+      requestId,
       lessonId,
       spec: runnerSpec,
       code,
@@ -224,6 +230,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
       }, 420);
     }, 160);
     timeoutRef.current = setTimeout(() => {
+      activeRequestIdRef.current = null;
       clearRunnerTimeout();
       clearPhaseTimeout();
       setIsRunning(false);
@@ -268,6 +275,11 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
     }
 
     if (message?.type === "sandbox-result") {
+      if (activeRequestIdRef.current && message.requestId && message.requestId !== activeRequestIdRef.current) {
+        // Stale or uncorrelated result from an earlier timed-out or cancelled run: discard.
+        return;
+      }
+      activeRequestIdRef.current = null;
       clearRunnerTimeout();
       clearPhaseTimeout();
       setIsRunning(false);

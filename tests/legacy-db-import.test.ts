@@ -132,6 +132,16 @@ describe("legacy database import", () => {
     expect(db.detached).toBe(true);
   });
 
+  it("resolves the legacy database path relative to db.databasePath directory when available", async () => {
+    const { db } = createFreshDatabases();
+    (db as unknown as { databasePath: string }).databasePath = "/data/user/0/com.jonathangomez.proofpath/databases/proofpath.db";
+
+    await importWith(db);
+
+    expect(db.attachedFilenames).toEqual(["/data/user/0/com.jonathangomez.proofpath/databases/careerforge.db"]);
+    expect(db.detached).toBe(true);
+  });
+
   it("no-ops when the legacy database file is missing", async () => {
     const { db } = createFreshDatabases();
     db.legacyFileExists = false;
