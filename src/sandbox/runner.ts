@@ -294,11 +294,25 @@ function failResult(
   };
 }
 
-function timeoutAfter(timeoutMs: number): Promise<never> {
-  return new Promise((_resolve, reject) => {
-    setTimeout(() => reject(new Error(`Sandbox timed out after ${timeoutMs}ms.`)), timeoutMs);
-  });
+/**
+ * Legacy in-process guard for Node tests and native adapters. The browser
+ * Worker path owns its own startup and execution deadlines and must not be
+ * wrapped in a second race that can fire before boot finishes.
+ */
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error(`Sandbox timed out after ${timeoutMs}ms.`)), timeoutMs);
+    });
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
 }
+
 
 /**
  * Distinguish a real termination from a boundary that only stopped waiting.
@@ -1249,8 +1263,9 @@ export async function runLessonSandbox(
     });
   }
 
+  const preemptible = canUsePreemptibleSandbox();
   const runner = async (): Promise<RunnerExecution> => {
-    if (canUsePreemptibleSandbox()) {
+    if (preemptible) {
       return runPreemptible(spec, code, runMode);
     }
 
@@ -1278,7 +1293,12 @@ export async function runLessonSandbox(
   };
 
   try {
-    const result = await Promise.race([runner(), timeoutAfter(spec.timeoutMs)]);
+    // Single owner for timeouts: the Worker path distinguishes startup from
+    // learner execution and terminates the actual computation. The in-process
+    // path keeps an explicit guard because it cannot preempt synchronous work.
+    const result = preemptible
+      ? await runner()
+      : await withTimeout(runner(), spec.timeoutMs);
     const rawTestResults = runMode === "run_checks" ? result.testResults : [];
     const passedTests = rawTestResults.filter((testResult) => testResult.passed).length;
     const score = rawTestResults.length === 0 ? 0 : Math.round((passedTests / rawTestResults.length) * 100);

@@ -158,7 +158,7 @@ Automated checks cover content integrity, sandbox policy, type safety, and the u
   ```bash
   npm run build:web
   ```
-* **Real-Browser Gates:** Runs the exported app in Chromium for the learner journey (checks, drafts, backup/restore, provenance, offline) and the runtime matrix (real Python/SQL/JS/TypeScript execution, timeout termination, and recovery).
+* **Real-Browser Gates:** Runs the exported app in Chromium for the first-time learner journey, runtime matrix, backup/restore and provenance journey, workspace-to-mission journey with the real verifier, and offline update safety (including offline Python after both a failed and a successful update).
   ```bash
   npx playwright install chromium
   npm run test:e2e

@@ -144,6 +144,43 @@ async function main() {
 
   const results = {};
   try {
+    // Cold startup slower than the 4 s lesson timeout must not count against
+    // learner execution. Delay the Pyodide asset itself in a fresh context.
+    const slowContext = await browser.newContext({ serviceWorkers: "block" });
+    await slowContext.addInitScript((progress) => {
+      if (!window.localStorage.getItem("proofpath.progress.v1")) {
+        window.localStorage.setItem("proofpath.progress.v1", JSON.stringify(progress));
+      }
+    }, seedProgress());
+    const slowPage = await slowContext.newPage();
+    let startupIntercepted = false;
+    await slowContext.route("**/sandbox-assets/pyodide/pyodide.js", async (route) => {
+      startupIntercepted = true;
+      await new Promise((resolve) => setTimeout(resolve, 6000));
+      await route.continue();
+    });
+    const slowStartedAt = Date.now();
+    await runLesson(slowPage, {
+      lessonId: "lesson-python-zero-first-script",
+      language: "python",
+      code: "print(\"first run\")\n",
+      expect: "Check passed",
+      timeout: 120000
+    });
+    const slowElapsed = Date.now() - slowStartedAt;
+    if (!startupIntercepted) {
+      throw new Error("test setup could not delay the Pyodide startup request");
+    }
+    if (slowElapsed < 4500) {
+      throw new Error(`startup delay was not exercised (elapsed ${slowElapsed}ms)`);
+    }
+    results.slowStartup = {
+      intercepted: startupIntercepted,
+      elapsedMs: slowElapsed,
+      outcome: "passed after startup exceeded the lesson timeout"
+    };
+    await slowContext.close();
+
     // Python: wrong then corrected.
     await runLesson(page, {
       lessonId: "lesson-python-zero-first-script",

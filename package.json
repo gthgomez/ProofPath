@@ -13,7 +13,7 @@
     "scan:redaction": "tsx scripts/scan-sandbox-redaction.ts",
     "verify:content": "tsx scripts/verify-content.ts",
     "verify": "npm run verify:content && npm run typecheck && npm run test",
-    "test:e2e": "node scripts/e2e-web-journey.mjs && node scripts/e2e-runtime-matrix.mjs",
+    "test:e2e": "node scripts/e2e-runtime-matrix.mjs && node scripts/e2e-first-time-journey.mjs && node scripts/e2e-web-journey.mjs && node scripts/e2e-workspace-journey.mjs && node scripts/e2e-offline-update.mjs",
     "test:e2e:journey": "node scripts/e2e-web-journey.mjs",
     "test:e2e:runtime": "node scripts/e2e-runtime-matrix.mjs",
     "build:web": "expo export --platform web && node scripts/generate-service-worker.mjs",

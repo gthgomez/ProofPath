@@ -109,7 +109,7 @@ function SQLiteProgressProvider({ children }: PropsWithChildren): ReactElement {
         // A crash during a restore leaves a journal. The current progress
         // identity decides whether the new or old draft snapshot wins.
         const recovery = await recoverPendingProgressRestore(editorDraftStore, {
-          readUpdatedAt: async () => (await loadProgress(db)).updatedAt
+          read: () => loadProgress(db)
         });
         if (isMounted && recovery.error) {
           setError(recovery.error);

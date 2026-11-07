@@ -8,7 +8,7 @@ import {
   resetEditorDraft,
   saveEditorDraft
 } from "@/storage/draft-store";
-import { createEditorDraftStore, draftStorageKey, type DraftPersistence } from "@/storage/draft-store.shared";
+import { createEditorDraftStore, DRAFT_KEY_PREFIX, draftStorageKey, type DraftPersistence } from "@/storage/draft-store.shared";
 
 describe("editor draft store (web / localStorage mirror)", () => {
   beforeEach(async () => {
@@ -329,5 +329,115 @@ describe("editor draft store ordering, reset fencing, and failure (shared factor
   it("namespaces draft keys by lesson", () => {
     expect(draftStorageKey("lesson-a")).not.toBe(draftStorageKey("lesson-b"));
     expect(draftStorageKey("lesson-a")).toContain("proofpath.editor_draft.");
+  });
+});
+
+describe("draft import rollback with session-memory adapters", () => {
+  function mirroringPersistence(initial: Record<string, string> = {}) {
+    const map = new Map(Object.entries(initial));
+    const sessionOnly = new Set<string>();
+    const failRemove = new Set<string>();
+    const failWrite = new Set<string>();
+
+    const persistence: DraftPersistence = {
+      async read(key) {
+        return map.get(key) ?? null;
+      },
+      async write(key, value) {
+        if (failWrite.has(key)) {
+          throw new Error(`write failed for ${key}`);
+        }
+        // Match the real web/native adapters: the session mirror is updated
+        // before durability is known.
+        map.set(key, value);
+        return sessionOnly.delete(key) ? "session" : "durable";
+      },
+      async remove(key) {
+        map.delete(key);
+        if (failRemove.delete(key)) {
+          throw new Error(`delete failed for ${key}`);
+        }
+      },
+      async clearAll() {
+        map.clear();
+      },
+      async entries() {
+        return Array.from(map.entries()).map(([key, value]) => ({ key, value }));
+      }
+    };
+
+    return { map, sessionOnly, failRemove, failWrite, persistence };
+  }
+
+  it("removes a new key whose write only reached the session mirror", async () => {
+    const fake = mirroringPersistence();
+    const store = createEditorDraftStore(fake.persistence);
+    fake.sessionOnly.add(`${DRAFT_KEY_PREFIX}lesson-b`);
+
+    const result = await store.importAll({ "lesson-b": { status: "draft", code: "new" } });
+
+    expect(result.ok).toBe(false);
+    expect(fake.map.has(`${DRAFT_KEY_PREFIX}lesson-b`)).toBe(false);
+  });
+
+  it("restores an existing key overwritten in memory before a session-only failure", async () => {
+    const fake = mirroringPersistence({ [`${DRAFT_KEY_PREFIX}lesson-a`]: "old" });
+    const store = createEditorDraftStore(fake.persistence);
+    fake.sessionOnly.add(`${DRAFT_KEY_PREFIX}lesson-a`);
+
+    const result = await store.importAll({ "lesson-a": { status: "draft", code: "new" } });
+
+    expect(result.ok).toBe(false);
+    expect(fake.map.get(`${DRAFT_KEY_PREFIX}lesson-a`)).toBe("old");
+  });
+
+  it("rolls back every touched key after an intermediate write failure", async () => {
+    const fake = mirroringPersistence({
+      [`${DRAFT_KEY_PREFIX}lesson-a`]: "old a",
+      [`${DRAFT_KEY_PREFIX}lesson-c`]: "old c"
+    });
+    const store = createEditorDraftStore(fake.persistence);
+    fake.sessionOnly.add(`${DRAFT_KEY_PREFIX}lesson-b`);
+
+    const result = await store.importAll({
+      "lesson-a": { status: "draft", code: "new a" },
+      "lesson-b": { status: "draft", code: "new b" },
+      "lesson-c": { status: "draft", code: "new c" }
+    });
+
+    expect(result.ok).toBe(false);
+    expect(fake.map.get(`${DRAFT_KEY_PREFIX}lesson-a`)).toBe("old a");
+    expect(fake.map.has(`${DRAFT_KEY_PREFIX}lesson-b`)).toBe(false);
+    expect(fake.map.get(`${DRAFT_KEY_PREFIX}lesson-c`)).toBe("old c");
+  });
+
+  it("restores a stale draft whose deletion failed after the memory mirror was cleared", async () => {
+    const fake = mirroringPersistence({
+      [`${DRAFT_KEY_PREFIX}lesson-a`]: "old a",
+      [`${DRAFT_KEY_PREFIX}lesson-stale`]: "old stale"
+    });
+    const store = createEditorDraftStore(fake.persistence);
+    fake.failRemove.add(`${DRAFT_KEY_PREFIX}lesson-stale`);
+
+    const result = await store.importAll({ "lesson-a": { status: "draft", code: "new a" } });
+
+    expect(result.ok).toBe(false);
+    expect(fake.map.get(`${DRAFT_KEY_PREFIX}lesson-a`)).toBe("old a");
+    expect(fake.map.get(`${DRAFT_KEY_PREFIX}lesson-stale`)).toBe("old stale");
+  });
+
+  it("reports incomplete rollback instead of claiming the old state", async () => {
+    const key = `${DRAFT_KEY_PREFIX}lesson-a`;
+    const fake = mirroringPersistence({ [key]: "old a" });
+    const store = createEditorDraftStore(fake.persistence);
+    fake.failWrite.add(key);
+
+    const result = await store.importAll({ "lesson-a": { status: "draft", code: "new a" } });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.rollbackComplete).toBe(false);
+      expect(result.error).toMatch(/roll back/i);
+    }
   });
 });

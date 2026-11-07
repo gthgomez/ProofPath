@@ -194,7 +194,23 @@
 
 ---
 
-## 17. Go / No-Go Gate
+## 17. P0 Closure (pre-merge)
+
+- [x] A real-browser cold startup of 6 s (longer than the 4 s lesson timeout) still executes and passes; startup feedback stays distinct from execution feedback
+- [x] Python and SQL non-terminating work is terminated; the next run succeeds; no stale passing result is accepted
+- [x] Concurrent boot is deduplicated; two pre-boot executions queue and both settle; preload overlap resolves; timeouts/errors reject exactly one request; queued work recovers on a clean Worker
+- [x] A progress write that commits but cannot be verified keeps the journal and never leaves new progress paired with old drafts
+- [x] Restoration recovers to one coherent old or new state after journal/draft/progress/read/restart failures; ambiguous progress keeps the journal and surfaces an error
+- [x] Failed draft imports roll back every attempted write and deletion, including session-memory-only writes; incomplete rollback is reported and the journal is kept
+- [x] Offline update: content-hashed versions, all-or-nothing install, failed B preserves working A, repaired B activates, offline Python works on both A and B, old caches removed only after completion
+- [x] First-time browser journey from empty storage completes onboarding, path selection, checks, checkpoint, evidence, backup/reset/import, and offline reload
+- [x] Workspace browser journey runs the real verifier (fail → repair → pass), saves coherent self-reported evidence, awards the mission after placement, and preserves manifest provenance in the reviewer packet
+- [ ] Browser E2E job is hosted CI (blocked: token lacks `workflow` scope)
+- [x] Native restore with transaction identity and reset execution verified on the offline emulator; SQL WebView cold start exceeded 24 s under software rendering and is recorded as a limitation
+
+---
+
+## 18. Go / No-Go Gate
 
 **Ship when all items pass.**
 

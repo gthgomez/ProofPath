@@ -465,6 +465,12 @@ export interface UserProgress {
   reviewItems: ReviewItem[];
   reviewEvents: ReviewEvent[];
   weeklyReports: WeeklyReportSnapshot[];
+  /**
+   * Durable identity for the last coordinated restore that produced this
+   * progress snapshot. Used only to reconcile an interrupted restore; it is
+   * not evidence that the content was independently verified.
+   */
+  restoreTransactionId?: string;
   updatedAt: string;
 }
 

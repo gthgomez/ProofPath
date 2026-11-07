@@ -86,22 +86,30 @@ function fakePersistence() {
 
 function fakeProgress(initial: UserProgress) {
   let stored = initial;
-  let failWrite = false;
-  let ignoreWrite = false;
+  let writeMode: "ok" | "throw-before" | "throw-after" | "ignore" = "ok";
+  let readFailures = 0;
+  let staleRead: UserProgress | null = null;
 
   const port: DurableProgressPort = {
     async readUpdatedAt() {
       return stored.updatedAt;
     },
     async read() {
-      return stored;
+      if (readFailures > 0) {
+        readFailures -= 1;
+        throw new Error("Progress read failed");
+      }
+      return staleRead ?? stored;
     },
     async write(next) {
-      if (failWrite) {
+      if (writeMode === "throw-before") {
         throw new Error("Progress storage is full");
       }
-      if (!ignoreWrite) {
+      if (writeMode !== "ignore") {
         stored = next;
+      }
+      if (writeMode === "throw-after") {
+        throw new Error("Progress write reported failure after commit");
       }
     }
   };
@@ -110,10 +118,19 @@ function fakeProgress(initial: UserProgress) {
     port,
     current: () => stored,
     failNextWrites(value: boolean) {
-      failWrite = value;
+      writeMode = value ? "throw-before" : "ok";
     },
     ignoreWrites(value: boolean) {
-      ignoreWrite = value;
+      writeMode = value ? "ignore" : "ok";
+    },
+    commitThenThrow() {
+      writeMode = "throw-after";
+    },
+    failReads(count: number) {
+      readFailures = count;
+    },
+    returnStaleProgress(progress: UserProgress | null) {
+      staleRead = progress;
     }
   };
 }
@@ -219,7 +236,7 @@ describe("coordinated progress and draft restore", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(await store.recoverPendingRestore(NOW)).toEqual({ existed: false, applied: null });
+    expect(await store.recoverPendingRestore(async () => ({ updatedAt: NOW }))).toEqual({ existed: false, applied: null });
     expect(await store.load("lesson-a")).toEqual({ status: "draft", code: "old draft" });
   });
 
@@ -292,7 +309,7 @@ describe("coordinated progress and draft restore", () => {
     expect(target.current()).toEqual(initialProgress());
   });
 
-  it("does not report success when the progress store does not retain the write", async () => {
+  it("keeps the journal and recovers the old state when a resolved write left old progress", async () => {
     const { map, store } = seededStore();
     await store.save("lesson-a", "old draft");
 
@@ -309,8 +326,146 @@ describe("coordinated progress and draft restore", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(map.get(`${DRAFT_KEY_PREFIX}lesson-a`)).toBe("old draft");
+    expect(result.error).toMatch(/could not verify/i);
+    expect(map.has(JOURNAL_KEY)).toBe(true);
+    expect(map.get(`${DRAFT_KEY_PREFIX}lesson-a`)).toBe("new");
     expect(target.current()).toEqual(initialProgress());
+
+    const recovery = await store.recoverPendingRestore(async () => ({ updatedAt: NOW }));
+    expect(recovery).toEqual({ existed: true, applied: "old" });
+    expect(map.get(`${DRAFT_KEY_PREFIX}lesson-a`)).toBe("old draft");
+    expect(map.has(JOURNAL_KEY)).toBe(false);
+  });
+
+  it("treats a committed write followed by a read failure as success once identity is confirmed", async () => {
+    const { map, store } = seededStore();
+    await store.save("lesson-a", "old draft");
+    const backup = makeBackup(initialProgress(), { "lesson-a": { status: "draft", code: "new" } });
+    const target = fakeProgress(initialProgress());
+    target.commitThenThrow();
+
+    const result = await coordinatedProgressRestore({
+      backup,
+      content: contentPack,
+      draftStore: store,
+      progressPort: target.port,
+      now: LATER
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.progress?.restoreTransactionId).toBeTruthy();
+    expect(map.get(`${DRAFT_KEY_PREFIX}lesson-a`)).toBe("new");
+    expect(map.has(JOURNAL_KEY)).toBe(false);
+  });
+
+  it("keeps a coherent new state when the commit is durable but verification reads fail", async () => {
+    const { map, store } = seededStore();
+    await store.save("lesson-a", "old draft");
+    const backup = makeBackup(initialProgress(), { "lesson-a": { status: "draft", code: "new" } });
+    const target = fakeProgress(initialProgress());
+    target.failReads(2);
+
+    const result = await coordinatedProgressRestore({
+      backup,
+      content: contentPack,
+      draftStore: store,
+      progressPort: target.port,
+      now: LATER
+    });
+
+    expect(result.ok).toBe(false);
+    expect(map.has(JOURNAL_KEY)).toBe(true);
+    expect(map.get(`${DRAFT_KEY_PREFIX}lesson-a`)).toBe("new");
+
+    const committed = target.current();
+    const recovery = await store.recoverPendingRestore(async () => ({
+      updatedAt: committed.updatedAt,
+      restoreTransactionId: committed.restoreTransactionId
+    }));
+    expect(recovery).toEqual({ existed: true, applied: "new" });
+    expect(map.get(`${DRAFT_KEY_PREFIX}lesson-a`)).toBe("new");
+    expect(map.has(JOURNAL_KEY)).toBe(false);
+  });
+
+  it("does not roll drafts back from a stale read after a resolved write", async () => {
+    const { map, store } = seededStore();
+    await store.save("lesson-a", "old draft");
+    const backup = makeBackup(initialProgress(), { "lesson-a": { status: "draft", code: "new" } });
+    const target = fakeProgress(initialProgress());
+    target.returnStaleProgress(initialProgress());
+
+    const result = await coordinatedProgressRestore({
+      backup,
+      content: contentPack,
+      draftStore: store,
+      progressPort: target.port,
+      now: LATER
+    });
+
+    expect(result.ok).toBe(false);
+    expect(map.has(JOURNAL_KEY)).toBe(true);
+    expect(map.get(`${DRAFT_KEY_PREFIX}lesson-a`)).toBe("new");
+
+    target.returnStaleProgress(null);
+    const committed = target.current();
+    const recovery = await store.recoverPendingRestore(async () => ({
+      updatedAt: committed.updatedAt,
+      restoreTransactionId: committed.restoreTransactionId
+    }));
+    expect(recovery).toEqual({ existed: true, applied: "new" });
+  });
+
+  it("does not guess when progress changed after a restore started", async () => {
+    const { map, store } = seededStore();
+    await store.save("lesson-a", "old draft");
+    const backup = makeBackup(initialProgress(), { "lesson-a": { status: "draft", code: "new" } });
+    await store.writeRestoreJournal({
+      version: 2,
+      transactionId: "tx-new",
+      createdAt: LATER,
+      oldDrafts: { "lesson-a": { status: "draft", code: "old draft" } },
+      newDrafts: backup.drafts,
+      oldProgressUpdatedAt: NOW,
+      newProgressUpdatedAt: LATER
+    });
+    await store.importAll(backup.drafts);
+
+    const recovery = await store.recoverPendingRestore(async () => ({
+      updatedAt: "2026-11-07T14:00:00.000Z",
+      restoreTransactionId: undefined
+    }));
+
+    expect(recovery.existed).toBe(true);
+    expect(recovery.applied).toBeNull();
+    expect(recovery.error).toMatch(/cannot be reconciled/i);
+    expect(map.has(JOURNAL_KEY)).toBe(true);
+  });
+
+  it("keeps the journal when progress storage cannot be read during recovery", async () => {
+    const { map, store } = seededStore();
+    await store.save("lesson-a", "old draft");
+    const backup = makeBackup(initialProgress(), { "lesson-a": { status: "draft", code: "new" } });
+    await store.writeRestoreJournal({
+      version: 2,
+      transactionId: "tx-new",
+      createdAt: LATER,
+      oldDrafts: { "lesson-a": { status: "draft", code: "old draft" } },
+      newDrafts: backup.drafts,
+      oldProgressUpdatedAt: NOW,
+      newProgressUpdatedAt: LATER
+    });
+    await store.importAll(backup.drafts);
+
+    const recovery = await recoverPendingProgressRestore(store, {
+      read: async () => {
+        throw new Error("progress unavailable");
+      }
+    });
+
+    expect(recovery.existed).toBe(true);
+    expect(recovery.applied).toBeNull();
+    expect(recovery.error).toMatch(/waiting for progress storage/i);
+    expect(map.has(JOURNAL_KEY)).toBe(true);
   });
 
   it("recovers the new drafts when progress committed before the process stopped", async () => {
@@ -319,7 +474,8 @@ describe("coordinated progress and draft restore", () => {
 
     const backup = makeBackup(initialProgress(), { "lesson-a": { status: "draft", code: "new" } });
     await store.writeRestoreJournal({
-      version: 1,
+      version: 2,
+      transactionId: "tx-new",
       createdAt: LATER,
       oldDrafts: { "lesson-a": { status: "draft", code: "old draft" } },
       newDrafts: backup.drafts,
@@ -330,7 +486,10 @@ describe("coordinated progress and draft restore", () => {
 
     const restarted = reopen(map);
 
-    const recovery = await restarted.recoverPendingRestore(LATER);
+    const recovery = await restarted.recoverPendingRestore(async () => ({
+      updatedAt: LATER,
+      restoreTransactionId: "tx-new"
+    }));
     expect(recovery).toEqual({ existed: true, applied: "new" });
     expect(await restarted.load("lesson-a")).toEqual({ status: "draft", code: "new" });
     expect(map.has(JOURNAL_KEY)).toBe(false);
@@ -342,7 +501,8 @@ describe("coordinated progress and draft restore", () => {
 
     const backup = makeBackup(initialProgress(), { "lesson-a": { status: "draft", code: "new" } });
     await store.writeRestoreJournal({
-      version: 1,
+      version: 2,
+      transactionId: "tx-new",
       createdAt: LATER,
       oldDrafts: { "lesson-a": { status: "draft", code: "old draft" } },
       newDrafts: backup.drafts,
@@ -354,7 +514,7 @@ describe("coordinated progress and draft restore", () => {
     const restarted = reopen(map);
 
     const recovery = await recoverPendingProgressRestore(restarted, {
-      readUpdatedAt: async () => NOW
+      read: async () => initialProgress()
     });
     expect(recovery).toEqual({ existed: true, applied: "old" });
     expect(await restarted.load("lesson-a")).toEqual({ status: "draft", code: "old draft" });

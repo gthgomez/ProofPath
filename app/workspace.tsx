@@ -11,6 +11,7 @@ import {
   type WorkspaceManifestValidation,
   type WorkspaceTask
 } from "@/domain/workspace-bridge";
+import type { ReadmeStatus } from "@/domain/types";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
@@ -85,6 +86,8 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
   const [validation, setValidation] = useState<WorkspaceManifestValidation | null>(null);
   const [transferStatus, setTransferStatus] = useState<string | null>(null);
   const [savedStatus, setSavedStatus] = useState<string | null>(null);
+  const [readmeStatus, setReadmeStatus] = useState<ReadmeStatus>("missing");
+  const [reflection, setReflection] = useState("");
 
   const bundle = createWorkspaceBundle(task);
   const relatedEvidence = task.linkedMissionId
@@ -140,7 +143,8 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
       linkedProjectMissionId: task.linkedMissionId,
       testStatus: "passing",
       verifierOutput: manifestText.trim(),
-      reflection: undefined
+      readmeStatus,
+      reflection: reflection.trim() || undefined
     });
 
     setSavedStatus(saved
@@ -222,6 +226,33 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
           style={[styles.input, styles.manifestInput]}
           value={manifestText}
         />
+        <MutedText>
+          Save the documentation on this same record so linked mission requirements describe one submission. A mission does not complete from unrelated evidence snippets.
+        </MutedText>
+        <Row>
+          {(["missing", "basic", "complete"] as const).map((status) => (
+            <ButtonShell
+              accessibilityHint={`Marks the project README as ${status}.`}
+              accessibilityLabel={`README status ${status}`}
+              key={status}
+              onPress={() => setReadmeStatus(status)}
+              selected={readmeStatus === status}
+              tone={readmeStatus === status ? "ink" : status === "missing" ? "rose" : "amber"}
+            >
+              README {status}
+            </ButtonShell>
+          ))}
+        </Row>
+        <TextInput
+          accessibilityHint="Explain how this project proves the skill and what still remains."
+          accessibilityLabel="Workspace reflection"
+          multiline
+          onChangeText={setReflection}
+          placeholder="Explain how this project proves the skill and what still remains."
+          placeholderTextColor={colors.muted}
+          style={[styles.input, styles.noteInput]}
+          value={reflection}
+        />
         <Row>
           <ButtonShell accessibilityHint="Checks the manifest against the task and workspace hash." onPress={handleValidate} tone="blue" variant="secondary">
             Validate manifest
@@ -285,6 +316,10 @@ const styles = StyleSheet.create({
   manifestInput: {
     fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
     minHeight: 140,
+    textAlignVertical: "top"
+  },
+  noteInput: {
+    minHeight: 100,
     textAlignVertical: "top"
   },
   code: {

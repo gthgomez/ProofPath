@@ -37,6 +37,13 @@ export class SandboxStartupError extends Error {
   }
 }
 
+export class SandboxCanceledError extends Error {
+  constructor(language: RunnerLanguage) {
+    super(`Sandbox ${language} execution was canceled before it completed.`);
+    this.name = "SandboxCanceledError";
+  }
+}
+
 export interface WorkerExecutionResult {
   stdout: string;
   stderr: string;
@@ -301,11 +308,25 @@ interface PendingRequest {
   reject: (error: Error) => void;
 }
 
-class SandboxWorkerRuntime {
+/**
+ * One Worker, one request lane.
+ *
+ * Concurrency contract:
+ * - Boot is deduplicated; every caller awaits the same startup promise.
+ * - Execution and typecheck requests are queued and run one at a time.
+ * - A request is associated with a token; duplicate and late messages are
+ *   ignored.
+ * - A timeout or worker error rejects exactly the active request, disposes the
+ *   Worker, and lets the next queued request start from a clean boot.
+ * - Public shutdown rejects any in-flight request instead of abandoning it.
+ */
+export class SandboxWorkerRuntime {
   private worker: Worker | null = null;
   private objectUrl: string | null = null;
   private booted = false;
+  private bootPromise: Promise<void> | null = null;
   private pending: PendingRequest | null = null;
+  private lane: Promise<unknown> = Promise.resolve();
   private tokenCounter = 0;
   private readonly language: RunnerLanguage;
 
@@ -317,13 +338,59 @@ class SandboxWorkerRuntime {
     if (this.booted) {
       return;
     }
+    if (this.bootPromise) {
+      return this.bootPromise;
+    }
+
+    const boot = this.bootOnce();
+    this.bootPromise = boot;
+    try {
+      await boot;
+    } finally {
+      if (this.bootPromise === boot) {
+        this.bootPromise = null;
+      }
+    }
+  }
+
+  async exec(request: ExecRequest, timeoutMs: number): Promise<WorkerExecutionResult> {
+    return this.runInLane(async () => {
+      await this.ensureBooted();
+      const message = await this.request({ type: "exec", request }, timeoutMs);
+      return normalizeExecutionResult(message.result);
+    });
+  }
+
+  async typecheck(code: string, fileName: string, timeoutMs: number): Promise<WorkerTypeCheckResult> {
+    return this.runInLane(async () => {
+      await this.ensureBooted();
+      const message = await this.request({ type: "typecheck", code, fileName }, timeoutMs);
+      return normalizeTypeCheckResult(message.result);
+    });
+  }
+
+  /** Reject any active request, then stop and release the Worker. */
+  terminate(reason: Error = new SandboxCanceledError(this.language)): void {
+    const pending = this.pending;
+    this.pending = null;
+    if (pending) {
+      clearTimeout(pending.timer);
+      pending.reject(reason);
+    }
+    this.disposeWorker();
+  }
+
+  private async bootOnce(): Promise<void> {
     try {
       await this.request({ type: "boot", language: this.language, assetBase: this.assetBase }, SANDBOX_BOOT_TIMEOUT_MS);
       this.booted = true;
     } catch (error) {
-      this.terminate();
+      this.disposeWorker();
       if (error instanceof SandboxTerminatedError) {
         throw new SandboxStartupError(this.language, "The runtime did not finish starting in time.");
+      }
+      if (error instanceof SandboxCanceledError) {
+        throw error;
       }
       throw new SandboxStartupError(
         this.language,
@@ -332,33 +399,10 @@ class SandboxWorkerRuntime {
     }
   }
 
-  async exec(request: ExecRequest, timeoutMs: number): Promise<WorkerExecutionResult> {
-    await this.ensureBooted();
-    const message = await this.request({ type: "exec", request }, timeoutMs);
-    return normalizeExecutionResult(message.result);
-  }
-
-  async typecheck(code: string, fileName: string, timeoutMs: number): Promise<WorkerTypeCheckResult> {
-    await this.ensureBooted();
-    const message = await this.request({ type: "typecheck", code, fileName }, timeoutMs);
-    return normalizeTypeCheckResult(message.result);
-  }
-
-  terminate(): void {
-    if (this.pending) {
-      const pending = this.pending;
-      this.pending = null;
-      clearTimeout(pending.timer);
-    }
-    if (this.worker) {
-      this.worker.terminate();
-      this.worker = null;
-    }
-    if (this.objectUrl) {
-      URL.revokeObjectURL(this.objectUrl);
-      this.objectUrl = null;
-    }
-    this.booted = false;
+  private runInLane<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.lane.then(task, task);
+    this.lane = run.then(() => undefined, () => undefined);
+    return run;
   }
 
   private request(payload: Record<string, unknown>, timeoutMs: number): Promise<Record<string, unknown>> {
@@ -366,9 +410,7 @@ class SandboxWorkerRuntime {
       this.createWorker();
     }
     if (this.pending) {
-      this.terminate();
-      this.createWorker();
-      this.booted = false;
+      return Promise.reject(new Error("Sandbox runtime already has an active request."));
     }
 
     const worker = this.worker as Worker;
@@ -380,7 +422,11 @@ class SandboxWorkerRuntime {
       }, Math.max(1, timeoutMs));
 
       this.pending = { token, timer, resolve, reject };
-      worker.postMessage({ ...payload, token });
+      try {
+        worker.postMessage({ ...payload, token });
+      } catch (error) {
+        this.fail(error instanceof Error ? error : new Error("Sandbox worker could not accept the request."));
+      }
     });
   }
 
@@ -419,10 +465,25 @@ class SandboxWorkerRuntime {
     if (pending) {
       clearTimeout(pending.timer);
     }
-    this.terminate();
+    this.disposeWorker();
     if (pending) {
       pending.reject(error);
     }
+  }
+
+  private disposeWorker(): void {
+    const worker = this.worker;
+    this.worker = null;
+    if (worker) {
+      worker.onmessage = null;
+      worker.onerror = null;
+      worker.terminate();
+    }
+    if (this.objectUrl) {
+      URL.revokeObjectURL(this.objectUrl);
+      this.objectUrl = null;
+    }
+    this.booted = false;
   }
 }
 

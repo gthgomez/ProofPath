@@ -32,11 +32,20 @@ token cannot modify `.github/workflows/ci.yml` because it lacks GitHub's
       - name: Export web build with offline shell
         run: npm run build:web
 
+      - name: Runtime matrix (Python, SQL, JavaScript, TypeScript, timeouts)
+        run: node scripts/e2e-runtime-matrix.mjs
+
+      - name: First-time learner journey (empty storage through evidence)
+        run: node scripts/e2e-first-time-journey.mjs
+
       - name: Learner journey (drafts, checks, backup, restore, provenance)
         run: node scripts/e2e-web-journey.mjs
 
-      - name: Runtime matrix (Python, SQL, JavaScript, TypeScript, timeouts)
-        run: node scripts/e2e-runtime-matrix.mjs
+      - name: Workspace -> real verifier -> mission -> reviewer packet
+        run: node scripts/e2e-workspace-journey.mjs
+
+      - name: Offline update safety and offline runtime assets
+        run: node scripts/e2e-offline-update.mjs
 
       - name: Upload browser artifacts on failure
         if: failure()

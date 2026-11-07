@@ -156,6 +156,9 @@ export function sanitizeImportedProgress(progress: UserProgress, now: string): U
 
   return {
     ...progress,
+    // A restore identity belongs to the device that performed the restore. An
+    // imported file must not be able to claim it.
+    restoreTransactionId: undefined,
     codeRunAttempts,
     quizAttempts,
     evidenceItems

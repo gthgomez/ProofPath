@@ -176,7 +176,7 @@ export function ProgressProvider({ children }: PropsWithChildren): ReactElement 
     // Finish or roll back a restore interrupted between its draft and progress
     // stages. Progress is already durable; only drafts need reconciliation.
     void recoverPendingProgressRestore(editorDraftStore, {
-      readUpdatedAt: async () => readStoredProgress().updatedAt
+      read: async () => readStoredProgress()
     }).then((recovery) => {
       if (isMounted && recovery.error) {
         setError(recovery.error);

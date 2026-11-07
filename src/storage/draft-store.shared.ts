@@ -63,12 +63,28 @@ export function draftStorageKey(lessonId: string): string {
 }
 
 export interface RestoreJournal {
+  version: 2;
+  /** Durable identity written into the restored progress snapshot. */
+  transactionId: string;
+  createdAt: string;
+  oldDrafts: Record<string, DraftState>;
+  newDrafts: Record<string, DraftState>;
+  oldProgressUpdatedAt: string;
+  newProgressUpdatedAt: string;
+}
+
+export interface RestoreJournalV1 {
   version: 1;
   createdAt: string;
   oldDrafts: Record<string, DraftState>;
   newDrafts: Record<string, DraftState>;
   oldProgressUpdatedAt: string;
   newProgressUpdatedAt: string;
+}
+
+export interface ProgressIdentity {
+  updatedAt: string;
+  restoreTransactionId?: string;
 }
 
 export interface RestoreRecoveryResult {
@@ -91,16 +107,19 @@ export interface EditorDraftStore {
    * Replace all drafts, requiring durable persistence, with rollback to the
    * previous snapshot if any write fails.
    */
-  importAll(snapshot: Record<string, DraftState>): Promise<{ ok: true } | { ok: false; error: string }>;
+  importAll(snapshot: Record<string, DraftState>): Promise<
+    | { ok: true }
+    | { ok: false; error: string; rollbackComplete: boolean }
+  >;
   /** Persist the recovery journal before a coordinated restore starts. */
   writeRestoreJournal(journal: RestoreJournal): Promise<void>;
   clearRestoreJournal(): Promise<void>;
   /**
-   * Resolve an interrupted restore. The progress store's current `updatedAt`
-   * decides which draft snapshot is authoritative: the new one only if the
-   * progress replacement actually completed.
+   * Resolve an interrupted restore. The durable progress identity decides which
+   * draft snapshot is authoritative. New journals use an explicit transaction
+   * id; legacy journals fall back to the old timestamp comparison.
    */
-  recoverPendingRestore(currentProgressUpdatedAt: string): Promise<RestoreRecoveryResult>;
+  recoverPendingRestore(readProgressIdentity: () => Promise<ProgressIdentity>): Promise<RestoreRecoveryResult>;
 }
 
 function serializeDraftState(state: DraftState): string | null {
@@ -186,28 +205,32 @@ export function createEditorDraftStore(persistence: DraftPersistence): EditorDra
 
   async function restoreEntries(
     previous: Map<string, string>,
-    writtenKeys: Set<string>
+    touchedKeys: Set<string>
   ): Promise<string | null> {
     const problems: string[] = [];
-    // Remove keys that did not exist before restoring older values, which also
-    // frees quota before the old (potentially larger) values are rewritten.
-    for (const key of writtenKeys) {
+    // `touchedKeys` includes writes that failed before reporting durability and
+    // deletions that failed after clearing the session mirror. Both can leave
+    // state behind, so both participate in rollback.
+    for (const key of touchedKeys) {
       if (!previous.has(key)) {
         try {
           await persistence.remove(key);
         } catch (error) {
-          problems.push(error instanceof Error ? error.message : "Unable to remove a partially restored draft.");
+          problems.push(`Unable to remove a partially restored draft: ${error instanceof Error ? error.message : "unknown error"}`);
         }
       }
     }
-    for (const [key, value] of previous) {
+    for (const key of touchedKeys) {
+      if (!previous.has(key)) {
+        continue;
+      }
       try {
-        const mode = await persistence.write(key, value);
+        const mode = await persistence.write(key, previous.get(key) as string);
         if (mode !== "durable") {
           problems.push(`Draft ${key} was only retained for this session while rolling back.`);
         }
       } catch (error) {
-        problems.push(error instanceof Error ? error.message : "Unable to roll back a draft.");
+        problems.push(`Unable to roll back a draft: ${error instanceof Error ? error.message : "unknown error"}`);
       }
     }
     return problems.length > 0 ? problems.join(" ") : null;
@@ -215,37 +238,42 @@ export function createEditorDraftStore(persistence: DraftPersistence): EditorDra
 
   async function importSnapshot(
     snapshot: Record<string, DraftState>
-  ): Promise<{ ok: true } | { ok: false; error: string }> {
+  ): Promise<{ ok: true } | { ok: false; error: string; rollbackComplete: boolean }> {
     // Callers are responsible for settling the queues; waiting here would
     // deadlock `importAll`, whose barrier includes this operation.
     const previous = await readDraftEntries();
     const next = draftRecordToEntries(snapshot);
-    const writtenKeys = new Set<string>();
+    // Track a key before writing it. Platform adapters may update their
+    // session mirror before reporting durability failure; rollback must cover
+    // those keys too, or an uncommitted draft stays visible.
+    const touchedKeys = new Set<string>();
 
     try {
       for (const [key, value] of next) {
+        touchedKeys.add(key);
         await writeDurable(key, value);
-        writtenKeys.add(key);
       }
       // Only remove stale entries after every new value is durable, so a quota
       // failure leaves the previous drafts intact.
       for (const key of previous.keys()) {
         if (!next.has(key)) {
+          touchedKeys.add(key);
           await persistence.remove(key);
         }
       }
       return { ok: true };
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "Unable to restore editor drafts.";
-      const rollbackError = await restoreEntries(previous, writtenKeys);
+      const rollbackError = await restoreEntries(previous, touchedKeys);
       return {
         ok: false,
-        error: rollbackError ? `${message} ${rollbackError}` : message
+        error: rollbackError ? `${message} ${rollbackError}` : message,
+        rollbackComplete: rollbackError === null
       };
     }
   }
 
-  async function readRestoreJournal(): Promise<RestoreJournal | null> {
+  async function readRestoreJournal(): Promise<RestoreJournal | RestoreJournalV1 | null> {
     let raw: string | null;
     try {
       raw = await persistence.read(RESTORE_JOURNAL_KEY);
@@ -257,20 +285,24 @@ export function createEditorDraftStore(persistence: DraftPersistence): EditorDra
     }
 
     try {
-      const parsed = JSON.parse(raw) as Partial<RestoreJournal>;
-      if (
-        parsed.version !== 1
-        || typeof parsed.createdAt !== "string"
-        || typeof parsed.oldProgressUpdatedAt !== "string"
-        || typeof parsed.newProgressUpdatedAt !== "string"
-        || !parsed.oldDrafts
-        || !parsed.newDrafts
-        || typeof parsed.oldDrafts !== "object"
-        || typeof parsed.newDrafts !== "object"
-      ) {
+      const parsed = JSON.parse(raw) as Partial<RestoreJournal | RestoreJournalV1>;
+      const sharedValid = typeof parsed.createdAt === "string"
+        && typeof parsed.oldProgressUpdatedAt === "string"
+        && typeof parsed.newProgressUpdatedAt === "string"
+        && parsed.oldDrafts
+        && parsed.newDrafts
+        && typeof parsed.oldDrafts === "object"
+        && typeof parsed.newDrafts === "object";
+      if (!sharedValid) {
         return null;
       }
-      return parsed as RestoreJournal;
+      if (parsed.version === 2 && typeof parsed.transactionId === "string" && parsed.transactionId.length > 0) {
+        return parsed as RestoreJournal;
+      }
+      if (parsed.version === 1) {
+        return parsed as RestoreJournalV1;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -375,14 +407,54 @@ export function createEditorDraftStore(persistence: DraftPersistence): EditorDra
     async clearRestoreJournal() {
       await persistence.remove(RESTORE_JOURNAL_KEY);
     },
-    async recoverPendingRestore(currentProgressUpdatedAt) {
+    async recoverPendingRestore(readProgressIdentity) {
       const journal = await readRestoreJournal();
       if (!journal) {
         return { existed: false, applied: null };
       }
 
+      let identity: ProgressIdentity;
+      try {
+        identity = await readProgressIdentity();
+      } catch (error) {
+        // Never guess which draft snapshot wins. Keep the journal so a later
+        // launch can reconcile once progress storage is readable.
+        return {
+          existed: true,
+          applied: null,
+          error: `An interrupted restore is waiting for progress storage: ${error instanceof Error ? error.message : "unknown read failure"}`
+        };
+      }
+
+      let useNew: boolean;
+      if (journal.version === 2) {
+        useNew = identity.restoreTransactionId === journal.transactionId;
+        const isClearlyOld = !useNew
+          && identity.restoreTransactionId === undefined
+          && identity.updatedAt === journal.oldProgressUpdatedAt;
+        if (!useNew && !isClearlyOld) {
+          return {
+            existed: true,
+            applied: null,
+            error: "An interrupted restore cannot be reconciled yet because progress changed after it started. The recovery journal was kept."
+          };
+        }
+      } else {
+        // Legacy journal: the timestamp is the only identity available.
+        if (identity.updatedAt === journal.newProgressUpdatedAt) {
+          useNew = true;
+        } else if (identity.updatedAt === journal.oldProgressUpdatedAt) {
+          useNew = false;
+        } else {
+          return {
+            existed: true,
+            applied: null,
+            error: "An interrupted legacy restore cannot be reconciled because progress changed after it started. The recovery journal was kept."
+          };
+        }
+      }
+
       await waitForSettled();
-      const useNew = currentProgressUpdatedAt === journal.newProgressUpdatedAt;
       const result = await importSnapshot(useNew ? journal.newDrafts : journal.oldDrafts);
       if (!result.ok) {
         return {

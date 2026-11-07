@@ -571,6 +571,7 @@ export const userProgressSchema = z.object({
   reviewItems: z.array(reviewItemSchema).optional(),
   reviewEvents: z.array(reviewEventSchema).optional(),
   weeklyReports: z.array(weeklyReportSnapshotSchema).optional(),
+  restoreTransactionId: nonEmptyString.optional(),
   updatedAt: nonEmptyString
 });
 
