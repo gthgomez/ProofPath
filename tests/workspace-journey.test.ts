@@ -161,4 +161,37 @@ describe("CI diagnosis workspace journey", () => {
     expect(run.code).toBe(0);
     expect(validateResultManifest(task, run.stdout.trim())).toEqual({ status: "valid", passed: true, problems: [] });
   });
+
+  it("rejects commented-out needs lines as false repairs", () => {
+    const task = buildCiWorkflowDiagnosisTask();
+    const dir = materialize(task, (files) => {
+      files.set(
+        ".github/workflows/ci.yml",
+        files.get(".github/workflows/ci.yml")!
+          .replace("pyhton -m pytest", "python -m pytest")
+          .replace("  deploy:", "  deploy:\n    # needs: [lint, test]")
+      );
+    });
+    const run = runVerifier(dir, "verify.py");
+
+    expect(run.code).not.toBe(0);
+    expect(run.stderr).toContain("The deploy job has no 'needs:'");
+    expect(validateResultManifest(task, run.stdout.trim()).passed).toBe(false);
+  });
+
+  it("accepts valid multiline YAML syntax for needs dependencies", () => {
+    const task = buildCiWorkflowDiagnosisTask();
+    const dir = materialize(task, (files) => {
+      files.set(
+        ".github/workflows/ci.yml",
+        files.get(".github/workflows/ci.yml")!
+          .replace("pyhton -m pytest", "python -m pytest")
+          .replace("  deploy:", "  deploy:\n    needs:\n      - lint\n      - test")
+      );
+    });
+    const run = runVerifier(dir, "verify.py");
+
+    expect(run.code).toBe(0);
+    expect(validateResultManifest(task, run.stdout.trim())).toEqual({ status: "valid", passed: true, problems: [] });
+  });
 });
