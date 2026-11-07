@@ -61,7 +61,19 @@ export async function importLegacyDatabase(
   db: LegacyImportDatabase,
   legacyFilename: string = LEGACY_DATABASE_NAME
 ): Promise<void> {
-  const filenameLiteral = legacyFilename.replace(/'/g, "''");
+  let resolvedFilename = legacyFilename;
+  // If the database instance exposes databasePath (as expo-sqlite's SQLiteDatabase does),
+  // resolve legacyFilename relative to the database's parent directory. This prevents
+  // relative ATTACH failures caused by process.cwd() not matching the Android app database directory.
+  if ("databasePath" in db && typeof (db as { databasePath?: unknown }).databasePath === "string") {
+    const fullPath = (db as { databasePath: string }).databasePath;
+    const lastSep = Math.max(fullPath.lastIndexOf("/"), fullPath.lastIndexOf("\\"));
+    if (lastSep > 0 && !legacyFilename.includes("/") && !legacyFilename.includes("\\")) {
+      resolvedFilename = `${fullPath.slice(0, lastSep + 1)}${legacyFilename}`;
+    }
+  }
+
+  const filenameLiteral = resolvedFilename.replace(/'/g, "''");
 
   try {
     await db.execAsync(`ATTACH DATABASE '${filenameLiteral}' AS ${LEGACY_SCHEMA_NAME}`);

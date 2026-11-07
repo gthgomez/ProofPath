@@ -12,7 +12,8 @@ ProofPath Code Lab is a production-style workflow trainer, not a full IDE and no
 
 - `Run file` executes the learner file and shows output. It never completes progress and never captures proof.
 - `Run checks` runs the lesson verifier. Passing checks can complete the Code Lab gate and create a proof artifact.
-- Hidden checks may affect pass/fail, but raw hidden messages, expected values, hidden code, and edge cases must stay redacted.
+- Hidden checks may affect pass/fail, but raw hidden messages, expected values, hidden code, and edge cases must stay redacted. Neither hidden stdout, hidden stderr, nor hidden failure messages are permitted to leak into learner output, terminal transcripts, or proof artifacts.
+- Both stdout and stderr buffers have an enforced cumulative cap (512 KB) to prevent memory exhaustion and UI lockups from runaway print loops.
 - Terminal transcripts and proof artifacts must consume redacted check data only.
 - Canonical copied output is generated from structured terminal events, not ad hoc strings.
 - Terminal result events include result status, reason, runtime, and exit-style status when a command ran.
@@ -76,8 +77,9 @@ Known limits:
 
 Current status:
 
-- JavaScript runs in an offline sandbox using a worker when available, with an in-process fallback for tests/environments without worker APIs.
-- Console output is captured as terminal stdout/stderr.
+- JavaScript runs in an offline sandbox using Web Workers (or Android WebView on native). Environments lacking Worker/Blob/URL isolation fail closed; in-process execution in the host realm has been eliminated.
+- Console output is captured as terminal stdout/stderr with a 512 KB cumulative output limit.
+- Native WebView runners use correlated request IDs (`requestId`) and discard stale or uncorrelated results after timeouts or unmounts.
 
 Terminal phases:
 
@@ -90,6 +92,7 @@ Known limits:
 - Network, filesystem, browser storage, host process, constructor escape, and obvious infinite-loop patterns are blocked.
 - No package installation.
 - Diagnostics cover deterministic SyntaxError, ReferenceError, and TypeError signals first.
+- In-page WASM runtimes (Pyodide on web) cannot be preemptively terminated from a promise timeout without Web Worker WASM threads; native WebViews terminate on timeout by destroying and recreating the underlying WebView instance.
 
 ## TypeScript
 

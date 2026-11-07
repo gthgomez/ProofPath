@@ -381,9 +381,23 @@ self.onmessage = (event) => {
   const stdout = [];
   const stderr = [];
   const testResults = [];
+  const MAX_OUTPUT_CHARS = 524288;
+  let totalChars = 0;
+  function appendOutput(target, text) {
+    if (totalChars >= MAX_OUTPUT_CHARS) return;
+    const addedLen = text.length + 1;
+    const remaining = MAX_OUTPUT_CHARS - totalChars;
+    if (addedLen > remaining) {
+      target.push(text.slice(0, Math.max(0, remaining - 45)) + "\\n[output truncated: exceeded 512KB limit]");
+      totalChars = MAX_OUTPUT_CHARS;
+    } else {
+      target.push(text);
+      totalChars += addedLen;
+    }
+  }
   const sandboxConsole = {
-    log: (...values) => stdout.push(values.map(normalizeOutput).join(" ")),
-    error: (...values) => stderr.push(values.map(normalizeOutput).join(" "))
+    log: (...values) => appendOutput(stdout, values.map(normalizeOutput).join(" ")),
+    error: (...values) => appendOutput(stderr, values.map(normalizeOutput).join(" "))
   };
 
   if (runMode === "run_file") {
@@ -409,6 +423,7 @@ self.onmessage = (event) => {
     const test = tests[index];
     const visible = index < visibleCount;
     const stdoutStart = stdout.length;
+    const stderrStart = stderr.length;
 
     try {
       const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code);
@@ -427,9 +442,10 @@ self.onmessage = (event) => {
         message: formatSandboxFailureMessage(error, language)
       });
     } finally {
-      // Hidden check output must never reach learner-visible stdout.
+      // Hidden check output must never reach learner-visible stdout or stderr.
       if (!visible) {
         stdout.length = stdoutStart;
+        stderr.length = stderrStart;
       }
     }
   }
@@ -648,6 +664,7 @@ async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<Cod
   for (const [index, test] of [...spec.visibleTests, ...spec.hiddenTests].entries()) {
     const visible = index < spec.visibleTests.length;
     const stdoutStart = stdout.length;
+    const stderrStart = stderr.length;
 
     try {
       const wrappedCode = [
@@ -663,13 +680,16 @@ async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<Cod
       }
       testResults.push(passResult(test, visible));
     } catch (error) {
-      stderr.push(error instanceof Error ? error.message : normalizeOutput(error));
+      if (visible) {
+        stderr.push(error instanceof Error ? error.message : normalizeOutput(error));
+      }
       testResults.push(failResult(test, visible, error, spec.language));
     } finally {
-      // Hidden checks must never contribute to learner-visible stdout: their
-      // harness can reveal the anti-forgery seed. Keep only visible output.
+      // Hidden checks must never contribute to learner-visible stdout or stderr: their
+      // harness or assertion errors can reveal internal test details or seeds. Keep only visible output.
       if (!visible) {
         stdout.length = stdoutStart;
+        stderr.length = stderrStart;
       }
     }
   }
@@ -760,6 +780,8 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
 
   for (const [index, test] of [...spec.visibleTests, ...spec.hiddenTests].entries()) {
     const visible = index < spec.visibleTests.length;
+    const stdoutStart = stdout.length;
+    const stderrStart = stderr.length;
     // Each check gets a fresh database seeded by setupCode so learner scripts
     // cannot leak state (for example a CREATE TABLE) into later checks.
     const db = new SQL.Database();
@@ -793,9 +815,18 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
       }
       testResults.push(passResult(test, visible, output || "Query ran"));
     } catch (error) {
-      stderr.push(error instanceof Error ? error.message : normalizeOutput(error));
+      const message = error instanceof Error ? error.message : normalizeOutput(error);
+      if (visible || message === "Output missing") {
+        stderr.push(message);
+      }
       testResults.push(failResult(test, visible, error, spec.language));
     } finally {
+      if (!visible) {
+        stdout.length = stdoutStart;
+        if (stderr.length > stderrStart && stderr[stderr.length - 1] !== "Output missing") {
+          stderr.length = stderrStart;
+        }
+      }
       db.close();
     }
   }

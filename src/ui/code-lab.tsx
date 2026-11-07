@@ -29,7 +29,7 @@ function formatVisibleTestExpectation(expectedOutputIncludes?: string[]): string
 }
 
 export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, onRunPassed, runnerSpec }: CodeLabProps): ReactElement {
-  const [code, setCode] = useState(runnerSpec.starterCode);
+  const [code, setCode] = useState(() => latestRun?.codeSnapshot ?? runnerSpec.starterCode);
   const [isRunning, setIsRunning] = useState(false);
   const [activeRunMode, setActiveRunMode] = useState<CodeRunMode>("run_checks");
   const [activePhaseIndex, setActivePhaseIndex] = useState(0);
@@ -38,10 +38,10 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const [focusedLine, setFocusedLine] = useState<number | null>(null);
 
   useEffect(() => {
-    setCode(runnerSpec.starterCode);
+    setCode(latestRun?.codeSnapshot ?? runnerSpec.starterCode);
     setRunError(null);
     setCopyStatus(null);
-  }, [runnerSpec.starterCode]);
+  }, [runnerSpec.starterCode, lessonId]);
 
   const runCode = async (runMode: CodeRunMode): Promise<void> => {
     setIsRunning(true);
