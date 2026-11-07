@@ -127,6 +127,8 @@
 - [x] `android/gradlew :app:assembleDebug` produces `app-debug.apk` (2026-10-11, `-PreactNativeArchitectures=x86_64`; `:app:assembleStandalone` also builds with the JS bundle embedded)
 - [x] Runtime device testing executed where the environment allows — 2026-10-11 on an offline Android 16 x86_64 emulator (WHPX): level-0 Python offline regex runner verified end to end (wrong answer fails instantly with guidance; corrected answer passes in 1 ms; attempt history survives force-stop/reinstall). WebView WASM cold boots (Pyodide, sql.js) exceed the 20 s startup allowance under software rendering — recorded in STATUS.md; physical-hardware timing still pending (see STATUS.md Blockers)
 
+- [x] 2026-11-07: `:app:assembleStandalone` (`-PreactNativeArchitectures=x86_64`, debug-signed) installed on an Android 16 (API 36) x86_64 emulator with KVM, airplane mode on. Offline launch, sample lesson, native Python runner fail→pass, force-stop/relaunch persistence, `ConfirmDialog` cancel, native clipboard copy action, named-file share sheet (`Sharing 1 file` → `proofpath-progress-backup.json`), document picker, and file-picker backup restore (restored draft visible) were exercised. WebView Pyodide/sql.js/TypeScript cold-boot timing and physical hardware remain unverified.
+
 **Pass criteria: 2 required, device step documented either way**
 
 ---
@@ -186,7 +188,7 @@
 - [ ] `scripts/e2e-web-journey.mjs` passes: journey, backup download/reset/file import/restore, cancel, invalid input, restored provenance, offline reload
 - [ ] `scripts/e2e-runtime-matrix.mjs` passes: Python/SQL/JS/TS, Python and SQL timeout termination, recovery, TypeScript diagnostics
 - [ ] `npm run build:web` generates `dist/sw.js`; offline reload and lesson navigation work after installation
-- [ ] Native file export/import and clipboard behavior are verified on a physical device or emulator (otherwise listed as unverified)
+- [x] Native file export/import and clipboard behavior were exercised on an Android 16 x86_64 emulator (named share sheet, document picker, file-picker restore, clipboard copy action); physical-hardware behavior remains unverified
 
 **Pass criteria: 14/14 (device rows require device evidence)**
 
