@@ -35,7 +35,7 @@
     "react-native-webview": "^13.16.1",
     "sql.js": "^1.14.1",
     "typescript": "5.9.3",
-    "zod": "4.4.3"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",
