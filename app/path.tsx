@@ -101,6 +101,21 @@ export default function LearningPathScreen(): ReactElement {
         </Link>
       </Panel>
 
+      <Panel accessibilityLabel="Path progress summary">
+        <SectionTitle>What your state means</SectionTitle>
+        <Row>
+          <Badge tone="green">{progress.completedLessonIds.length} completed</Badge>
+          <Badge tone="amber">{progress.placedOutLessonIds.length} placed out</Badge>
+          <Badge tone="blue">{(progress.durableLessonMiniProjectIds ?? []).length} verified Code Lab</Badge>
+        </Row>
+        <MutedText>
+          Completed means the lesson, its mini-project check, and its checkpoint are all satisfied. Placed out means you unlocked navigation with a placement test; it is not verified completion and does not add portfolio proof.
+        </MutedText>
+        <MutedText>
+          Verified Code Lab counts lessons with a durable passing `Run checks` attempt. Editing the code afterward makes the current draft unverified until you run checks again.
+        </MutedText>
+      </Panel>
+
       {tracks.length === 0 ? (
         <Panel>
           <SectionTitle>No Learn tracks for this path yet</SectionTitle>

@@ -5,18 +5,36 @@ import { shuffleQuizChoices, workshop } from "../python/shared";
 // track's lessons and quizzes, and the shared builders in
 // src/content/python/shared.ts do the rest.
 
+const aiBoundaryPracticeReps: LessonPracticeBlock[] = [
+  {
+    tier: "diagnose",
+    starterCode: "const mobileConfig = {\n  apiBaseUrl: 'https://example.test/api',\n  providerApiKey: 'sk-live-demo',\n  trackId: 'path-software-foundations'\n};",
+    expectedOutput: "providerApiKey must move behind the server boundary; apiBaseUrl and trackId may be public.",
+    checkYourAnswer: "Ask whether the value would let someone spend money or impersonate the app. If yes, it is not public config."
+  },
+  {
+    tier: "transfer",
+    starterCode: "serverRoute('/api/mentor-plan'):\n- validates the learner goal\n- calls the model provider\n- returns a plan\n\nMissing: rate limit and audit log",
+    expectedOutput: "Add server-side rate limiting and an audit record before returning the plan.",
+    checkYourAnswer: "Secrets are not the only boundary concern. Abuse controls and reviewable logs belong with the privileged call."
+  }
+];
+
 const aiRetrievalPracticeReps: LessonPracticeBlock[] = [
   {
+    tier: "replicate",
     starterCode: "const retrievedIds = ['n1'];\nconst answer = { claims: [{ text: 'Tests passed', citationId: 'n1' }] };\nconsole.log(answer.claims[0].citationId);",
     expectedOutput: "The answer cites n1, which is inside the retrieved note id list.",
     checkYourAnswer: "The claim cites a retrieved note. Change the citation to n2 and the grounding check should reject it."
   },
   {
+    tier: "diagnose",
     starterCode: "const retrievedIds = ['n1'];\nconst answer = { claims: [{ text: 'The app is deployed', citationId: null }] };\nconsole.log(answer.claims[0].citationId);",
     expectedOutput: "null means the claim is unsupported and should not be presented as fact.",
     checkYourAnswer: "Unsupported is a valid safe result. Do not fill in a citation just to make the answer look complete."
   },
   {
+    tier: "transfer",
     starterCode: "const notes = [{ id: 'n1', text: 'SQLite stores progress locally.' }, { id: 'n2', text: 'Secrets stay server-side.' }];\nconst retrievedIds = ['n2'];",
     expectedOutput: "An answer about secrets may cite n2, but an answer about SQLite should not pretend n2 supports it.",
     checkYourAnswer: "This rep practices topic fit. Grounding is not just citation format; the cited note must support the claim."
@@ -89,7 +107,8 @@ export const aiAppsLessons: Lesson[] = [
             hiddenTests: [],
             expectedOutput: ["no provider secret", "passed"]
           }
-        }
+        },
+        aiBoundaryPracticeReps
       )
     },
     {

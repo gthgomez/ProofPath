@@ -1,9 +1,39 @@
-import type { Lesson, Quiz } from "@/domain/types";
+import type { Lesson, LessonPracticeBlock, Quiz } from "@/domain/types";
 import { checkpointQuiz, proofLesson } from "../python/shared";
 
 // Testing and Debugging track. Mirrors the python/level-N.ts split: this file owns the
 // track's lessons and quizzes, and the shared builders in
 // src/content/python/shared.ts do the rest.
+
+const regressionPracticeReps: LessonPracticeBlock[] = [
+  {
+    tier: "diagnose",
+    starterCode: "function parseMinutes(value) {\n  return Number(value);\n}\n\n// Old bug: parseMinutes('') returned 0 instead of invalid.",
+    expectedOutput: "The harness needs a blank-input case that expects 'invalid', because returning 0 silently accepts bad data.",
+    checkYourAnswer: "Name the exact old-bug input. A regression case should fail if someone removes the blank check."
+  },
+  {
+    tier: "transfer",
+    starterCode: "const cases = [\n  { input: { minutes: 45 }, expected: 45 },\n  { input: { minutes: -5 }, expected: 'invalid' }\n];",
+    expectedOutput: "The negative-minutes case is the transfer: the same rejection rule applies to a different invalid input.",
+    checkYourAnswer: "Transfer tests keep the rule, not just one literal value. What other invalid input should share the behavior?"
+  }
+];
+
+const failureLogPracticeReps: LessonPracticeBlock[] = [
+  {
+    tier: "diagnose",
+    starterCode: "symptom: app crashes\nhypothesis: 'the code is bad'\nfix: changed several files\nverifier: none\nresidual risk: unknown",
+    expectedOutput: "This log is not reviewable: the hypothesis is vague, the fix is unbounded, and there is no verifier.",
+    checkYourAnswer: "A useful hypothesis names a cause. A useful fix is small enough to inspect, and a verifier proves one behavior."
+  },
+  {
+    tier: "transfer",
+    starterCode: "symptom: saved progress resets after reload\nhypothesis: provider writes before hydration\nfix: write only after load completes\nverifier: reload test passes\nresidual risk: slow devices not measured",
+    expectedOutput: "This is a reviewable log: each field is concrete and the residual risk is honest.",
+    checkYourAnswer: "The same five fields work for a different bug. Which new risk would you test next?"
+  }
+];
 
 export const testingDebuggingLessons: Lesson[] = [
     proofLesson({
@@ -44,7 +74,8 @@ export const testingDebuggingLessons: Lesson[] = [
       requiredCodeIncludes: ["summarizeMinutes", "cases"],
       requiredOutputIncludes: ["passed"],
       runnerStarterCode: "const cases = [{ input: { minutes: 30 }, expected: 30 }, { input: { minutes: '' }, expected: 'invalid' }];\n\nfunction summarizeMinutes(input) {\n  return input.minutes;\n}",
-      runnerTestCode: "if (summarizeMinutes(cases[0].input) !== 30) throw new Error('normal minutes should pass');\nif (summarizeMinutes(cases[1].input) !== 'invalid') throw new Error('empty minutes should be invalid');\nconsole.log('passed');"
+      runnerTestCode: "if (summarizeMinutes(cases[0].input) !== 30) throw new Error('normal minutes should pass');\nif (summarizeMinutes(cases[1].input) !== 'invalid') throw new Error('empty minutes should be invalid');\nconsole.log('passed');",
+      practiceReps: regressionPracticeReps
     }),
     proofLesson({
       id: "lesson-debugging-failure-log",
@@ -84,7 +115,8 @@ export const testingDebuggingLessons: Lesson[] = [
       requiredCodeIncludes: ["symptom", "hypothesis", "verifier"],
       requiredOutputIncludes: ["passed"],
       runnerStarterCode: "const failureLog = { symptom: '', hypothesis: '', fix: '', verifier: '', residualRisk: '' };\n\nfunction isUsefulLog(log) {\n  return false;\n}",
-      runnerTestCode: "const good = { symptom: 'blank minutes crash', hypothesis: 'parser trusts blanks', fix: 'reject blank minutes', verifier: 'empty case returns invalid', residualRisk: 'timezone formats not tested' };\nif (!isUsefulLog(good)) throw new Error('complete log should pass');\nif (isUsefulLog({ ...good, verifier: '' })) throw new Error('missing verifier should fail');\nconsole.log('passed');"
+      runnerTestCode: "const good = { symptom: 'blank minutes crash', hypothesis: 'parser trusts blanks', fix: 'reject blank minutes', verifier: 'empty case returns invalid', residualRisk: 'timezone formats not tested' };\nif (!isUsefulLog(good)) throw new Error('complete log should pass');\nif (isUsefulLog({ ...good, verifier: '' })) throw new Error('missing verifier should fail');\nconsole.log('passed');",
+      practiceReps: failureLogPracticeReps
     }),
 ];
 

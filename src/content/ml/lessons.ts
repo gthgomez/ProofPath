@@ -5,18 +5,36 @@ import { shuffleQuizChoices, workshop } from "../python/shared";
 // track's lessons and quizzes, and the shared builders in
 // src/content/python/shared.ts do the rest.
 
+const mlMetricsPracticeReps: LessonPracticeBlock[] = [
+  {
+    tier: "diagnose",
+    starterCode: "accuracy = 98%\nsample size = 100\npositives = 2\nsplit = held-out test set",
+    expectedOutput: "The score is not trustworthy by itself: a model that always predicts negative can score 98% here while missing both positives.",
+    checkYourAnswer: "Look at class balance before celebrating accuracy. What happens to the two positive examples?"
+  },
+  {
+    tier: "transfer",
+    starterCode: "task = 'flag urgent support tickets'\nmissing an urgent ticket is costly\nfalse alarm cost is a quick human review",
+    expectedOutput: "Favor recall for the urgent class, then report precision and the review cost alongside it.",
+    checkYourAnswer: "The right metric depends on which error hurts more. Explain the tradeoff instead of choosing one number automatically."
+  }
+];
+
 const mlConfusionMatrixPracticeReps: LessonPracticeBlock[] = [
   {
+    tier: "diagnose",
     starterCode: "const matrix = { tp: 8, fp: 2, fn: 5, tn: 20 };\nconsole.log(matrix.fn);",
     expectedOutput: "The matrix reports 5 false negatives.",
     checkYourAnswer: "False negatives are real positives the model missed. Ask what user harm happens when this number is high."
   },
   {
+    tier: "diagnose",
     starterCode: "const matrix = { tp: 12, fp: 6, fn: 1, tn: 30 };\nconsole.log(matrix.fp);",
     expectedOutput: "The matrix reports 6 false positives.",
     checkYourAnswer: "False positives are negative examples predicted positive. They matter when incorrect alerts or approvals are costly."
   },
   {
+    tier: "transfer",
     starterCode: "const matrix = { tp: 9, fp: 1, fn: 9, tn: 40 };\nconsole.log(matrix.tp + matrix.fn);",
     expectedOutput: "18 actual positive examples",
     checkYourAnswer: "This rep ties the cells back to the data. Actual positives are true positives plus false negatives."
@@ -89,7 +107,8 @@ export const mlLessons: Lesson[] = [
             hiddenTests: [],
             expectedOutput: ["score", "split", "sample size", "failure", "limitation"]
           }
-        }
+        },
+        mlMetricsPracticeReps
       )
     },
     {
