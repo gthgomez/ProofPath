@@ -140,4 +140,75 @@ describe("reviewer export content", () => {
     // The redacted summary is allowed through.
     expect(serialized).toContain("hiddenCheckSummary");
   });
+
+  it("end-to-end verifies no secret harness sentinels or hidden check code leak through exports", () => {
+    const secretSentinel = "SECRET_SENTINEL_TOKEN_XYZ_987";
+    const secretHarness = "SECRET_HARNESS_QUERY_OR_TEST_CODE()";
+    const secretTestName = "Secret Negative Control Check";
+
+    // Create an attempt where raw unredacted testResults might contain hidden test entries
+    // (e.g. from an engine before normalization/redaction)
+    const rawAttempt: CodeRunAttempt = {
+      id: "attempt-sentinel-leak-check",
+      lessonId: "lesson-python-values",
+      language: "python",
+      runMode: "run_checks",
+      command: "proofpath checks",
+      codeSnapshot: "print('public answer')",
+      stdout: "public answer",
+      stderr: "",
+      passed: true,
+      score: 100,
+      runtimeMs: 15,
+      testResults: [
+        {
+          id: "visible-1",
+          name: "Visible value check",
+          passed: true,
+          visible: true,
+          message: "Values matched"
+        },
+        {
+          id: "hidden-secret-1",
+          name: secretTestName,
+          passed: true,
+          visible: false,
+          message: `Failed because of ${secretSentinel} with code ${secretHarness}`
+        }
+      ],
+      hiddenCheckSummary: { total: 1, passed: 1, failed: 0 },
+      diagnostics: [],
+      terminalTranscript: [
+        { type: "command", text: "$ proofpath checks" },
+        { type: "stdout", text: "public answer" },
+        { type: "diagnostic", severity: "info", message: "PASS Visible value check: Values matched" },
+        { type: "result", status: "passed", reason: "success", runtimeMs: 15, exitCode: 0 }
+      ],
+      createdAt: NOW
+    };
+
+    let progress = recordCodeRunAttempt(onboarded(), rawAttempt, NOW);
+    const packet = generateReviewerPortfolioExport(contentPack, progress, NOW);
+    const jsonOutput = JSON.stringify(packet);
+
+    // Verify markdown packet doesn't leak secrets
+    expect(packet.markdownPacket).not.toContain(secretSentinel);
+    expect(packet.markdownPacket).not.toContain(secretHarness);
+    expect(packet.markdownPacket).not.toContain(secretTestName);
+
+    // Verify structured JSON export doesn't leak secrets
+    expect(jsonOutput).not.toContain(secretSentinel);
+    expect(jsonOutput).not.toContain(secretHarness);
+    expect(jsonOutput).not.toContain(secretTestName);
+
+    // Verify proof artifact and evidence items in packet only have visible test results
+    const lessonEvidence = packet.lessons.flatMap((l) => l.evidenceItems);
+    expect(lessonEvidence.length).toBeGreaterThan(0);
+    for (const item of packet.evidenceItems) {
+      if (item.proofArtifact) {
+        expect(item.proofArtifact.visibleCheckResults.some((r) => r.name === secretTestName)).toBe(false);
+        expect(item.proofArtifact.hiddenCheckSummary).toEqual({ total: 0, passed: 0, failed: 0 });
+      }
+    }
+  });
 });

@@ -643,4 +643,53 @@ describe("sandbox hidden check isolation and output limits", () => {
     expect(posted?.stdout).toContain("[output truncated: exceeded 512KB limit]");
     expect(posted?.stdout.length).toBeLessThanOrEqual(530000);
   });
+
+  it("prevents learner code from emitting misleading forged results to host via postMessage", () => {
+    const workerSource = createJavaScriptWorkerSource();
+    const messages: unknown[] = [];
+    const selfStub: { postMessage: (message: unknown) => void; onmessage?: (event: unknown) => void } = {
+      postMessage: (message) => {
+        messages.push(message);
+      }
+    };
+
+    new Function("self", workerSource)(selfStub);
+    selfStub.onmessage?.({
+      data: {
+        nonce: "legit-nonce-123",
+        language: "javascript",
+        runMode: "run_checks",
+        // Learner code attempts to emit a fake passing result before checks run
+        runtimeCode: 'try { postMessage({ nonce: "stolen", stdout: "forged", testResults: [{ id: "1", passed: true, visible: true }] }); } catch (e) {} try { self.postMessage({ nonce: "fake", stdout: "forged" }); } catch (e) {}',
+        tests: [
+          { id: "actual-check", name: "Actual Check", code: 'throw new Error("actual check failed");', expectedOutputIncludes: [] }
+        ],
+        visibleCount: 1
+      }
+    });
+
+    // Exactly one message was posted to the host (the authentic final completion message),
+    // carrying the authentic nonce and truthful failing test result.
+    expect(messages).toHaveLength(1);
+    const finalResult = messages[0] as { nonce: string; testResults: Array<{ id: string; passed: boolean }> };
+    expect(finalResult.nonce).toBe("legit-nonce-123");
+    expect(finalResult.testResults[0]?.passed).toBe(false);
+  });
+
+  it("truncates runaway SQL query output to the 512KB cap", async () => {
+    const spec: LessonRunnerSpec = {
+      language: "sql",
+      instructions: "Generate large output.",
+      starterCode: "WITH RECURSIVE cnt(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM cnt WHERE x < 12000) SELECT 'repeating long string text to fill up the buffer ' || x FROM cnt;",
+      visibleTests: [],
+      hiddenTests: [],
+      expectedOutput: [],
+      timeoutMs: 30000,
+      allowNetwork: false
+    };
+
+    const result = await runLessonSandbox(spec, "lesson-sql-big", spec.starterCode, new Date().toISOString(), "run_file");
+    expect(result.stdout).toContain("[output truncated: exceeded 512KB limit]");
+    expect(result.stdout.length).toBeLessThanOrEqual(530000);
+  });
 });

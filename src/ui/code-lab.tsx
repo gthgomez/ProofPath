@@ -13,6 +13,8 @@ import { CodeTerminal } from "@/ui/code-terminal";
 import { SyntaxHighlightedEditor } from "@/ui/syntax-highlighted-editor";
 import type { CodeLabProps } from "@/ui/code-lab.shared";
 
+import { getEditorDraft, saveEditorDraft, clearEditorDraft } from "@/storage/draft-store";
+
 function formatVisibleTestExpectation(expectedOutputIncludes?: string[]): string {
   if (!expectedOutputIncludes?.length) {
     return "";
@@ -29,7 +31,7 @@ function formatVisibleTestExpectation(expectedOutputIncludes?: string[]): string
 }
 
 export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, onRunPassed, runnerSpec }: CodeLabProps): ReactElement {
-  const [code, setCode] = useState(() => latestRun?.codeSnapshot ?? runnerSpec.starterCode);
+  const [code, setCode] = useState(() => getEditorDraft(lessonId) ?? latestRun?.codeSnapshot ?? runnerSpec.starterCode);
   const [isRunning, setIsRunning] = useState(false);
   const [activeRunMode, setActiveRunMode] = useState<CodeRunMode>("run_checks");
   const [activePhaseIndex, setActivePhaseIndex] = useState(0);
@@ -38,7 +40,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const [focusedLine, setFocusedLine] = useState<number | null>(null);
 
   useEffect(() => {
-    setCode(latestRun?.codeSnapshot ?? runnerSpec.starterCode);
+    setCode(getEditorDraft(lessonId) ?? latestRun?.codeSnapshot ?? runnerSpec.starterCode);
     setRunError(null);
     setCopyStatus(null);
   }, [runnerSpec.starterCode, lessonId]);
@@ -157,7 +159,10 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
         diagnostics={diagnostics}
         focusLine={focusedLine}
         language={runnerSpec.language}
-        onChangeText={setCode}
+        onChangeText={(nextCode) => {
+          setCode(nextCode);
+          saveEditorDraft(lessonId, nextCode);
+        }}
         value={code}
       />
       <Row>
@@ -185,7 +190,10 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
         <ButtonShell
           accessibilityHint="Restores the lesson starter code."
           disabled={isSaving || isRunning}
-          onPress={() => setCode(runnerSpec.starterCode)}
+          onPress={() => {
+            setCode(runnerSpec.starterCode);
+            clearEditorDraft(lessonId);
+          }}
           size="compact"
           tone="ink"
           variant="secondary"
