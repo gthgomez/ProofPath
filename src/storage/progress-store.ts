@@ -19,7 +19,7 @@ import type {
   WeeklyReportSnapshot
 } from "@/domain/types";
 
-const DATABASE_VERSION = 10;
+const DATABASE_VERSION = 11;
 const PROGRESS_ROW_ID = "default";
 
 type TransactionalSQLiteDatabase = SQLiteDatabase & {
@@ -129,6 +129,8 @@ interface ReviewEventRow {
   reviewed_at: string;
   next_due_at: string;
   interval_days: number;
+  /** 1 when the review was answered with assistance; null/0 otherwise. */
+  assisted: number | null;
 }
 
 interface WeeklyReportRow {
@@ -477,6 +479,7 @@ async function createNormalizedSchema(db: SQLiteDatabase): Promise<void> {
       reviewed_at TEXT NOT NULL,
       next_due_at TEXT NOT NULL,
       interval_days INTEGER NOT NULL,
+      assisted INTEGER,
       sort_order INTEGER NOT NULL
     );
 
@@ -621,6 +624,15 @@ async function ensureCodeRunAttemptColumns(db: SQLiteDatabase): Promise<void> {
     if (!existingColumns.has(column.name)) {
       await db.execAsync(`ALTER TABLE code_run_attempts ADD COLUMN ${column.name} ${column.definition};`);
     }
+  }
+}
+
+async function ensureReviewEventColumns(db: SQLiteDatabase): Promise<void> {
+  const rows = await db.getAllAsync<TableInfoRow>("PRAGMA table_info(review_events)");
+  const existingColumns = new Set(rows.map((row) => row.name));
+
+  if (!existingColumns.has("assisted")) {
+    await db.execAsync("ALTER TABLE review_events ADD COLUMN assisted INTEGER;");
   }
 }
 
@@ -1104,8 +1116,8 @@ async function saveReviewEvents(db: SQLiteDatabase, reviewEvents: ReviewEvent[])
   for (const [index, event] of reviewEvents.entries()) {
     await db.runAsync(
       `INSERT INTO review_events (
-        id, target_type, target_id, rating, reviewed_at, next_due_at, interval_days, sort_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, target_type, target_id, rating, reviewed_at, next_due_at, interval_days, assisted, sort_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       event.id,
       event.targetType,
       event.targetId,
@@ -1113,6 +1125,7 @@ async function saveReviewEvents(db: SQLiteDatabase, reviewEvents: ReviewEvent[])
       event.reviewedAt,
       event.nextDueAt,
       event.intervalDays,
+      event.assisted ? 1 : null,
       index
     );
   }
@@ -1286,7 +1299,7 @@ async function loadNormalizedProgress(db: SQLiteDatabase): Promise<UserProgress 
      FROM review_items ORDER BY sort_order ASC`
   );
   const reviewEventRows = await db.getAllAsync<ReviewEventRow>(
-    `SELECT id, target_type, target_id, rating, reviewed_at, next_due_at, interval_days
+    `SELECT id, target_type, target_id, rating, reviewed_at, next_due_at, interval_days, assisted
      FROM review_events ORDER BY sort_order ASC`
   );
   const weeklyReportRows = await db.getAllAsync<WeeklyReportRow>(
@@ -1400,7 +1413,10 @@ async function loadNormalizedProgress(db: SQLiteDatabase): Promise<UserProgress 
       rating: row.rating,
       reviewedAt: row.reviewed_at,
       nextDueAt: row.next_due_at,
-      intervalDays: row.interval_days
+      intervalDays: row.interval_days,
+      // Preserve the original absent/false distinction: only a stored 1 (or a
+      // truthy legacy value) becomes `true`; otherwise the field stays absent.
+      ...(row.assisted ? { assisted: true } : {})
     })),
     weeklyReports: weeklyReportRows.map((row) => ({
       id: row.id,
@@ -1435,6 +1451,7 @@ export async function prepareProgressDbSchema(db: SQLiteDatabase): Promise<void>
   await ensureUserProfileColumns(db);
   await ensureLessonWorkshopColumns(db);
   await ensureCodeRunAttemptColumns(db);
+  await ensureReviewEventColumns(db);
   await ensureEvidenceProofColumn(db);
   await seedContentTables(db);
 }

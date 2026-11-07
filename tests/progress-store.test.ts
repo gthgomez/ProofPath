@@ -273,7 +273,8 @@ class FakeSQLiteDatabase {
         rating: event.rating,
         reviewed_at: event.reviewedAt,
         next_due_at: event.nextDueAt,
-        interval_days: event.intervalDays
+        interval_days: event.intervalDays,
+        assisted: event.assisted ? 1 : null
       })) as T[];
     }
 
@@ -513,9 +514,10 @@ class FakeSQLiteDatabase {
           rating: params[3] as ReviewEvent["rating"],
           reviewedAt: params[4] as string,
           nextDueAt: params[5] as string,
-          intervalDays: params[6] as number
+          intervalDays: params[6] as number,
+          ...(params[7] === 1 ? { assisted: true } : {})
         },
-        sort_order: params[7] as number
+        sort_order: params[8] as number
       });
       return;
     }
@@ -712,7 +714,7 @@ describe("progress-store", () => {
     await migrateProgressDb(fakeDb as unknown as SQLiteDatabase);
 
     const schemaSql = fakeDb.executedSql.join("\n");
-    expect(fakeDb.version).toBe(10);
+    expect(fakeDb.version).toBe(11);
     expect(schemaSql).toContain("CREATE TABLE IF NOT EXISTS user_profile");
     expect(schemaSql).toContain("CREATE TABLE IF NOT EXISTS evidence_items");
     expect(schemaSql).toContain("CREATE TABLE IF NOT EXISTS review_items");
@@ -741,7 +743,7 @@ describe("progress-store", () => {
     await migrateProgressDb(fakeDb as unknown as SQLiteDatabase);
     const loadedProgress = await loadProgress(fakeDb as unknown as SQLiteDatabase);
 
-    expect(fakeDb.version).toBe(10);
+    expect(fakeDb.version).toBe(11);
     expect(fakeDb.completedLessons.map((row) => row.entity_id)).toEqual(["lesson-python-functions"]);
     expect(fakeDb.completedLessonMiniProjects.map((row) => row.entity_id)).toEqual(["lesson-python-functions"]);
     expect(fakeDb.completedQuizzes.map((row) => row.entity_id)).toEqual(["quiz-python-functions"]);
@@ -884,5 +886,35 @@ describe("progress-store", () => {
 
     expect(loaded.placedOutLessonIds).toEqual(["lesson-python-variables", "lesson-python-numbers"]);
     expect(loaded.placedOutQuizIds).toEqual(["quiz-python-variables", "quiz-python-numbers"]);
+  });
+
+  it("round-trips the assisted flag on review events and keeps absent legacy values absent", async () => {
+    const db = createDb();
+    await migrateProgressDb(db);
+    const now = "2026-11-07T22:00:00.000Z";
+
+    const assistedProgress = recordReview(
+      createInitialProgress(now),
+      "lesson",
+      "lesson-python-values",
+      "good",
+      now,
+      { assisted: true }
+    );
+    const unassistedProgress = recordReview(
+      createInitialProgress(now),
+      "quiz",
+      "quiz-python-values",
+      "good",
+      now
+    );
+
+    await saveProgress(db, assistedProgress);
+    const loadedAssisted = await loadProgress(db);
+    expect(loadedAssisted.reviewEvents[0]?.assisted).toBe(true);
+
+    await saveProgress(db, unassistedProgress);
+    const loadedUnassisted = await loadProgress(db);
+    expect(loadedUnassisted.reviewEvents[0]?.assisted).toBeUndefined();
   });
 });

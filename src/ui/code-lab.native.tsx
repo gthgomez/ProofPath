@@ -23,7 +23,7 @@ import { colors, radius, semanticColors, spacing } from "@/ui/theme";
 import { CodeProblems } from "@/ui/code-problems";
 import { CodeTerminal } from "@/ui/code-terminal";
 import { SyntaxHighlightedEditor } from "@/ui/syntax-highlighted-editor";
-import { getEditorDraft, saveEditorDraft, clearEditorDraft } from "@/storage/draft-store";
+import { getEditorDraft, resetEditorDraft, saveEditorDraft } from "@/storage/draft-store";
 import type { CodeLabProps } from "@/ui/code-lab.shared";
 
 // The native run-time startup allowance (and the unmeasured-cold-start note)
@@ -49,7 +49,10 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
-  const [code, setCode] = useState(() => getEditorDraft(lessonId) ?? latestRun?.codeSnapshot ?? runnerSpec.starterCode);
+  const editedRef = useRef(false);
+  const latestRunRef = useRef(latestRun);
+  latestRunRef.current = latestRun;
+  const [code, setCode] = useState(runnerSpec.starterCode);
   const [isBridgeReady, setIsBridgeReady] = useState(false);
   const [isRuntimeWarm, setIsRuntimeWarm] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -59,13 +62,49 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [focusedLine, setFocusedLine] = useState<number | null>(null);
   const [webViewKey, setWebViewKey] = useState(0);
+  const [draftStatus, setDraftStatus] = useState<string | null>(null);
   const runnerHtml = useMemo(() => createNativeWebViewRunnerHtml(), []);
 
   useEffect(() => {
-    setCode(getEditorDraft(lessonId) ?? latestRun?.codeSnapshot ?? runnerSpec.starterCode);
+    let cancelled = false;
+    editedRef.current = false;
     setRunError(null);
     setCopyStatus(null);
+
+    // Hydrate from the SQLite-backed draft store. An edit made before hydration
+    // wins over the stored draft, and a durable reset tombstone wins over the
+    // last executed snapshot so old code cannot reappear after a restart.
+    void getEditorDraft(lessonId)
+      .then((state) => {
+        if (cancelled || editedRef.current) {
+          return;
+        }
+        if (state.status === "draft") {
+          setCode(state.code);
+        } else if (state.status === "reset") {
+          setCode(runnerSpec.starterCode);
+        } else {
+          setCode(latestRunRef.current?.codeSnapshot ?? runnerSpec.starterCode);
+        }
+      })
+      .catch(() => {
+        if (!cancelled && !editedRef.current) {
+          setCode(latestRunRef.current?.codeSnapshot ?? runnerSpec.starterCode);
+          setDraftStatus("Draft storage is unavailable on this device. Your edit is kept for this session only.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [runnerSpec.starterCode, lessonId]);
+
+  const persistDraft = (nextCode: string): void => {
+    editedRef.current = true;
+    void saveEditorDraft(lessonId, nextCode).then((result) => {
+      setDraftStatus(result === "failed" ? "Draft could not be saved on this device. Your edit is kept for this session only." : null);
+    });
+  };
 
   useEffect(() => {
     return () => {
@@ -403,10 +442,11 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
         language={runnerSpec.language}
         onChangeText={(nextCode) => {
           setCode(nextCode);
-          saveEditorDraft(lessonId, nextCode);
+          persistDraft(nextCode);
         }}
         value={code}
       />
+      {draftStatus ? <MutedText accessibilityLiveRegion="polite">{draftStatus}</MutedText> : null}
       <Row>
         <ButtonShell
           accessibilityHint="Runs the current file and shows terminal output without completing the Code Lab check."
@@ -434,7 +474,12 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
           disabled={isSaving || isRunning}
           onPress={() => {
             setCode(runnerSpec.starterCode);
-            clearEditorDraft(lessonId);
+            editedRef.current = true;
+            // Persist a reset tombstone so a remount or app restart does not
+            // resurrect the last executed snapshot.
+            void resetEditorDraft(lessonId).then((result) => {
+              setDraftStatus(result === "failed" ? "Reset could not be saved on this device. It applies to this session only." : null);
+            });
           }}
           size="compact"
           tone="ink"

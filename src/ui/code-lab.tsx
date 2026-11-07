@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { buildRunningTerminalEvents, emptyHiddenCheckSummary, formatTerminalTranscript, runtimeCapabilitiesFor } from "@/domain/code-run";
 import { isScaffoldStarter, scaffoldStarterNotice, type ScaffoldStarterNotice } from "@/domain/starter-expectation";
@@ -13,7 +13,7 @@ import { CodeTerminal } from "@/ui/code-terminal";
 import { SyntaxHighlightedEditor } from "@/ui/syntax-highlighted-editor";
 import type { CodeLabProps } from "@/ui/code-lab.shared";
 
-import { getEditorDraft, saveEditorDraft, clearEditorDraft } from "@/storage/draft-store";
+import { getEditorDraft, resetEditorDraft, saveEditorDraft } from "@/storage/draft-store";
 
 function formatVisibleTestExpectation(expectedOutputIncludes?: string[]): string {
   if (!expectedOutputIncludes?.length) {
@@ -31,19 +31,57 @@ function formatVisibleTestExpectation(expectedOutputIncludes?: string[]): string
 }
 
 export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, onRunPassed, runnerSpec }: CodeLabProps): ReactElement {
-  const [code, setCode] = useState(() => getEditorDraft(lessonId) ?? latestRun?.codeSnapshot ?? runnerSpec.starterCode);
+  const [code, setCode] = useState(runnerSpec.starterCode);
   const [isRunning, setIsRunning] = useState(false);
   const [activeRunMode, setActiveRunMode] = useState<CodeRunMode>("run_checks");
   const [activePhaseIndex, setActivePhaseIndex] = useState(0);
   const [runError, setRunError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [focusedLine, setFocusedLine] = useState<number | null>(null);
+  const [draftStatus, setDraftStatus] = useState<string | null>(null);
+  const editedRef = useRef(false);
+  const latestRunRef = useRef(latestRun);
+  latestRunRef.current = latestRun;
 
   useEffect(() => {
-    setCode(getEditorDraft(lessonId) ?? latestRun?.codeSnapshot ?? runnerSpec.starterCode);
+    let cancelled = false;
+    editedRef.current = false;
     setRunError(null);
     setCopyStatus(null);
+
+    // Hydrate asynchronously so native SQLite-backed drafts work. An edit made
+    // before hydration completes wins over the stored draft.
+    void getEditorDraft(lessonId)
+      .then((state) => {
+        if (cancelled || editedRef.current) {
+          return;
+        }
+        if (state.status === "draft") {
+          setCode(state.code);
+        } else if (state.status === "reset") {
+          // An explicit reset is durable: never resurrect the last executed snapshot.
+          setCode(runnerSpec.starterCode);
+        } else {
+          setCode(latestRunRef.current?.codeSnapshot ?? runnerSpec.starterCode);
+        }
+      })
+      .catch(() => {
+        if (!cancelled && !editedRef.current) {
+          setCode(latestRunRef.current?.codeSnapshot ?? runnerSpec.starterCode);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [runnerSpec.starterCode, lessonId]);
+
+  const persistDraft = (nextCode: string): void => {
+    editedRef.current = true;
+    void saveEditorDraft(lessonId, nextCode).then((result) => {
+      setDraftStatus(result === "failed" ? "Draft could not be saved on this device. Your edit is kept for this session only." : null);
+    });
+  };
 
   const runCode = async (runMode: CodeRunMode): Promise<void> => {
     setIsRunning(true);
@@ -161,10 +199,11 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
         language={runnerSpec.language}
         onChangeText={(nextCode) => {
           setCode(nextCode);
-          saveEditorDraft(lessonId, nextCode);
+          persistDraft(nextCode);
         }}
         value={code}
       />
+      {draftStatus ? <MutedText accessibilityLiveRegion="polite">{draftStatus}</MutedText> : null}
       <Row>
         <ButtonShell
           accessibilityHint="Runs the current file and shows terminal output without completing the Code Lab check."
@@ -192,7 +231,12 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
           disabled={isSaving || isRunning}
           onPress={() => {
             setCode(runnerSpec.starterCode);
-            clearEditorDraft(lessonId);
+            editedRef.current = true;
+            // Persist a reset tombstone so a remount does not resurrect the old
+            // executed snapshot via `latestRun.codeSnapshot`.
+            void resetEditorDraft(lessonId).then((result) => {
+              setDraftStatus(result === "failed" ? "Reset could not be saved on this device. It applies to this session only." : null);
+            });
           }}
           size="compact"
           tone="ink"

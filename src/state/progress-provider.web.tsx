@@ -18,6 +18,7 @@ import {
 } from "@/domain/progress";
 import { calculateReadinessScore } from "@/domain/readiness";
 import { getContentForRole, getRoleTarget } from "@/domain/role-routing";
+import { editorDraftStore } from "@/storage/draft-store";
 import type {
   CodeRunAttempt,
   EvidenceTestStatus,
@@ -225,6 +226,8 @@ export function ProgressProvider({ children }: PropsWithChildren): ReactElement 
         progressRef.current = initialProgress;
         setProgress(initialProgress);
         try {
+          // Clear editor drafts with progress; a draft failure must not block reset.
+          await editorDraftStore.clearAll().catch(() => undefined);
           saveWebProgress(initialProgress);
           setError(null);
         } catch (caughtError) {

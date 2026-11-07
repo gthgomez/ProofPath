@@ -21,6 +21,7 @@ import { getContentForRole, getRoleTarget } from "@/domain/role-routing";
 import { roleTargets } from "@/content/roles";
 import type { CodeRunAttempt, EvidenceTestStatus, EvidenceType, Quiz, ReadinessScore, ReadmeStatus, ReviewRating, ReviewTargetType, RoleTarget, UserProfile, UserProgress } from "@/domain/types";
 import { loadProgress, resetProgress, saveProgress } from "@/storage/progress-store";
+import { editorDraftStore } from "@/storage/draft-store";
 
 interface EvidenceInput {
   type: EvidenceType;
@@ -189,6 +190,9 @@ function SQLiteProgressProvider({ children }: PropsWithChildren): ReactElement {
         setIsSaving(true);
         try {
           await saveQueueRef.current.catch(() => undefined);
+          // Clear editor drafts with progress, but leave unrelated storage alone.
+          // A draft failure must not block the progress reset.
+          await editorDraftStore.clearAll().catch(() => undefined);
           const initialProgress = await resetProgress(db);
           progressRef.current = initialProgress;
           setProgress(initialProgress);
@@ -360,6 +364,7 @@ function WebProgressProvider({ children }: PropsWithChildren): ReactElement {
         progressRef.current = initialProgress;
         setProgress(initialProgress);
         try {
+          await editorDraftStore.clearAll().catch(() => undefined);
           saveWebProgress(initialProgress);
           setError(null);
         } catch (caughtError) {
