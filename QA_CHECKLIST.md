@@ -194,7 +194,9 @@
 
 ---
 
-## 17. P0 Closure (pre-merge)
+## 17. P0 Closure (merged in PR #52 as `d9cabc04`)
+
+Merged-tree verification: `npm run verify` 66 files / 613 tests, `tsc` clean, `npm run build:web` exit 0, post-merge CI Ubuntu + Windows pass. PR #51 closed as superseded (not merged).
 
 - [x] A real-browser cold startup of 6 s (longer than the 4 s lesson timeout) still executes and passes; startup feedback stays distinct from execution feedback
 - [x] Python and SQL non-terminating work is terminated; the next run succeeds; no stale passing result is accepted
