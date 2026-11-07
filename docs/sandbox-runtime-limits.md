@@ -20,6 +20,11 @@ ProofPath Code Lab is a production-style workflow trainer, not a full IDE and no
 - Canonical copied output is generated from structured terminal events, not ad hoc strings.
 - Terminal result events include result status, reason, runtime, and exit-style status when a command ran.
 - Learner editor draft code (including unrun typing and edits after a run) is persisted per lesson so work is not lost when switching tabs or reloading the screen.
+- A versioned disclosure boundary (`sandboxDisclosureVersion`) distinguishes current, source-sanitized output from legacy records. Attempts or proof artifacts without the marker are quarantined on normalization, load, backup, and export: raw stdout, stderr, diagnostics, and terminal text are withheld, visible result text is neutralized, and the already-computed grade plus the learner's code snapshot are preserved. Ambiguous legacy text is never guessed apart.
+- The editor's “Check passed” state requires byte-for-byte equality with the checked snapshot. A previous pass is a separate historical achievement; editing or resetting shows “Unverified changes” until the current draft is re-run.
+- Draft clearing is a generation-fenced barrier: saves issued before a reset are dropped, in-flight writes settle before clearing, and edits issued after the reset survive. Native drafts live in `proofpath-drafts.db`; web drafts use localStorage with an in-memory mirror.
+- SQL results are formatted through an early 512 KB cap, TypeScript diagnostics are capped (200 formatted errors plus a count), and failure messages are bounded. Pyodide and sql.js still run on the main page and cannot be preempted; their timeout text says the UI “stopped waiting” rather than claiming a hard stop.
+- Versioned progress backups (`proofpath-progress-backup` v1) validate before mutation, include drafts and reset tombstones, and require explicit confirmation. A progress backup is not a reviewer portfolio packet.
 - Policy blocks are shown as pre-execution blocks; skipped phases are intentional and are not fake failures.
 - Problems diagnostics should use deterministic parser/runtime/policy signals first, then lesson-authored hints.
 - Problems should show line numbers only when known or high-confidence. Otherwise the UI should say `Location unknown`.

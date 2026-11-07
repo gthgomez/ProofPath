@@ -150,7 +150,28 @@
 
 ---
 
-## 14. Go / No-Go Gate
+## 14. Historical Disclosure, Current-Draft Truth & Backup (2026-11-07 continuation)
+
+- [ ] A legacy attempt/proof (no `sandboxDisclosureVersion`) with sentinels in stdout, stderr, diagnostics, transcript, visible names, or messages exports neither the sentinels nor the names in Markdown or JSON
+- [ ] Legacy quarantine preserves the grade (`passed`/`score`) and the learner's `codeSnapshot`; repeated normalization is idempotent
+- [ ] Fresh runner attempts keep visible output and visible check feedback
+- [ ] `clearAll` cannot be followed by a pre-reset save; in-flight writes settle before clearing; a post-reset edit survives
+- [ ] “Check passed” appears only when the editor exactly matches the checked snapshot
+- [ ] Editing after a pass shows “Unverified changes” while “Lesson passed previously” remains
+- [ ] Reset/restored draft never appears as checked until it is re-run
+- [ ] Native results are rejected on request-ID, lesson, language, mode, code-snapshot, runtime, timestamp, empty-result, or contradictory-score mismatch
+- [ ] A v10 SQLite fixture upgrades to v11 without losing lessons, evidence, attempts, or review rows; assisted is null for legacy and true round-trips
+- [ ] A backup round-trip preserves profile, achievements, placement, attempts, evidence, reviews/assistance, reports, and draft/reset state
+- [ ] Malformed, wrong-format, newer-version, oversized, and invalid backups are rejected before mutation; restore requires confirmation
+- [ ] Native Copy uses the platform clipboard; web Copy/Download remain functional
+- [ ] Real-browser journey passes (`scripts/e2e-web-journey.mjs`): incorrect→fail, corrected→pass, edit→unverified, reload→draft+achievement, downloads verified
+- [ ] `npm audit --include=dev` (23: 1 low/12 moderate/10 high) and `npm audit --omit=dev` (19: 1/10/8) are both acknowledged; no forced Expo major upgrade
+
+**Pass criteria: 13/13 (physical-device clipboard/share and SQLite restart still require device evidence)**
+
+---
+
+## 15. Go / No-Go Gate
 
 **Ship when all items pass.**
 
