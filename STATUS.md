@@ -1,8 +1,8 @@
 # ProofPath Status
 
 **Last verified:** 2026-11-07
-**Final verified main commit:** `ea2beb7` (squash-merge of PR #49; native Python grading, containment hardening, workspace verifier, and state continuity fixes; see Recent Evidence)
-**Current campaign branch:** `campaign/runtime-truth-and-continuity` (PR #52); see the top Recent Evidence entry for the verification actually run at its head.
+**Final verified main commit:** `d9cabc04ef13be70194cb50b23269c1df914db8d` (squash-merge of PR #52; runtime lifecycle, coherent restore, safe offline updates, browser/native verification)
+**Campaign branch:** `campaign/runtime-truth-and-continuity` (PR #52) is merged; PR #51 is closed as superseded. Zero open PRs at the post-merge check.
 **Status:** active development
 **Confidence:** high
 
@@ -31,7 +31,9 @@ Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite lo
 
 ## Recent Evidence
 
-- **2026-11-07 (P0 closure before merge, same branch):** local `npm run verify` green with **66 test files / 613 tests**. A real Chromium runtime run proved that a **6 s cold Pyodide startup against a 4 s lesson timeout still passes** (8.4 s elapsed), so startup no longer consumes the learner execution deadline. All browser gates pass: runtime matrix, first-time learner journey (empty storage → onboarding → path → checks → checkpoint → evidence → backup/reset/import → offline), existing journey, workspace → real Python/SQLite/TypeScript verifier → self-reported mission evidence → reviewer packet, and offline update safety.
+- **2026-11-07 (post-merge verification, `main` `d9cabc04`):** PR #52 was squash-merged into `main` as `d9cabc04ef13be70194cb50b23269c1df914db8d`. PR #51 was closed as **superseded, not merged**: every file it touches is present in #52's merged diff, and its two commits were cherry-picked and repaired. Zero open PRs remain. On the merged tree: `npm run verify` green with **66 files / 613 tests** (content validation SUCCESS, redaction scan, `tsc --noEmit` clean); `npm run build:web` exit 0 with a content-hashed service worker (35 precached paths); hosted post-merge CI Ubuntu + Windows both pass at `d9cabc04`: https://github.com/gthgomez/ProofPath/actions/runs/42415899235. Remaining blocker: the browser E2E job is still not hosted CI because the available OAuth token lacks GitHub's `workflow` scope; the ready job is in `docs/engineering/browser-e2e-ci-job.md`.
+
+- **2026-11-07 (P0 closure, merged in #52):** local `npm run verify` green with **66 test files / 613 tests**. A real Chromium runtime run proved that a **6 s cold Pyodide startup against a 4 s lesson timeout still passes** (8.4 s elapsed), so startup no longer consumes the learner execution deadline. All browser gates pass: runtime matrix, first-time learner journey (empty storage → onboarding → path → checks → checkpoint → evidence → backup/reset/import → offline), existing journey, workspace → real Python/SQLite/TypeScript verifier → self-reported mission evidence → reviewer packet, and offline update safety.
   - **Single execution lifecycle (P0-A):** the browser path no longer wraps the Worker in `Promise.race`. `runPreemptible` owns boot (45 s) and then the learner deadline; an execution timeout terminates the actual Worker. The in-process Node guard remains only for non-browser adapters.
   - **Worker concurrency (P0-B):** boot is deduplicated, execution/typecheck requests run in one serialized lane, every request carries a token, timeouts/errors reject exactly one active request, and queued work re-boots a clean Worker. Tests cover simultaneous boot, two pre-boot executions, preload overlap, timeout during boot/execution, worker error with a queued request, duplicate/late messages, shutdown, and retry.
   - **Ambiguous restore commit (P0-C):** restores now write a durable `restoreTransactionId` into the progress snapshot. Verification uses that identity, not timestamps alone. A committed-but-unreadable write keeps the journal and never rolls drafts back into a mixed state; startup reconciliation applies new or old drafts only on an unambiguous identity, otherwise it keeps the journal and surfaces an error.
