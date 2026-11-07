@@ -1,4 +1,4 @@
-import { Platform, Share } from "react-native";
+import { Clipboard, Platform, Share } from "react-native";
 
 export type TransferOutcome = "downloaded" | "shared" | "clipped" | "dismissed" | "unsupported" | "failed";
 
@@ -68,6 +68,19 @@ export async function shareText(title: string, message: string): Promise<Transfe
 
 /** Copy text to the clipboard. Never label this an "export" or "download". */
 export async function copyToClipboard(content: string): Promise<TransferOutcome> {
+  // `navigator.clipboard` is a browser API and is absent on native. React
+  // Native still ships a Clipboard bridge in this SDK, so use it there instead
+  // of reporting a false "unsupported" and leaving the learner without a copy
+  // path.
+  if (Platform.OS !== "web") {
+    try {
+      Clipboard.setString(content);
+      return "clipped";
+    } catch {
+      return "failed";
+    }
+  }
+
   const maybeNavigator = (globalThis as typeof globalThis & { navigator?: ClipboardLike }).navigator;
 
   if (!maybeNavigator?.clipboard?.writeText) {
