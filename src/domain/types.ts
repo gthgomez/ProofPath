@@ -258,6 +258,12 @@ export interface CodeRunAttempt {
   hiddenCheckSummary: HiddenCheckSummary;
   diagnostics: ProblemDiagnostic[];
   terminalTranscript: TerminalEvent[];
+  /**
+   * Disclosure-boundary version of the sandbox output this attempt was produced
+   * by. Attempts without this marker predate per-check disclosure boundaries and
+   * their raw output cannot be assumed safe to publish.
+   */
+  sandboxDisclosureVersion?: number;
   createdAt: string;
 }
 
@@ -372,6 +378,8 @@ export interface ProofArtifact {
   codeHash: string;
   codeSnapshot?: string;
   terminalTranscript: TerminalEvent[];
+  /** Same disclosure marker as the originating run attempt. */
+  sandboxDisclosureVersion?: number;
 }
 
 export interface UserProfile {

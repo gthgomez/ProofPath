@@ -81,6 +81,7 @@ interface CodeRunAttemptRow {
   hidden_check_summary_json: string | null;
   diagnostics_json: string | null;
   terminal_transcript_json: string | null;
+  sandbox_disclosure_version: number | null;
   created_at: string;
 }
 
@@ -425,6 +426,7 @@ async function createNormalizedSchema(db: SQLiteDatabase): Promise<void> {
       hidden_check_summary_json TEXT NOT NULL DEFAULT '{"total":0,"passed":0,"failed":0}',
       diagnostics_json TEXT NOT NULL DEFAULT '[]',
       terminal_transcript_json TEXT NOT NULL DEFAULT '[]',
+      sandbox_disclosure_version INTEGER,
       created_at TEXT NOT NULL,
       sort_order INTEGER NOT NULL
     );
@@ -609,6 +611,8 @@ async function ensureLessonWorkshopColumns(db: SQLiteDatabase): Promise<void> {
   }
 }
 
+export const CODE_RUN_DISCLOSURE_MIGRATION = "ALTER TABLE code_run_attempts ADD COLUMN sandbox_disclosure_version INTEGER;";
+
 async function ensureCodeRunAttemptColumns(db: SQLiteDatabase): Promise<void> {
   const rows = await db.getAllAsync<TableInfoRow>("PRAGMA table_info(code_run_attempts)");
   const existingColumns = new Set(rows.map((row) => row.name));
@@ -617,22 +621,29 @@ async function ensureCodeRunAttemptColumns(db: SQLiteDatabase): Promise<void> {
     { name: "command", definition: "TEXT NOT NULL DEFAULT ''" },
     { name: "hidden_check_summary_json", definition: "TEXT NOT NULL DEFAULT '{\"total\":0,\"passed\":0,\"failed\":0}'" },
     { name: "diagnostics_json", definition: "TEXT NOT NULL DEFAULT '[]'" },
-    { name: "terminal_transcript_json", definition: "TEXT NOT NULL DEFAULT '[]'" }
+    { name: "terminal_transcript_json", definition: "TEXT NOT NULL DEFAULT '[]'" },
+    { name: "sandbox_disclosure_version", definition: "INTEGER" }
   ];
 
   for (const column of columns) {
     if (!existingColumns.has(column.name)) {
-      await db.execAsync(`ALTER TABLE code_run_attempts ADD COLUMN ${column.name} ${column.definition};`);
+      if (column.name === "sandbox_disclosure_version") {
+        await db.execAsync(CODE_RUN_DISCLOSURE_MIGRATION);
+      } else {
+        await db.execAsync(`ALTER TABLE code_run_attempts ADD COLUMN ${column.name} ${column.definition};`);
+      }
     }
   }
 }
+
+export const REVIEW_EVENT_ASSISTED_MIGRATION = "ALTER TABLE review_events ADD COLUMN assisted INTEGER;";
 
 async function ensureReviewEventColumns(db: SQLiteDatabase): Promise<void> {
   const rows = await db.getAllAsync<TableInfoRow>("PRAGMA table_info(review_events)");
   const existingColumns = new Set(rows.map((row) => row.name));
 
   if (!existingColumns.has("assisted")) {
-    await db.execAsync("ALTER TABLE review_events ADD COLUMN assisted INTEGER;");
+    await db.execAsync(REVIEW_EVENT_ASSISTED_MIGRATION);
   }
 }
 
@@ -1026,8 +1037,8 @@ async function saveCodeRunAttempts(db: SQLiteDatabase, codeRunAttempts: CodeRunA
     await db.runAsync(
       `INSERT INTO code_run_attempts (
         id, lesson_id, language, run_mode, command, code_snapshot, stdout, stderr, passed, score, runtime_ms,
-        test_results_json, hidden_check_summary_json, diagnostics_json, terminal_transcript_json, created_at, sort_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        test_results_json, hidden_check_summary_json, diagnostics_json, terminal_transcript_json, sandbox_disclosure_version, created_at, sort_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       attempt.id,
       attempt.lessonId,
       attempt.language,
@@ -1043,6 +1054,7 @@ async function saveCodeRunAttempts(db: SQLiteDatabase, codeRunAttempts: CodeRunA
       JSON.stringify(attempt.hiddenCheckSummary),
       JSON.stringify(attempt.diagnostics),
       JSON.stringify(attempt.terminalTranscript),
+      typeof attempt.sandboxDisclosureVersion === "number" ? attempt.sandboxDisclosureVersion : null,
       attempt.createdAt,
       index
     );
@@ -1283,7 +1295,7 @@ async function loadNormalizedProgress(db: SQLiteDatabase): Promise<UserProgress 
   );
   const codeRunAttemptRows = await db.getAllAsync<CodeRunAttemptRow>(
     `SELECT id, lesson_id, language, run_mode, command, code_snapshot, stdout, stderr, passed, score, runtime_ms,
-      test_results_json, hidden_check_summary_json, diagnostics_json, terminal_transcript_json, created_at
+      test_results_json, hidden_check_summary_json, diagnostics_json, terminal_transcript_json, sandbox_disclosure_version, created_at
      FROM code_run_attempts ORDER BY sort_order ASC`
   );
   const evidenceRows = await db.getAllAsync<EvidenceRow>(
@@ -1393,6 +1405,7 @@ async function loadNormalizedProgress(db: SQLiteDatabase): Promise<UserProgress 
       hiddenCheckSummary: row.hidden_check_summary_json ? JSON.parse(row.hidden_check_summary_json) as CodeRunAttempt["hiddenCheckSummary"] : { total: 0, passed: 0, failed: 0 },
       diagnostics: row.diagnostics_json ? JSON.parse(row.diagnostics_json) as CodeRunAttempt["diagnostics"] : [],
       terminalTranscript: row.terminal_transcript_json ? JSON.parse(row.terminal_transcript_json) as CodeRunAttempt["terminalTranscript"] : [],
+      ...(row.sandbox_disclosure_version !== null ? { sandboxDisclosureVersion: row.sandbox_disclosure_version } : {}),
       createdAt: row.created_at
     })),
     weeklyPlanTaskIds: completedWeeklyTaskRows.map((row) => row.entity_id),

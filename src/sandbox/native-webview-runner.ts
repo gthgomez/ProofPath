@@ -1,4 +1,4 @@
-import { normalizeCodeRunAttempt } from "@/domain/code-run";
+import { CURRENT_SANDBOX_DISCLOSURE_VERSION, normalizeCodeRunAttempt } from "@/domain/code-run";
 import type { CodeRunAttempt, CodeRunMode, CodeRunTestResult, LessonRunnerSpec, RunnerLanguage } from "@/domain/types";
 import {
   PYTHON_DIRECT_RUN_NAME,
@@ -358,6 +358,7 @@ export function createNativeWebViewRunnerHtml(): string {
         runtimeMs: Date.now() - startedAt,
         testResults: redacted.visibleCheckResults,
         hiddenCheckSummary: learnerSafeHiddenSummary,
+        sandboxDisclosureVersion: ${CURRENT_SANDBOX_DISCLOSURE_VERSION},
         createdAt: request.now
       };
     }
@@ -932,8 +933,77 @@ function sanitizeNativeAttempt(raw: unknown): CodeRunAttempt | null {
     runtimeMs: attempt.runtimeMs,
     testResults,
     diagnostics: [],
+    // The host marks this attempt trusted because it was produced by the current
+    // bundled WebView runner, which sanitizes hidden output at the source. The
+    // version is not accepted from the message, so a forged field cannot promote
+    // an untrusted payload.
+    sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
     createdAt: attempt.createdAt
   });
+}
+
+export type NativeResultIntegrity =
+  | { ok: true }
+  | { ok: false; reason: string };
+
+/**
+ * Bind a structurally valid result to the exact run that is still active.
+ *
+ * A request ID proves the message belongs to the current request, but it does
+ * not prove the payload describes the code the learner actually ran. This check
+ * rejects context mismatches and internally contradictory success claims so a
+ * stale, cross-lesson, or malformed message cannot create durable proof.
+ *
+ * The remaining trust boundary is explicit: the bundled WebView executor
+ * computes hidden-check pass/fail. The host verifies consistency, not the
+ * executor's honesty about private checks it alone can see.
+ */
+export function validateNativeWebViewResult(
+  attempt: CodeRunAttempt,
+  request: NativeWebViewRunnerRequest,
+  receivedRequestId?: string
+): NativeResultIntegrity {
+  if (request.requestId !== undefined && receivedRequestId !== request.requestId) {
+    return { ok: false, reason: "request-id-mismatch" };
+  }
+
+  if (attempt.lessonId !== request.lessonId) {
+    return { ok: false, reason: "lesson-id-mismatch" };
+  }
+
+  if (attempt.language !== request.spec.language) {
+    return { ok: false, reason: "language-mismatch" };
+  }
+
+  if (attempt.runMode !== request.runMode) {
+    return { ok: false, reason: "run-mode-mismatch" };
+  }
+
+  if (attempt.codeSnapshot !== request.code) {
+    return { ok: false, reason: "code-snapshot-mismatch" };
+  }
+
+  if (!Number.isFinite(attempt.runtimeMs) || attempt.runtimeMs < 0) {
+    return { ok: false, reason: "invalid-runtime" };
+  }
+
+  if (Number.isNaN(Date.parse(attempt.createdAt))) {
+    return { ok: false, reason: "invalid-timestamp" };
+  }
+
+  if (attempt.runMode === "run_checks" && attempt.passed) {
+    if (attempt.testResults.length === 0) {
+      return { ok: false, reason: "empty-results" };
+    }
+    if (attempt.testResults.some((result) => result.visible && !result.passed)) {
+      return { ok: false, reason: "contradictory-visible-failure" };
+    }
+    if (attempt.score !== 100) {
+      return { ok: false, reason: "contradictory-score" };
+    }
+  }
+
+  return { ok: true };
 }
 
 export function parseNativeWebViewRunnerMessage(payload: string): NativeWebViewRunnerMessage | null {

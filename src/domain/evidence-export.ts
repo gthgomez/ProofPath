@@ -1,6 +1,6 @@
 import type { ContentPack, EvidenceItem, ProofArtifact, UserProgress } from "./types";
 import { calculateReadinessScore } from "./readiness";
-import { formatProofArtifactVerifierOutput } from "./code-run";
+import { formatProofArtifactVerifierOutput, sanitizeProofArtifactForDisclosure } from "./code-run";
 import { evidenceTrustLabel } from "./evidence-trust";
 import { getContentForRole } from "./role-routing";
 
@@ -57,16 +57,17 @@ function fenced(content: string): string[] {
 }
 
 function toEntry(item: EvidenceItem): ReviewedEvidenceEntry {
+  const safeProof = item.proofArtifact ? sanitizeProofArtifactForDisclosure(item.proofArtifact) : undefined;
   return {
     id: item.id,
     title: item.title,
     trust: item.trust ?? "manual_note",
     trustLabel: evidenceTrustLabel(item.trust),
     testStatus: item.testStatus,
-    command: item.proofArtifact?.command,
+    command: safeProof?.command,
     repoUrl: item.repoUrl,
     commitHash: item.commitHash,
-    verifierOutput: item.proofArtifact ? formatProofArtifactVerifierOutput(item.proofArtifact) : item.verifierOutput,
+    verifierOutput: safeProof ? formatProofArtifactVerifierOutput(safeProof) : item.verifierOutput,
     reflection: item.reflection ?? item.body,
     createdAt: item.createdAt
   };
@@ -78,29 +79,39 @@ function toEntry(item: EvidenceItem): ReviewedEvidenceEntry {
  * riding along into a shared export.
  */
 function safeProofArtifact(proof: ProofArtifact): ProofArtifact {
+  const safe = sanitizeProofArtifactForDisclosure(proof);
   return {
-    sourceRunAttemptId: proof.sourceRunAttemptId,
-    lessonId: proof.lessonId,
-    ...(proof.lessonVersion ? { lessonVersion: proof.lessonVersion } : {}),
-    ...(proof.missionId ? { missionId: proof.missionId } : {}),
-    language: proof.language,
-    runMode: proof.runMode,
-    command: proof.command,
-    passed: proof.passed,
-    ...(proof.score !== undefined ? { score: proof.score } : {}),
-    runtimeMs: proof.runtimeMs,
-    createdAt: proof.createdAt,
-    stdout: proof.stdout,
-    stderr: proof.stderr,
-    visibleCheckResults: proof.visibleCheckResults,
-    hiddenCheckSummary: proof.hiddenCheckSummary,
-    codeHash: proof.codeHash,
-    ...(proof.codeSnapshot ? { codeSnapshot: proof.codeSnapshot } : {}),
-    terminalTranscript: proof.terminalTranscript
+    sourceRunAttemptId: safe.sourceRunAttemptId,
+    lessonId: safe.lessonId,
+    ...(safe.lessonVersion ? { lessonVersion: safe.lessonVersion } : {}),
+    ...(safe.missionId ? { missionId: safe.missionId } : {}),
+    language: safe.language,
+    runMode: safe.runMode,
+    command: safe.command,
+    passed: safe.passed,
+    ...(safe.score !== undefined ? { score: safe.score } : {}),
+    runtimeMs: safe.runtimeMs,
+    createdAt: safe.createdAt,
+    stdout: safe.stdout,
+    stderr: safe.stderr,
+    visibleCheckResults: safe.visibleCheckResults,
+    hiddenCheckSummary: safe.hiddenCheckSummary,
+    codeHash: safe.codeHash,
+    ...(safe.codeSnapshot ? { codeSnapshot: safe.codeSnapshot } : {}),
+    terminalTranscript: safe.terminalTranscript,
+    ...(safe.sandboxDisclosureVersion !== undefined ? { sandboxDisclosureVersion: safe.sandboxDisclosureVersion } : {})
   };
 }
 
 function safeEvidenceItem(item: EvidenceItem): EvidenceItem {
+  const safeProof = item.proofArtifact ? safeProofArtifact(item.proofArtifact) : undefined;
+  // For a proof-backed item the verifier output must be derived from the
+  // sanitized proof. Legacy records also stored a raw copy in `verifierOutput`,
+  // which could still contain hidden buffer contents.
+  const safeVerifierOutput = safeProof
+    ? formatProofArtifactVerifierOutput(safeProof)
+    : item.verifierOutput;
+
   return {
     id: item.id,
     type: item.type,
@@ -117,9 +128,9 @@ function safeEvidenceItem(item: EvidenceItem): EvidenceItem {
     ...(item.commitHash ? { commitHash: item.commitHash } : {}),
     ...(item.artifactUri ? { artifactUri: item.artifactUri } : {}),
     ...(item.deploymentUrl ? { deploymentUrl: item.deploymentUrl } : {}),
-    ...(item.verifierOutput ? { verifierOutput: item.verifierOutput } : {}),
+    ...(safeVerifierOutput ? { verifierOutput: safeVerifierOutput } : {}),
     ...(item.reflection ? { reflection: item.reflection } : {}),
-    ...(item.proofArtifact ? { proofArtifact: safeProofArtifact(item.proofArtifact) } : {}),
+    ...(safeProof ? { proofArtifact: safeProof } : {}),
     ...(item.trust ? { trust: item.trust } : {})
   };
 }

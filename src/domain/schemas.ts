@@ -422,6 +422,7 @@ export const codeRunAttemptSchema = z.object({
   hiddenCheckSummary: hiddenCheckSummarySchema.default({ total: 0, passed: 0, failed: 0 }),
   diagnostics: z.array(problemDiagnosticSchema).default([]),
   terminalTranscript: z.array(terminalEventSchema).default([]),
+  sandboxDisclosureVersion: z.number().int().nonnegative().optional(),
   createdAt: nonEmptyString
 });
 
@@ -443,7 +444,8 @@ export const proofArtifactSchema = z.object({
   hiddenCheckSummary: hiddenCheckSummarySchema,
   codeHash: nonEmptyString,
   codeSnapshot: z.string().optional(),
-  terminalTranscript: z.array(terminalEventSchema)
+  terminalTranscript: z.array(terminalEventSchema),
+  sandboxDisclosureVersion: z.number().int().nonnegative().optional()
 });
 
 export const projectMissionSchema = z.object({

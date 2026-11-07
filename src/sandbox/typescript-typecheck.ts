@@ -89,8 +89,8 @@ function proofPathFormatTypeCheckErrors(fileName, diagnostics) {
   }).join("\n");
 }
 
-function proofPathFormatTypeCheckLearnerMessage(diagnostics) {
-  var count = diagnostics.length;
+function proofPathFormatTypeCheckLearnerMessage(diagnostics, totalDiagnostics) {
+  var count = typeof totalDiagnostics === "number" ? totalDiagnostics : diagnostics.length;
   var lines = [
     "Not yet. TypeScript found " + count + (count === 1 ? " type error" : " type errors") +
       " before the checks could run."
@@ -146,7 +146,8 @@ function proofPathTypeCheck(ts, libFiles, fileName, code) {
   var rawDiagnostics = ts.getPreEmitDiagnostics(program).filter(function (diagnostic) {
     return diagnostic.file && diagnostic.file.fileName === fileName;
   });
-  var diagnostics = rawDiagnostics.map(function (diagnostic) {
+  var totalDiagnostics = rawDiagnostics.length;
+  var diagnostics = rawDiagnostics.slice(0, 200).map(function (diagnostic) {
     var position = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
     return {
       line: position.line + 1,
@@ -155,11 +156,15 @@ function proofPathTypeCheck(ts, libFiles, fileName, code) {
       message: ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")
     };
   });
+  var stderr = proofPathFormatTypeCheckErrors(fileName, diagnostics);
+  if (totalDiagnostics > diagnostics.length) {
+    stderr += "\n... " + (totalDiagnostics - diagnostics.length) + " more type error(s) omitted.";
+  }
 
   return {
     diagnostics: diagnostics,
-    stderr: proofPathFormatTypeCheckErrors(fileName, diagnostics),
-    learnerMessage: proofPathFormatTypeCheckLearnerMessage(diagnostics)
+    stderr: stderr,
+    learnerMessage: proofPathFormatTypeCheckLearnerMessage(diagnostics, totalDiagnostics)
   };
 }
 `;

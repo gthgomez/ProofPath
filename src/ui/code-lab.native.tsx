@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
-import { buildRunningTerminalEvents, buildTerminalTranscript, codeRunCommand, emptyHiddenCheckSummary, formatTerminalTranscript, normalizeCodeRunAttempt, runtimeCapabilitiesFor } from "@/domain/code-run";
+import { buildRunningTerminalEvents, buildTerminalTranscript, codeRunCommand, CURRENT_SANDBOX_DISCLOSURE_VERSION, emptyHiddenCheckSummary, formatTerminalTranscript, normalizeCodeRunAttempt, runtimeCapabilitiesFor } from "@/domain/code-run";
 import { isScaffoldStarter, scaffoldStarterNotice, type ScaffoldStarterNotice } from "@/domain/starter-expectation";
 import type { CodeRunAttempt, CodeRunMode, TerminalEvent } from "@/domain/types";
 import { buildProblemDiagnostics } from "@/sandbox/diagnostics";
@@ -13,6 +13,7 @@ import {
   NATIVE_SANDBOX_WEBVIEW_SECURITY_PROPS,
   nativeRunTimeoutMs,
   parseNativeWebViewRunnerMessage,
+  validateNativeWebViewResult,
   type NativeWebViewRunnerRequest
 } from "@/sandbox/native-webview-runner";
 import { canRunNativePythonProof, runNativePythonFile, runNativePythonProof } from "@/sandbox/native-python-proof-runner";
@@ -44,11 +45,14 @@ function formatVisibleTestExpectation(expectedOutputIncludes?: string[]): string
   return parts.length ? ` - ${parts.join("; ")}` : "";
 }
 
-export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, onRunPassed, runnerSpec }: CodeLabProps): ReactElement {
+export function CodeLab({ attemptHistory = [], historicalAchievement = false, isSaving, latestRun, lessonId, onRunPassed, runnerSpec }: CodeLabProps): ReactElement {
   const webViewRef = useRef<React.ElementRef<typeof WebView>>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
+  // The full request context, not just the ID: accepted results must match the
+  // lesson, language, mode, and exact code snapshot that were sent.
+  const activeRequestRef = useRef<NativeWebViewRunnerRequest | null>(null);
   const editedRef = useRef(false);
   const latestRunRef = useRef(latestRun);
   latestRunRef.current = latestRun;
@@ -102,7 +106,13 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const persistDraft = (nextCode: string): void => {
     editedRef.current = true;
     void saveEditorDraft(lessonId, nextCode).then((result) => {
-      setDraftStatus(result === "failed" ? "Draft could not be saved on this device. Your edit is kept for this session only." : null);
+      setDraftStatus(
+        result === "saved"
+          ? null
+          : result === "session_only"
+            ? "Draft kept for this session only. Device storage is unavailable, so it will not survive a restart."
+            : "Draft could not be saved on this device. Copy your code before leaving."
+      );
     });
   };
 
@@ -119,6 +129,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
       timeoutRef.current = null;
     }
     activeRequestIdRef.current = null;
+    activeRequestRef.current = null;
   };
 
   const clearPhaseTimeout = (): void => {
@@ -146,6 +157,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
       lessonId,
       language: runnerSpec.language,
       runMode,
+      sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
       command,
       codeSnapshot: code,
       stdout: "",
@@ -202,6 +214,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
           lessonId,
           language: runnerSpec.language,
           runMode,
+          sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
           command,
           codeSnapshot: code,
           stdout: "",
@@ -261,6 +274,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
       now,
       runMode
     };
+    activeRequestRef.current = request;
     const payload = JSON.stringify({ type: "run", request });
 
     phaseTimeoutRef.current = setTimeout(() => {
@@ -315,15 +329,30 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
     }
 
     if (message?.type === "sandbox-result") {
-      if (!activeRequestIdRef.current || message.requestId !== activeRequestIdRef.current) {
+      const activeRequest = activeRequestRef.current;
+      if (!activeRequest || !activeRequestIdRef.current || message.requestId !== activeRequestIdRef.current) {
         // Discard: no run is currently active, or the result does not match the active run request ID.
         return;
       }
-      activeRequestIdRef.current = null;
+
+      const attempt = normalizeCodeRunAttempt(message.attempt);
+      const integrity = validateNativeWebViewResult(attempt, activeRequest, message.requestId);
       clearRunnerTimeout();
       clearPhaseTimeout();
       setIsRunning(false);
-      onRunPassed(normalizeCodeRunAttempt(message.attempt));
+
+      if (!integrity.ok) {
+        // A structurally valid message that does not describe the code we asked
+        // the runner to execute must never become proof. Recreate the bridge so
+        // a confused runtime cannot keep answering the same request.
+        setIsBridgeReady(false);
+        setIsRuntimeWarm(false);
+        setWebViewKey((current) => current + 1);
+        setRunError(`Discarded an inconsistent sandbox result (${integrity.reason}). Run again to produce a verifiable result.`);
+        return;
+      }
+
+      onRunPassed(attempt);
     }
   };
 
@@ -360,28 +389,41 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
     setCopyStatus(copied ? "Check summary copied." : "Check summary is visible below.");
   };
 
-  const proofCaptured = latestRun?.runMode === "run_checks" && latestRun.passed;
-  const fileRan = latestRun?.runMode === "run_file" && latestRun.passed;
+  const learnerAttemptHistory = attemptHistory;
+  // Only the exact snapshot that was checked is verified. A previous pass on
+  // different text is a historical achievement, not proof for this draft.
+  const currentDraftMatchesLastRun = code === latestRun?.codeSnapshot;
+  const verifiedRun = currentDraftMatchesLastRun ? latestRun : undefined;
+  const draftUnverified = Boolean(latestRun) && !currentDraftMatchesLastRun;
+  const historicalPass = historicalAchievement
+    || learnerAttemptHistory.some((attempt) => attempt.runMode === "run_checks" && attempt.passed)
+    || (latestRun?.runMode === "run_checks" && latestRun.passed);
+  const proofCaptured = verifiedRun?.runMode === "run_checks" && verifiedRun.passed;
+  const fileRan = verifiedRun?.runMode === "run_file" && verifiedRun.passed;
   const runtimeCapabilities = runtimeCapabilitiesFor(runnerSpec.language);
   const terminalEvents: TerminalEvent[] = isRunning
     ? buildRunningTerminalEvents(runnerSpec.language, activeRunMode, activePhaseIndex)
-    : latestRun?.terminalTranscript ?? buildRunningTerminalEvents(runnerSpec.language, "run_checks", -1);
-  const diagnostics = latestRun?.diagnostics ?? [];
+    : verifiedRun?.terminalTranscript ?? buildRunningTerminalEvents(runnerSpec.language, "run_checks", -1);
+  const diagnostics = verifiedRun?.diagnostics ?? [];
   const scaffoldNotice = isScaffoldStarter(runnerSpec.starterCode) ? scaffoldStarterNotice() : null;
-  const failedGradedRun = latestRun?.runMode === "run_checks" && !latestRun.passed;
+  const failedGradedRun = verifiedRun?.runMode === "run_checks" && !verifiedRun.passed;
   const runState = isRunning
     ? activeRunMode === "run_file"
       ? "Running file"
       : "Running checks"
     : proofCaptured
       ? "Check passed"
-      : fileRan
-        ? "File ran"
-      : latestRun
-        ? "Needs attention"
-        : isBridgeReady
-          ? "Ready to run"
-          : "Starting runner";
+      : draftUnverified
+        ? "Unverified changes"
+        : fileRan
+          ? "File ran"
+          : verifiedRun
+            ? "Needs attention"
+            : historicalPass
+              ? "Passed previously"
+              : isBridgeReady
+                ? "Ready to run"
+                : "Starting runner";
 
   return (
     <View style={styles.codeLab}>
@@ -413,23 +455,31 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
         <Badge tone={(runnerSpec.language === "python" && canRunNativePythonProof(runnerSpec)) || isBridgeReady ? "green" : "amber"}>
           {runnerSpec.language === "python" && canRunNativePythonProof(runnerSpec) ? "native check ready" : isBridgeReady ? "native ready" : "native starting"}
         </Badge>
-        {latestRun ? <Badge tone={latestRun.passed ? "green" : "rose"}>{latestRunBadgeLabel(latestRun)}</Badge> : null}
+        {historicalPass && !proofCaptured ? <Badge tone="green">Lesson passed previously</Badge> : null}
+        {draftUnverified ? <Badge tone="amber">Current draft unverified</Badge> : null}
+        {verifiedRun ? <Badge tone={verifiedRun.passed ? "green" : "rose"}>{latestRunBadgeLabel(verifiedRun)}</Badge> : null}
       </Row>
       <SectionTitle>Code Lab</SectionTitle>
       <BodyText>{runnerSpec.instructions}</BodyText>
       {scaffoldNotice && !latestRun ? <ScaffoldStarterCard notice={scaffoldNotice} /> : null}
-      <View style={[styles.statusCard, proofCaptured ? styles.statusPass : latestRun && !latestRun.passed ? styles.statusFail : null]}>
+      <View style={[styles.statusCard, proofCaptured ? styles.statusPass : verifiedRun && !verifiedRun.passed ? styles.statusFail : null]}>
         <Row>
-          <Badge tone={proofCaptured ? "green" : latestRun && !latestRun.passed ? "rose" : isRunning ? "amber" : fileRan ? "blue" : "teal"}>{runState}</Badge>
+          <Badge tone={proofCaptured ? "green" : draftUnverified ? "amber" : verifiedRun && !verifiedRun.passed ? "rose" : isRunning ? "amber" : fileRan ? "blue" : "teal"}>{runState}</Badge>
         </Row>
         <MutedText>
           {proofCaptured
-            ? "Check passed. Save the output when you are ready to add portfolio evidence."
-            : fileRan
-              ? "The file ran. Run checks when you are ready to validate the answer."
-            : latestRun
-              ? "Read the failing test, change the smallest thing, then run again."
-              : "Run file to inspect output. Run checks when you are ready to validate the answer."}
+            ? "Check passed for the code currently in the editor. Save the output when you are ready to add portfolio evidence."
+            : draftUnverified
+              ? historicalPass
+                ? "This draft has changed since it passed. Run checks to verify the current version; your earlier pass stays on your record."
+                : "This draft has changed since the last run. Run checks to verify the current version."
+              : fileRan
+                ? "The file ran. Run checks when you are ready to validate the answer."
+                : verifiedRun
+                  ? "Read the failing test, change the smallest thing, then run again."
+                  : historicalPass
+                    ? "You passed this lesson previously. Run checks to verify the code currently in the editor."
+                    : "Run file to inspect output. Run checks when you are ready to validate the answer."}
         </MutedText>
       </View>
       <SectionTitle>Code editor</SectionTitle>
@@ -478,7 +528,13 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
             // Persist a reset tombstone so a remount or app restart does not
             // resurrect the last executed snapshot.
             void resetEditorDraft(lessonId).then((result) => {
-              setDraftStatus(result === "failed" ? "Reset could not be saved on this device. It applies to this session only." : null);
+              setDraftStatus(
+                result === "saved"
+                  ? null
+                  : result === "session_only"
+                    ? "Reset applied for this session only; device storage is unavailable, so it may not survive a restart."
+                    : "Reset could not be saved on this device. It applies to this session only."
+              );
             });
           }}
           size="compact"
@@ -556,6 +612,7 @@ function CodeRunResult({
 }): ReactElement {
   return (
     <View style={styles.testResult}>
+      <MutedText>Last executed snapshot. It may differ from the code currently in the editor.</MutedText>
       <Row>
         <Badge tone={latestRun.passed ? "green" : "rose"}>{resultStatusLabel(latestRun)}</Badge>
         <Badge tone="blue">{runtimeLabel(latestRun)}</Badge>

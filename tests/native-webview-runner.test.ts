@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as tsModule from "typescript";
-import { normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
+import { CURRENT_SANDBOX_DISCLOSURE_VERSION, normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
 import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec } from "@/domain/types";
 import {
   createNativeWebViewRunnerHtml,
@@ -218,6 +218,7 @@ describe("native WebView sandbox runner bridge", () => {
       score: 100,
       runtimeMs: 4,
       testResults: [{ id: "visible", name: "Visible", passed: true, visible: true, message: "Passed" }],
+      sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
       createdAt: "2026-05-07T20:30:00.000Z"
     });
     const resultPayload = JSON.stringify({ type: "sandbox-result", attempt });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { contentPack } from "@/content/seed";
 import {
   createProofArtifactFromAttempt,
+  CURRENT_SANDBOX_DISCLOSURE_VERSION,
   normalizeCodeRunAttempt,
   publicHiddenCheckSummary,
   redactCheckResults
@@ -37,6 +38,7 @@ function attempt(overrides: Partial<CodeRunAttempt> = {}): CodeRunAttempt {
     hiddenCheckSummary: { total: 2, passed: 1, failed: 1 },
     diagnostics: [],
     terminalTranscript: [],
+    sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
     createdAt: NOW,
     ...overrides
   };

@@ -1,6 +1,7 @@
 import {
   buildTerminalTranscript,
   codeRunCommand,
+  CURRENT_SANDBOX_DISCLOSURE_VERSION,
   defaultFileName,
   emptyHiddenCheckSummary,
   normalizeCodeRunAttempt,
@@ -271,16 +272,19 @@ function failResult(
   error: unknown,
   language: LessonRunnerSpec["language"]
 ): CodeRunTestResult {
+  const message = formatSandboxFailureFeedback({
+    kind: classifySandboxError(error),
+    language,
+    detail: error instanceof Error ? error.message : normalizeOutput(error) || "Test failed"
+  });
   return {
     id: test.id,
     name: test.name,
     passed: false,
     visible,
-    message: formatSandboxFailureFeedback({
-      kind: classifySandboxError(error),
-      language,
-      detail: error instanceof Error ? error.message : normalizeOutput(error) || "Test failed"
-    })
+    message: message.length > MAX_ERROR_SUMMARY_CHARS
+      ? `${message.slice(0, MAX_ERROR_SUMMARY_CHARS)}\n[message truncated]`
+      : message
   };
 }
 
@@ -966,6 +970,23 @@ async function getSqlJs(): Promise<SqlJsModule> {
   return sqlPromise;
 }
 
+function formatSqlResult(result: Array<{ values: unknown[][] }>, maxChars = MAX_OUTPUT_CHARS): string {
+  const lines: string[] = [];
+  let total = 0;
+  for (const table of result) {
+    for (const row of table.values) {
+      const line = row.join(" | ");
+      if (total + line.length + 1 > maxChars) {
+        lines.push("[output truncated: exceeded 512KB limit]");
+        return lines.join("\n");
+      }
+      lines.push(line);
+      total += line.length + 1;
+    }
+  }
+  return lines.join("\n");
+}
+
 async function runSql(spec: LessonRunnerSpec, code: string): Promise<RunnerExecution> {
   const SQL = await getSqlJs();
   const testResults: CodeRunTestResult[] = [];
@@ -997,7 +1018,7 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<RunnerExecu
       }
 
       const result = db.exec(code);
-      const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n");
+      const output = formatSqlResult(result);
       // Hidden checks must never contribute to learner-visible stdout: their
       // output reveals the anti-forgery seed inserted by the harness. Evaluate
       // the hidden expectation from `output`, but only publish visible output.
@@ -1050,7 +1071,7 @@ async function runSqlFile(spec: LessonRunnerSpec, code: string): Promise<RunnerE
       }
 
       const result = db.exec(code);
-      capper.append(stdout, result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n"));
+      capper.append(stdout, formatSqlResult(result));
     } catch (error) {
       executionError = error instanceof Error ? error.message : String(error);
       capper.appendError(stderr, executionError);
@@ -1088,6 +1109,7 @@ export async function runLessonSandbox(
       lessonId,
       language: spec.language,
       runMode,
+      sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
       command,
       codeSnapshot: code,
       stdout: "",
@@ -1167,6 +1189,7 @@ export async function runLessonSandbox(
       lessonId,
       language: spec.language,
       runMode,
+      sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
       command,
       codeSnapshot: code,
       stdout: result.stdout,
@@ -1223,6 +1246,7 @@ export async function runLessonSandbox(
       lessonId,
       language: spec.language,
       runMode,
+      sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
       command,
       codeSnapshot: code,
       stdout: "",

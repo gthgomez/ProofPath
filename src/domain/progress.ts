@@ -1,5 +1,5 @@
 import { DEFAULT_ROLE_TARGET_ID, legacyCareerPathIdMap } from "@/content/roles";
-import { createProofArtifactFromAttempt, formatProofArtifactVerifierOutput, normalizeCodeRunAttempt } from "@/domain/code-run";
+import { createProofArtifactFromAttempt, formatProofArtifactVerifierOutput, normalizeCodeRunAttempt, sanitizeProofArtifactForDisclosure } from "@/domain/code-run";
 import { classifyEvidenceTrust, isCommitHashLike, isUrlLike, normalizeTrustClassification } from "@/domain/evidence-trust";
 import { advanceReviewItem, createReviewItem, recordReviewEvent, removeReviewItem, reviewKey, upsertReviewItem } from "@/domain/review";
 import { createWeeklyReportSnapshot, upsertWeeklyReport } from "@/domain/weekly-report";
@@ -131,7 +131,8 @@ function normalizeEvidenceItem(item: StoredEvidenceItem): EvidenceItem {
     linkedSkillIds: item.linkedSkillIds ?? [],
     testStatus: item.testStatus ?? "unknown",
     readmeStatus: item.readmeStatus ?? "missing",
-    trust: inferredTrust
+    trust: inferredTrust,
+    ...(item.proofArtifact ? { proofArtifact: sanitizeProofArtifactForDisclosure(item.proofArtifact) } : {})
   };
 }
 

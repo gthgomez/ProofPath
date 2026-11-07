@@ -14,6 +14,56 @@ import type {
 
 const MAX_PROOF_CODE_SNAPSHOT_LENGTH = 12000;
 
+/**
+ * Version of the sandbox output disclosure boundary.
+ *
+ * Version 2 runners sanitize private check output at the source: hidden stdout
+ * and stderr are rolled back per check, hidden results are removed, and the
+ * public hidden summary is zeroed. Records produced before this marker existed
+ * cannot be assumed to have that property, because their raw buffers may still
+ * contain hidden verifier output.
+ */
+export const CURRENT_SANDBOX_DISCLOSURE_VERSION = 2;
+
+/**
+ * Shown in place of quarantined legacy sandbox output. We cannot reliably split
+ * an old mixed stdout/stderr buffer into public and private text, so the honest
+ * choice is to omit the ambiguous material and say so rather than publish it.
+ */
+export const LEGACY_OUTPUT_QUARANTINE_NOTICE =
+  "Legacy sandbox output withheld because it predates per-check disclosure boundaries. Visible check results and the learner's own code are preserved; raw stdout, stderr, diagnostics, and terminal text are omitted.";
+
+function hasTrustedDisclosure(version: number | undefined): boolean {
+  return typeof version === "number" && version >= CURRENT_SANDBOX_DISCLOSURE_VERSION;
+}
+
+function legacyQuarantineDiagnostic(): ProblemDiagnostic {
+  return {
+    id: "legacy-output-quarantine",
+    severity: "info",
+    source: "runtime",
+    message: LEGACY_OUTPUT_QUARANTINE_NOTICE,
+    confidence: "known"
+  };
+}
+
+/**
+ * Legacy check results carry runner-generated names, ids, and messages that we
+ * cannot prove are free of hidden verifier text. Preserve the pass/fail shape
+ * (which drives the already-computed grade) but synthesize neutral labels.
+ */
+function sanitizeLegacyVisibleResults(results: CodeRunTestResult[]): CodeRunTestResult[] {
+  return results
+    .filter((result) => result.visible)
+    .map((result, index) => ({
+      id: `visible-${index + 1}`,
+      name: `Visible check ${index + 1}`,
+      passed: Boolean(result.passed),
+      visible: true,
+      message: "Visible check result preserved; legacy detail withheld."
+    }));
+}
+
 export function codeRunCommand(language: RunnerLanguage, runMode: CodeRunMode): string {
   const fileName = defaultFileName(language);
   if (runMode === "run_file") {
@@ -158,9 +208,20 @@ export function normalizeCodeRunAttempt(attempt: Partial<CodeRunAttempt> & Pick<
   // Deliberately ignore any supplied summary: the public policy is zero counts.
   // A sanitized aggregate passed by an older runner must not resurrect counts.
   const hiddenCheckSummary = publicHiddenCheckSummary();
-  const diagnostics = attempt.diagnostics ?? [];
+  const trustedDisclosure = hasTrustedDisclosure(attempt.sandboxDisclosureVersion);
+
+  // A supplied terminalTranscript is never trusted on its own: it may be a
+  // legacy transcript that embedded hidden stdout/stderr. Even with a trusted
+  // attempt, rebuilding from the already-sanitized buffers keeps one source of
+  // truth and makes repeated normalization idempotent.
+  const diagnostics = trustedDisclosure ? (attempt.diagnostics ?? []) : [legacyQuarantineDiagnostic()];
+  const stdout = trustedDisclosure ? attempt.stdout : "";
+  const stderr = trustedDisclosure ? attempt.stderr : "";
+  const visibleCheckResults = trustedDisclosure
+    ? redacted.visibleCheckResults
+    : sanitizeLegacyVisibleResults(attempt.testResults ?? []);
   const command = attempt.command ?? codeRunCommand(attempt.language, runMode);
-  const terminalTranscript = attempt.terminalTranscript ?? buildTerminalTranscript({
+  const terminalTranscript = buildTerminalTranscript({
     command,
     diagnostics,
     hiddenCheckSummary,
@@ -168,19 +229,59 @@ export function normalizeCodeRunAttempt(attempt: Partial<CodeRunAttempt> & Pick<
     passed: attempt.passed,
     runMode,
     runtimeMs: attempt.runtimeMs,
-    stderr: attempt.stderr,
-    stdout: attempt.stdout,
-    testResults: redacted.visibleCheckResults
+    stderr,
+    stdout,
+    testResults: visibleCheckResults
   });
 
   return {
     ...attempt,
     runMode,
     command,
-    testResults: redacted.visibleCheckResults,
+    stdout,
+    stderr,
+    testResults: visibleCheckResults,
     hiddenCheckSummary,
     diagnostics,
-    terminalTranscript
+    terminalTranscript,
+    sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION
+  };
+}
+
+/**
+ * Apply the disclosure boundary to a proof artifact that may have been persisted
+ * before per-check sanitization existed. Proofs created by current runners carry
+ * a trusted marker and pass through unchanged; ambiguous legacy proofs lose
+ * their raw buffers and gain an explanatory transcript event.
+ */
+export function sanitizeProofArtifactForDisclosure(proof: ProofArtifact): ProofArtifact {
+  if (hasTrustedDisclosure(proof.sandboxDisclosureVersion)) {
+    return proof;
+  }
+
+  const visibleCheckResults = sanitizeLegacyVisibleResults(proof.visibleCheckResults);
+  const hiddenCheckSummary = publicHiddenCheckSummary();
+  const transcript = buildTerminalTranscript({
+    command: proof.command,
+    diagnostics: [legacyQuarantineDiagnostic()],
+    hiddenCheckSummary,
+    language: proof.language,
+    passed: proof.passed,
+    runMode: proof.runMode,
+    runtimeMs: proof.runtimeMs,
+    stderr: "",
+    stdout: "",
+    testResults: visibleCheckResults
+  });
+
+  return {
+    ...proof,
+    stdout: "",
+    stderr: "",
+    visibleCheckResults,
+    hiddenCheckSummary,
+    terminalTranscript: transcript,
+    sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION
   };
 }
 
@@ -320,7 +421,8 @@ export function createProofArtifactFromAttempt(attempt: CodeRunAttempt, missionI
     hiddenCheckSummary: normalizedAttempt.hiddenCheckSummary,
     codeHash: hashCodeSnapshot(normalizedAttempt.codeSnapshot),
     ...(normalizedAttempt.codeSnapshot.length <= MAX_PROOF_CODE_SNAPSHOT_LENGTH ? { codeSnapshot: normalizedAttempt.codeSnapshot } : {}),
-    terminalTranscript: normalizedAttempt.terminalTranscript
+    terminalTranscript: normalizedAttempt.terminalTranscript,
+    sandboxDisclosureVersion: normalizedAttempt.sandboxDisclosureVersion ?? CURRENT_SANDBOX_DISCLOSURE_VERSION
   };
 }
 
@@ -417,6 +519,17 @@ function terminalResultReason({
     return testResults.some((testResult) => testResult.id.includes("runner-error"))
       ? "runner_error"
       : "check_failed";
+  }
+
+  if (runMode === "run_checks" && !passed) {
+    // The aggregate pass flag can fail when only a private check failed. No
+    // private result is needed to say honestly that a check failed; only a
+    // real execution diagnostic would change the classification.
+    const runtimeFailure = diagnostics.some((diagnostic) => (
+      diagnostic.severity === "error"
+      && (diagnostic.source === "runtime" || diagnostic.source === "system")
+    ));
+    return runtimeFailure ? "runtime_error" : "check_failed";
   }
 
   if (diagnostics.some((diagnostic) => diagnostic.source === "system")) {
