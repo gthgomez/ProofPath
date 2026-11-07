@@ -30,8 +30,11 @@
 - [ ] No fetch/network in sandbox templates
 - [ ] No DOM mutation in sandbox
 - [ ] No filesystem access in sandbox
+- [ ] Bracketed/concatenated constructor escape rejected by policy
+- [ ] In-process JS fallback removed; fails closed when Worker is unavailable
+- [ ] Android WebView disables file-origin cross-access and universal access
 
-**Pass criteria: 4/4**
+**Pass criteria: 7/7**
 
 ---
 
@@ -77,8 +80,9 @@
 - [ ] App launches without network
 - [ ] SQLite persistence works
 - [ ] Progress survives app restart
+- [ ] Placement state (placedOutLessonIds, placedOutQuizIds) persists in SQLite across reloads
 
-**Pass criteria: 3/3**
+**Pass criteria: 4/4**
 
 ---
 
@@ -101,8 +105,9 @@
 - [ ] Deliberately broken project code fails the verifier
 - [ ] TypeScript contract drift is caught by `tsc --noEmit`
 - [ ] A mismatched workspace hash is rejected as `stale-workspace`
+- [ ] CI workflow verifier ignores commented lines (rejecting `# needs: [lint, test]`) and accepts multiline YAML array syntax
 
-**Pass criteria: 6/6**
+**Pass criteria: 7/7**
 
 ---
 
