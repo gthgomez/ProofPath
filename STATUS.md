@@ -1,7 +1,7 @@
 # ProofPath Status
 
-**Last verified:** 2026-10-11
-**Final verified main commit:** `e0bb38cef3ce218bc7749576e07a81b783c647a1` (squash-merge of PR #43; this branch `codex/pr43-review-fixes` sits on top; see Recent Evidence)
+**Last verified:** 2026-11-06
+**Final verified main commit:** `ea2beb7` (squash-merge of PR #49; native Python grading, containment hardening, workspace verifier, and state continuity fixes; see Recent Evidence)
 **Status:** active development
 **Confidence:** high
 
@@ -30,7 +30,13 @@ Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite lo
 
 ## Recent Evidence
 
-- Campaign PRs merged to `main`: [#39](https://github.com/gthgomez/ProofPath/pull/39) (evidence truth), [#40](https://github.com/gthgomez/ProofPath/pull/40) (full-stack journey), [#41](https://github.com/gthgomez/ProofPath/pull/41) (beginner UX + export), [#42](https://github.com/gthgomez/ProofPath/pull/42) (campaign status recording), [#43](https://github.com/gthgomez/ProofPath/pull/43) (offline runner selection + Git mechanics lesson). All had green hosted CI on their final head before merge.
+- Campaign PRs merged to `main`: [#39](https://github.com/gthgomez/ProofPath/pull/39) (evidence truth), [#40](https://github.com/gthgomez/ProofPath/pull/40) (full-stack journey), [#41](https://github.com/gthgomez/ProofPath/pull/41) (beginner UX + export), [#42](https://github.com/gthgomez/ProofPath/pull/42) (campaign status recording), [#43](https://github.com/gthgomez/ProofPath/pull/43) (offline runner selection + Git mechanics lesson), [#48](https://github.com/gthgomez/ProofPath/pull/48) (README real local workflows), and [#49](https://github.com/gthgomez/ProofPath/pull/49) (learning-evidence repair). All had green hosted CI on their final head before merge.
+- **2026-11-06 (branch `feat/learning-evidence-repair`, PR #49 merge `ea2beb7`):**
+  - **Native Python grading & runner selection:** Resolved undefined f-string variable bug in `native-python-proof-runner.ts` so undefined variables throw `NameError` instead of returning false proof. Method call invocations (`/\.\w+\(/`) in check expectations are rejected from the restricted native regex interpreter and properly routed to WebView Pyodide runtime (resolving Issue #44 where valid string methods were falsely rejected). Pinned `lesson-python-strings` and `lesson-python-pytest-ci` to `WEBVIEW_PYTHON_LESSONS`.
+  - **Containment hardening (PR #47 integration):** Integrated sandbox security hardening: removed the in-process JS fallback (`runner.ts`), strengthened policy regex against bracketed/concatenated constructor escapes, and explicitly disabled Android WebView file access from file URLs (`NATIVE_SANDBOX_WEBVIEW_SECURITY_PROPS`). Tests run with VM-backed worker shim. Draft PR #47 closed as superseded.
+  - **Workspace verifier hardening:** Hardened GitHub Actions CI workflow verifier in `workspace-tasks.ts` to strip commented lines (rejecting `# needs: [lint, test]`) and support multiline YAML list syntax for `needs:`.
+  - **Persistence continuity & web provider alignment:** Added `placedOutLessonIds` and `placedOutQuizIds` to `userProgressSchema` in `schemas.ts`, created SQLite tables `placed_out_lessons` and `placed_out_quizzes` in `progress-store.ts`, and aligned web and native `progress-provider` APIs (`placement` and `fastTrack`).
+  - Hosted CI (Ubuntu and Windows) passed with 48 test files, 469 passed, 1 skipped. Web export smoke test succeeded.
 - `npm run verify` on 2026-10-09 at `abbbea1`: content validation SUCCESS, `tsc --noEmit` clean, **47 test files / 455 tests pass**.
 - `npx expo export --platform web` and `--platform android` both succeed.
 - Android debug APK assembled with Gradle (`:app:assembleDebug`), including CMake native libraries for all ABIs (`android/app/build/outputs/apk/debug/app-debug.apk`).
