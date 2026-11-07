@@ -13,10 +13,11 @@ ProofPath Code Lab is a production-style workflow trainer, not a full IDE and no
 - `Run file` executes the learner file and shows output. It never completes progress and never captures proof.
 - `Run checks` runs the lesson verifier. Passing checks can complete the Code Lab gate and create a proof artifact.
 - Hidden checks may affect pass/fail, but raw hidden messages, expected values, hidden code, and edge cases must stay redacted. Neither hidden stdout, hidden stderr, nor hidden failure messages are permitted to leak into learner output, terminal transcripts, or proof artifacts.
-- Both stdout and stderr buffers have an enforced cumulative cap (512 KB) to prevent memory exhaustion and UI lockups from runaway print loops.
+- Both stdout and stderr buffers have an enforced cumulative cap (512 KB) per run to prevent memory exhaustion and UI lockups from runaway print loops. The cap is instantiated fresh per run and enforced across JS, Python, SQL, and error output paths.
 - Terminal transcripts and proof artifacts must consume redacted check data only.
 - Canonical copied output is generated from structured terminal events, not ad hoc strings.
 - Terminal result events include result status, reason, runtime, and exit-style status when a command ran.
+- Learner editor draft code (including unrun typing and edits after a run) is persisted per lesson so work is not lost when switching tabs or reloading the screen.
 - Policy blocks are shown as pre-execution blocks; skipped phases are intentional and are not fake failures.
 - Problems diagnostics should use deterministic parser/runtime/policy signals first, then lesson-authored hints.
 - Problems should show line numbers only when known or high-confidence. Otherwise the UI should say `Location unknown`.
@@ -78,8 +79,9 @@ Known limits:
 Current status:
 
 - JavaScript runs in an offline sandbox using Web Workers (or Android WebView on native). Environments lacking Worker/Blob/URL isolation fail closed; in-process execution in the host realm has been eliminated.
-- Console output is captured as terminal stdout/stderr with a 512 KB cumulative output limit.
-- Native WebView runners use correlated request IDs (`requestId`) and discard stale or uncorrelated results after timeouts or unmounts.
+- Worker messaging is protected with an unguessable execution `nonce`, private post bindings, and global `postMessage` revocation/shadowing so learner code cannot emit forged passing results.
+- Console output is captured as terminal stdout/stderr with a 512 KB cumulative output limit per run. Output limits are reset on every run.
+- Native WebView runners require an active matching `requestId`. Results without an active run or with mismatched request IDs are strictly discarded.
 
 Terminal phases:
 
@@ -92,7 +94,10 @@ Known limits:
 - Network, filesystem, browser storage, host process, constructor escape, and obvious infinite-loop patterns are blocked.
 - No package installation.
 - Diagnostics cover deterministic SyntaxError, ReferenceError, and TypeError signals first.
-- In-page WASM runtimes (Pyodide on web) cannot be preemptively terminated from a promise timeout without Web Worker WASM threads; native WebViews terminate on timeout by destroying and recreating the underlying WebView instance.
+- Execution stopping boundaries:
+  - Native Android: On timeout, the host terminates execution by destroying and recreating the WebView instance (`setWebViewKey`), resetting runtime state and discarding orphaned results via `requestId`.
+  - Web JavaScript: On timeout, `worker.terminate()` halts the worker thread immediately.
+  - Web Python & SQL: Pyodide and sql.js execute in the browser page context. `Promise.race` enforces an asynchronous timeout boundary and returns failure feedback to the learner, but because single-threaded WebAssembly execution lacks preemptive interruption, an unyielding infinite loop cannot be preempted without dedicated Web Worker threads or a page reload.
 
 ## TypeScript
 

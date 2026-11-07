@@ -690,4 +690,115 @@ describe("native WebView runner behavior (embedded script executed with stubs)",
     expect(attempt.passed).toBe(true);
     expect(attempt.stdout).toContain("2");
   });
+
+  it("resets output character capping between consecutive runs on the same runner", async () => {
+    const { windowStub, sandbox } = createEmbeddedNativeRunnerWindow({});
+    const results: EmbeddedAttempt[] = [];
+    let resolveRun!: () => void;
+
+    windowStub.ReactNativeWebView.postMessage = (payload: string) => {
+      const message = JSON.parse(payload) as { type?: string; attempt?: EmbeddedAttempt };
+      if (message.type === "sandbox-result" && message.attempt) {
+        results.push(message.attempt);
+        resolveRun?.();
+      }
+    };
+
+    // First run emits huge output that triggers truncation
+    const firstRunPromise = new Promise<void>((resolve) => {
+      resolveRun = resolve;
+    });
+    sandbox.run({
+      type: "run",
+      request: {
+        lessonId: "lesson-output-1",
+        code: 'for (var i = 0; i < 25000; i++) console.log("line " + i + " padding text data");',
+        now: "2026-11-06T20:00:00.000Z",
+        runMode: "run_file",
+        spec: {
+          language: "javascript",
+          instructions: "Test big output.",
+          starterCode: "",
+          visibleTests: [],
+          hiddenTests: [],
+          expectedOutput: [],
+          timeoutMs: 4000,
+          allowNetwork: false
+        }
+      }
+    });
+    await firstRunPromise;
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.stdout).toContain("[output truncated: exceeded 512KB limit]");
+
+    // Second run on the same window emits normal output
+    const secondRunPromise = new Promise<void>((resolve) => {
+      resolveRun = resolve;
+    });
+    sandbox.run({
+      type: "run",
+      request: {
+        lessonId: "lesson-output-2",
+        code: 'console.log("second run output line");',
+        now: "2026-11-06T20:00:01.000Z",
+        runMode: "run_file",
+        spec: {
+          language: "javascript",
+          instructions: "Test second run output.",
+          starterCode: "",
+          visibleTests: [],
+          hiddenTests: [],
+          expectedOutput: [],
+          timeoutMs: 4000,
+          allowNetwork: false
+        }
+      }
+    });
+    await secondRunPromise;
+
+    expect(results).toHaveLength(2);
+    // The second run's output must not be empty or truncated by the previous run
+    expect(results[1]?.stdout).toBe("second run output line");
+  });
+
+  it("includes requestId in results and correlates active runs", async () => {
+    const { windowStub, sandbox } = createEmbeddedNativeRunnerWindow({});
+    let capturedResult: { type?: string; requestId?: string; attempt?: unknown } | undefined;
+    let resolveResult!: () => void;
+    const resultPromise = new Promise<void>((resolve) => {
+      resolveResult = resolve;
+    });
+
+    windowStub.ReactNativeWebView.postMessage = (payload: string) => {
+      capturedResult = JSON.parse(payload);
+      resolveResult?.();
+    };
+
+    sandbox.run({
+      type: "run",
+      request: {
+        requestId: "req-xyz-999",
+        lessonId: "lesson-test",
+        code: "console.log('hello');",
+        now: "2026-11-06T20:00:00.000Z",
+        runMode: "run_file",
+        spec: {
+          language: "javascript",
+          instructions: "Say hello",
+          starterCode: "",
+          visibleTests: [],
+          hiddenTests: [],
+          expectedOutput: [],
+          timeoutMs: 4000,
+          allowNetwork: false
+        }
+      }
+    });
+    await resultPromise;
+
+    expect(capturedResult).toBeDefined();
+    expect(capturedResult?.type).toBe("sandbox-result");
+    expect(capturedResult?.requestId).toBe("req-xyz-999");
+  });
 });

@@ -377,21 +377,26 @@ function passesOutputCheck(output, test) {
 }
 
 self.onmessage = (event) => {
-  const { language, runMode, runtimeCode, tests, visibleCount } = event.data;
+  const { nonce, language, runMode, runtimeCode, tests, visibleCount } = event.data;
   const stdout = [];
   const stderr = [];
   const testResults = [];
   const MAX_OUTPUT_CHARS = 524288;
   let totalChars = 0;
+  let truncated = false;
   function appendOutput(target, text) {
-    if (totalChars >= MAX_OUTPUT_CHARS) return;
-    const addedLen = text.length + 1;
+    if (truncated) return;
+    const normalized = normalizeOutput(text);
+    const addedLen = normalized.length + 1;
     const remaining = MAX_OUTPUT_CHARS - totalChars;
-    if (addedLen > remaining) {
-      target.push(text.slice(0, Math.max(0, remaining - 45)) + "\\n[output truncated: exceeded 512KB limit]");
+    if (addedLen >= remaining) {
+      const sliceLen = Math.max(0, remaining - 45);
+      const prefix = sliceLen > 0 ? normalized.slice(0, sliceLen) + "\\n" : "";
+      target.push(prefix + "[output truncated: exceeded 512KB limit]");
+      truncated = true;
       totalChars = MAX_OUTPUT_CHARS;
     } else {
-      target.push(text);
+      target.push(normalized);
       totalChars += addedLen;
     }
   }
@@ -400,19 +405,29 @@ self.onmessage = (event) => {
     error: (...values) => appendOutput(stderr, values.map(normalizeOutput).join(" "))
   };
 
+  // Capture real postMessage for worker completion and protect against learner-emitted messages
+  const post = typeof self.postMessage === "function" ? self.postMessage.bind(self) : function() {};
+  try {
+    delete self.postMessage;
+  } catch (_) {}
+  self.postMessage = function() {};
+
   if (runMode === "run_file") {
     try {
-      const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode);
-      runner(sandboxConsole);
-      self.postMessage({
+      const runner = new Function("console", "postMessage", "self", "window", "globalThis", "\\"use strict\\";\\n" + runtimeCode);
+      runner(sandboxConsole, undefined, undefined, undefined, undefined);
+      post({
+        nonce,
         stdout: stdout.join("\\n"),
         stderr: stderr.join("\\n"),
         testResults
       });
     } catch (error) {
-      self.postMessage({
+      appendOutput(stderr, error instanceof Error ? error.message : String(error));
+      post({
+        nonce,
         stdout: stdout.join("\\n"),
-        stderr: (stderr.length > 0 ? stderr.join("\\n") + "\\n" : "") + (error instanceof Error ? error.message : String(error)),
+        stderr: stderr.join("\\n"),
         testResults
       });
     }
@@ -426,8 +441,8 @@ self.onmessage = (event) => {
     const stderrStart = stderr.length;
 
     try {
-      const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code);
-      runner(sandboxConsole);
+      const runner = new Function("console", "postMessage", "self", "window", "globalThis", "\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code);
+      runner(sandboxConsole, undefined, undefined, undefined, undefined);
       const output = stdout.slice(stdoutStart).join("\\n");
       if (!passesOutputCheck(output, test)) {
         throw new Error("Output missing");
@@ -450,13 +465,37 @@ self.onmessage = (event) => {
     }
   }
 
-  self.postMessage({
+  post({
+    nonce,
     stdout: stdout.join("\\n"),
     stderr: stderr.join("\\n"),
     testResults
   });
 };
 `;
+}
+
+export const MAX_OUTPUT_CHARS = 524288;
+
+export function createOutputCapper(maxChars = MAX_OUTPUT_CHARS): (target: string[], text: unknown) => void {
+  let totalChars = 0;
+  let truncated = false;
+  return (target: string[], text: unknown) => {
+    if (truncated) return;
+    const normalized = normalizeOutput(text);
+    const addedLen = normalized.length + 1;
+    const remaining = maxChars - totalChars;
+    if (addedLen >= remaining) {
+      const sliceLen = Math.max(0, remaining - 45);
+      const prefix = sliceLen > 0 ? normalized.slice(0, sliceLen) + "\n" : "";
+      target.push(prefix + "[output truncated: exceeded 512KB limit]");
+      truncated = true;
+      totalChars = maxChars;
+    } else {
+      target.push(normalized);
+      totalChars += addedLen;
+    }
+  };
 }
 
 async function runJavaScriptInWorker(spec: LessonRunnerSpec, runtimeCode: string, runMode: CodeRunMode): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
@@ -467,17 +506,26 @@ async function runJavaScriptInWorker(spec: LessonRunnerSpec, runtimeCode: string
   return new Promise((resolve, reject) => {
     const workerUrl = URL.createObjectURL(new Blob([createJavaScriptWorkerSource()], { type: "text/javascript" }));
     const worker = new Worker(workerUrl);
+    const nonce = `pp-worker-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const timeoutId = setTimeout(() => {
       worker.terminate();
       URL.revokeObjectURL(workerUrl);
       reject(new Error(`Sandbox worker timed out after ${spec.timeoutMs}ms.`));
     }, spec.timeoutMs);
 
-    worker.onmessage = (event: MessageEvent<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">>) => {
+    worker.onmessage = (event: MessageEvent<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults"> & { nonce?: string }>) => {
+      if (!event.data || event.data.nonce !== nonce) {
+        // Discard unauthorized or forged messages emitted by learner code
+        return;
+      }
       clearTimeout(timeoutId);
       worker.terminate();
       URL.revokeObjectURL(workerUrl);
-      resolve(event.data);
+      resolve({
+        stdout: event.data.stdout,
+        stderr: event.data.stderr,
+        testResults: event.data.testResults
+      });
     };
 
     worker.onerror = (event) => {
@@ -488,6 +536,7 @@ async function runJavaScriptInWorker(spec: LessonRunnerSpec, runtimeCode: string
     };
 
     worker.postMessage({
+      nonce,
       language: spec.language,
       runMode,
       runtimeCode,
@@ -657,9 +706,10 @@ async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<Cod
   const testResults: CodeRunTestResult[] = [];
   const stdout: string[] = [];
   const stderr: string[] = [];
+  const append = createOutputCapper();
 
-  pyodide.setStdout({ batched: (text: string) => stdout.push(text) });
-  pyodide.setStderr({ batched: (text: string) => stderr.push(text) });
+  pyodide.setStdout({ batched: (text: string) => append(stdout, text) });
+  pyodide.setStderr({ batched: (text: string) => append(stderr, text) });
 
   for (const [index, test] of [...spec.visibleTests, ...spec.hiddenTests].entries()) {
     const visible = index < spec.visibleTests.length;
@@ -680,8 +730,9 @@ async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<Cod
       }
       testResults.push(passResult(test, visible));
     } catch (error) {
-      if (visible) {
-        stderr.push(error instanceof Error ? error.message : normalizeOutput(error));
+      const message = error instanceof Error ? error.message : normalizeOutput(error);
+      if (visible || message === "Output missing") {
+        append(stderr, message);
       }
       testResults.push(failResult(test, visible, error, spec.language));
     } finally {
@@ -689,7 +740,9 @@ async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<Cod
       // harness or assertion errors can reveal internal test details or seeds. Keep only visible output.
       if (!visible) {
         stdout.length = stdoutStart;
-        stderr.length = stderrStart;
+        if (stderr.length > stderrStart && stderr[stderr.length - 1] !== "Output missing") {
+          stderr.length = stderrStart;
+        }
       }
     }
   }
@@ -705,16 +758,17 @@ async function runPythonFile(code: string): Promise<Pick<CodeRunAttempt, "stdout
   const pyodide = await getPyodide();
   const stdout: string[] = [];
   const stderr: string[] = [];
+  const append = createOutputCapper();
 
-  pyodide.setStdout({ batched: (text: string) => stdout.push(text) });
-  pyodide.setStderr({ batched: (text: string) => stderr.push(text) });
+  pyodide.setStdout({ batched: (text: string) => append(stdout, text) });
+  pyodide.setStderr({ batched: (text: string) => append(stderr, text) });
   try {
     // Direct execution is the "run the file" scenario: `__name__` is "__main__",
     // so `if __name__ == "__main__":` blocks run, matching `python file.py`.
     pyodide.globals.set("__name__", PYTHON_DIRECT_RUN_NAME);
     await pyodide.runPythonAsync(code);
   } catch (error) {
-    stderr.push(error instanceof Error ? error.message : String(error));
+    append(stderr, error instanceof Error ? error.message : String(error));
   }
 
   return {
@@ -777,6 +831,7 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
   const testResults: CodeRunTestResult[] = [];
   const stdout: string[] = [];
   const stderr: string[] = [];
+  const append = createOutputCapper();
 
   for (const [index, test] of [...spec.visibleTests, ...spec.hiddenTests].entries()) {
     const visible = index < spec.visibleTests.length;
@@ -807,7 +862,7 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
       // output reveals the anti-forgery seed inserted by the harness. Evaluate
       // the hidden expectation from `output`, but only publish visible output.
       if (visible) {
-        stdout.push(output);
+        append(stdout, output);
       }
 
       if (!passesOutputCheck(output, test)) {
@@ -817,7 +872,7 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
     } catch (error) {
       const message = error instanceof Error ? error.message : normalizeOutput(error);
       if (visible || message === "Output missing") {
-        stderr.push(message);
+        append(stderr, message);
       }
       testResults.push(failResult(test, visible, error, spec.language));
     } finally {
@@ -843,6 +898,7 @@ async function runSqlFile(spec: LessonRunnerSpec, code: string): Promise<Pick<Co
   const db = new SQL.Database();
   const stdout: string[] = [];
   const stderr: string[] = [];
+  const append = createOutputCapper();
 
   try {
     try {
@@ -851,9 +907,9 @@ async function runSqlFile(spec: LessonRunnerSpec, code: string): Promise<Pick<Co
       }
 
       const result = db.exec(code);
-      stdout.push(result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n"));
+      append(stdout, result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n"));
     } catch (error) {
-      stderr.push(error instanceof Error ? error.message : String(error));
+      append(stderr, error instanceof Error ? error.message : String(error));
     }
   } finally {
     db.close();

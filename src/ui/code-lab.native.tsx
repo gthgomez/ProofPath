@@ -23,6 +23,7 @@ import { colors, radius, semanticColors, spacing } from "@/ui/theme";
 import { CodeProblems } from "@/ui/code-problems";
 import { CodeTerminal } from "@/ui/code-terminal";
 import { SyntaxHighlightedEditor } from "@/ui/syntax-highlighted-editor";
+import { getEditorDraft, saveEditorDraft, clearEditorDraft } from "@/storage/draft-store";
 import type { CodeLabProps } from "@/ui/code-lab.shared";
 
 // The native run-time startup allowance (and the unmeasured-cold-start note)
@@ -48,7 +49,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
-  const [code, setCode] = useState(() => latestRun?.codeSnapshot ?? runnerSpec.starterCode);
+  const [code, setCode] = useState(() => getEditorDraft(lessonId) ?? latestRun?.codeSnapshot ?? runnerSpec.starterCode);
   const [isBridgeReady, setIsBridgeReady] = useState(false);
   const [isRuntimeWarm, setIsRuntimeWarm] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -61,7 +62,7 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
   const runnerHtml = useMemo(() => createNativeWebViewRunnerHtml(), []);
 
   useEffect(() => {
-    setCode(latestRun?.codeSnapshot ?? runnerSpec.starterCode);
+    setCode(getEditorDraft(lessonId) ?? latestRun?.codeSnapshot ?? runnerSpec.starterCode);
     setRunError(null);
     setCopyStatus(null);
   }, [runnerSpec.starterCode, lessonId]);
@@ -275,8 +276,8 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
     }
 
     if (message?.type === "sandbox-result") {
-      if (activeRequestIdRef.current && message.requestId && message.requestId !== activeRequestIdRef.current) {
-        // Stale or uncorrelated result from an earlier timed-out or cancelled run: discard.
+      if (!activeRequestIdRef.current || message.requestId !== activeRequestIdRef.current) {
+        // Discard: no run is currently active, or the result does not match the active run request ID.
         return;
       }
       activeRequestIdRef.current = null;
@@ -400,7 +401,10 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
         diagnostics={diagnostics}
         focusLine={focusedLine}
         language={runnerSpec.language}
-        onChangeText={setCode}
+        onChangeText={(nextCode) => {
+          setCode(nextCode);
+          saveEditorDraft(lessonId, nextCode);
+        }}
         value={code}
       />
       <Row>
@@ -428,7 +432,10 @@ export function CodeLab({ attemptHistory = [], isSaving, latestRun, lessonId, on
         <ButtonShell
           accessibilityHint="Restores the lesson starter code."
           disabled={isSaving || isRunning}
-          onPress={() => setCode(runnerSpec.starterCode)}
+          onPress={() => {
+            setCode(runnerSpec.starterCode);
+            clearEditorDraft(lessonId);
+          }}
           size="compact"
           tone="ink"
           variant="secondary"
@@ -603,7 +610,7 @@ function latestRunBadgeLabel(latestRun: NonNullable<CodeLabProps["latestRun"]>):
     : `${latestRun.score}% last checks`;
 }
 
-function formatProofSummary(latestRun: NonNullable<CodeLabProps["latestRun"]>): string {
+export function formatProofSummary(latestRun: NonNullable<CodeLabProps["latestRun"]>): string {
   return [
     `command: ${latestRun.command}`,
     `mode: ${latestRun.runMode}`,

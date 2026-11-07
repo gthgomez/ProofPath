@@ -205,15 +205,20 @@ export function createNativeWebViewRunnerHtml(): string {
 
     var MAX_OUTPUT_CHARS = 524288;
     var totalOutputChars = 0;
+    var isOutputTruncated = false;
     function appendOutput(target, text) {
-      if (totalOutputChars >= MAX_OUTPUT_CHARS) return;
-      var addedLen = text.length + 1;
+      if (isOutputTruncated) return;
+      var normalized = normalizeOutput(text);
+      var addedLen = normalized.length + 1;
       var remaining = MAX_OUTPUT_CHARS - totalOutputChars;
-      if (addedLen > remaining) {
-        target.push(text.slice(0, Math.max(0, remaining - 45)) + "\\n[output truncated: exceeded 512KB limit]");
+      if (addedLen >= remaining) {
+        var sliceLen = Math.max(0, remaining - 45);
+        var prefix = sliceLen > 0 ? normalized.slice(0, sliceLen) + "\\n" : "";
+        target.push(prefix + "[output truncated: exceeded 512KB limit]");
+        isOutputTruncated = true;
         totalOutputChars = MAX_OUTPUT_CHARS;
       } else {
-        target.push(text);
+        target.push(normalized);
         totalOutputChars += addedLen;
       }
     }
@@ -432,10 +437,10 @@ export function createNativeWebViewRunnerHtml(): string {
 
       if (request.runMode === "run_file") {
         try {
-          const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode);
-          runner(sandboxConsole);
+          const runner = new Function("console", "ReactNativeWebView", "window", "postMessage", "ProofPathSandbox", "\\"use strict\\";\\n" + runtimeCode);
+          runner(sandboxConsole, undefined, undefined, undefined, undefined);
         } catch (error) {
-          stderr.push(error instanceof Error ? error.message : String(error));
+          appendOutput(stderr, error instanceof Error ? error.message : String(error));
         }
         return buildAttempt(request, startedAt, stdout, stderr, testResults);
       }
@@ -447,8 +452,8 @@ export function createNativeWebViewRunnerHtml(): string {
         const stderrStart = stderr.length;
 
         try {
-          const runner = new Function("console", "\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code);
-          runner(sandboxConsole);
+          const runner = new Function("console", "ReactNativeWebView", "window", "postMessage", "ProofPathSandbox", "\\"use strict\\";\\n" + runtimeCode + "\\n" + test.code);
+          runner(sandboxConsole, undefined, undefined, undefined, undefined);
           const output = stdout.slice(stdoutStart).join("\\n");
           if (!passesOutputCheck(output, test)) {
             throw new Error("Output missing");
@@ -549,15 +554,15 @@ export function createNativeWebViewRunnerHtml(): string {
       // checks use an import-style sentinel that guarantees a non-__main__ name.
       const moduleName = request.runMode === "run_file" ? PYTHON_DIRECT_RUN_NAME : PYTHON_IMPORT_RUN_NAME;
 
-      pyodide.setStdout({ batched: (text) => stdout.push(text) });
-      pyodide.setStderr({ batched: (text) => stderr.push(text) });
+      pyodide.setStdout({ batched: (text) => appendOutput(stdout, text) });
+      pyodide.setStderr({ batched: (text) => appendOutput(stderr, text) });
       pyodide.globals.set("__name__", moduleName);
 
       if (request.runMode === "run_file") {
         try {
           await pyodide.runPythonAsync(request.code);
         } catch (error) {
-          stderr.push(error instanceof Error ? error.message : String(error));
+          appendOutput(stderr, error instanceof Error ? error.message : String(error));
         }
         return buildAttempt(request, startedAt, stdout, stderr, testResults);
       }
@@ -583,7 +588,7 @@ export function createNativeWebViewRunnerHtml(): string {
           testResults.push({ id: test.id, name: test.name, passed: true, visible, message: "Passed" });
         } catch (error) {
           if (visible) {
-            stderr.push(error instanceof Error ? error.message : String(error || "Test failed"));
+            appendOutput(stderr, error instanceof Error ? error.message : String(error || "Test failed"));
           }
           testResults.push({
             id: test.id,
@@ -654,9 +659,9 @@ export function createNativeWebViewRunnerHtml(): string {
 
           const result = fileDb.exec(request.code);
           const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\\n");
-          stdout.push(output);
+          appendOutput(stdout, output);
         } catch (error) {
-          stderr.push(error instanceof Error ? error.message : String(error));
+          appendOutput(stderr, error instanceof Error ? error.message : String(error));
         } finally {
           fileDb.close();
         }
@@ -690,7 +695,7 @@ export function createNativeWebViewRunnerHtml(): string {
           // Hidden checks must never contribute to learner-visible stdout: their
           // output reveals the anti-forgery seed inserted by the harness.
           if (visible) {
-            stdout.push(output);
+            appendOutput(stdout, output);
           }
 
           if (!passesOutputCheck(output, test)) {
@@ -700,7 +705,7 @@ export function createNativeWebViewRunnerHtml(): string {
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error || "Test failed");
           if (visible || message === "Output missing") {
-            stderr.push(message);
+            appendOutput(stderr, message);
           }
           testResults.push({
             id: test.id,
@@ -743,6 +748,8 @@ export function createNativeWebViewRunnerHtml(): string {
     }
 
     async function handleRun(request) {
+      totalOutputChars = 0;
+      isOutputTruncated = false;
       let attempt;
       try {
         if (request.spec.language === "python") {
