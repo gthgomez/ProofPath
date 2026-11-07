@@ -2,6 +2,7 @@ import type { ContentPack, EvidenceItem, ProofArtifact, UserProgress } from "./t
 import { calculateReadinessScore } from "./readiness";
 import { formatProofArtifactVerifierOutput } from "./code-run";
 import { evidenceTrustLabel } from "./evidence-trust";
+import { getContentForRole } from "./role-routing";
 
 export interface ReviewedEvidenceEntry {
   id: string;
@@ -147,7 +148,11 @@ export function generateReviewerPortfolioExport(
   progress: UserProgress,
   now = new Date().toISOString()
 ): ReviewerPortfolioExport {
-  const readiness = calculateReadinessScore(content, progress, now);
+  // Match the readiness scope the app's providers use (role-scoped content), so
+  // the on-screen score and the exported score agree for the same snapshot and
+  // time. Calculating against the full pack here was a documented mismatch.
+  const scopedContent = getContentForRole(content, progress.profile.roleTargetId);
+  const readiness = calculateReadinessScore(scopedContent, progress, now);
   const evidenceItems = progress.evidenceItems;
 
   const autoVerifiedCount = evidenceItems.filter((item) => item.trust === "auto_verified_code_lab").length;
@@ -178,13 +183,17 @@ export function generateReviewerPortfolioExport(
 
   const lessons = Array.from(lessonMap.entries()).map(([lessonId, items]) => ({
     lessonId,
-    lessonTitle: content.lessons.find((lesson) => lesson.id === lessonId)?.title ?? lessonId,
+    lessonTitle: scopedContent.lessons.find((lesson) => lesson.id === lessonId)?.title
+      ?? content.lessons.find((lesson) => lesson.id === lessonId)?.title
+      ?? lessonId,
     evidenceItems: items.map(toEntry)
   }));
 
   const missions = Array.from(missionMap.entries()).map(([missionId, items]) => ({
     missionId,
-    missionTitle: content.projectMissions.find((mission) => mission.id === missionId)?.title ?? missionId,
+    missionTitle: scopedContent.projectMissions.find((mission) => mission.id === missionId)?.title
+      ?? content.projectMissions.find((mission) => mission.id === missionId)?.title
+      ?? missionId,
     evidenceItems: items.map(toEntry)
   }));
 

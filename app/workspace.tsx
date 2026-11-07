@@ -100,9 +100,13 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
     if (outcome === "downloaded") {
       setTransferStatus(`Downloaded ${bundle.fileName}. Reconstruct the files, preserving paths.`);
     } else if (outcome === "shared") {
-      setTransferStatus("Opened the share sheet. Save the file, then reconstruct it preserving paths.");
+      setTransferStatus("Opened the share sheet with the workspace bundle text. File attachment is not available in this build; use Copy workspace text and save it yourself, preserving paths.");
+    } else if (outcome === "dismissed") {
+      setTransferStatus("Share cancelled. Nothing was exported; use Copy workspace text instead.");
+    } else if (outcome === "failed") {
+      setTransferStatus("Sharing failed. Use Copy workspace text instead.");
     } else {
-      setTransferStatus("This platform cannot save files directly. Use Copy workspace text instead.");
+      setTransferStatus("This platform cannot share files directly. Use Copy workspace text instead.");
     }
   }
 
@@ -174,8 +178,12 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
           The JSON export carries every file path and its contents, so the project can be reconstructed exactly.
         </MutedText>
         <Row>
-          <ButtonShell accessibilityHint="Downloads or shares the workspace files." onPress={handleExport} tone="teal">
-            {Platform.OS === "web" ? "Download workspace file" : "Share workspace file"}
+          <ButtonShell
+            accessibilityHint={Platform.OS === "web" ? "Downloads the workspace bundle file." : "Shares the workspace bundle text. This build does not attach a named file."}
+            onPress={handleExport}
+            tone="teal"
+          >
+            {Platform.OS === "web" ? "Download workspace file" : "Share workspace text"}
           </ButtonShell>
           <ButtonShell
             accessibilityHint="Copies the full workspace as text with file delimiters."

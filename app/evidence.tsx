@@ -57,9 +57,13 @@ export default function EvidenceLogScreen(): ReactElement {
     if (outcome === "downloaded") {
       setCopyStatus(`Downloaded ${fileName}.`);
     } else if (outcome === "shared") {
-      setCopyStatus("Opened the share sheet. Save the file to keep your packet.");
+      setCopyStatus("Opened the share sheet with the packet text. File attachment is not available in this build; use Copy to keep the full packet.");
+    } else if (outcome === "dismissed") {
+      setCopyStatus("Share cancelled. Nothing was exported; use Copy to keep the packet.");
+    } else if (outcome === "failed") {
+      setCopyStatus("Sharing failed. Use Copy to keep the packet.");
     } else {
-      setCopyStatus("This platform cannot save files directly. Use Copy instead.");
+      setCopyStatus("This platform cannot share files directly. Use Copy instead.");
     }
   };
 
@@ -203,24 +207,24 @@ export default function EvidenceLogScreen(): ReactElement {
         </MutedText>
         <Row style={{ marginVertical: spacing.xs, flexWrap: "wrap", gap: spacing.xs }}>
           <ButtonShell
-            accessibilityHint={Platform.OS === "web" ? "Downloads a Markdown packet of all portfolio evidence." : "Shares a Markdown packet of all portfolio evidence."}
+            accessibilityHint={Platform.OS === "web" ? "Downloads a Markdown packet of all portfolio evidence." : "Shares the Markdown packet text. This build does not attach a named file."}
             accessibilityLabel="Export Markdown Packet"
             onPress={() => handleExportPacket("markdown")}
             size="compact"
             tone="teal"
             variant="secondary"
           >
-            {Platform.OS === "web" ? "Download Markdown packet" : "Share Markdown packet"}
+            {Platform.OS === "web" ? "Download Markdown packet" : "Share Markdown text"}
           </ButtonShell>
           <ButtonShell
-            accessibilityHint={Platform.OS === "web" ? "Downloads the JSON evidence packet for portfolio imports." : "Shares the JSON evidence packet for portfolio imports."}
+            accessibilityHint={Platform.OS === "web" ? "Downloads the JSON evidence packet for portfolio imports." : "Shares the JSON packet text. This build does not attach a named file."}
             accessibilityLabel="Export JSON Packet"
             onPress={() => handleExportPacket("json")}
             size="compact"
             tone="blue"
             variant="secondary"
           >
-            {Platform.OS === "web" ? "Download JSON packet" : "Share JSON packet"}
+            {Platform.OS === "web" ? "Download JSON packet" : "Share JSON text"}
           </ButtonShell>
           <ButtonShell
             accessibilityHint="Copies the Markdown packet to the clipboard. This is a copy, not a file export."

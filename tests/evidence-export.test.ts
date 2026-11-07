@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { contentPack } from "@/content/seed";
 import { createInitialProgress, addEvidenceItem, setRoleTarget } from "@/domain/progress";
 import { generateReviewerPortfolioExport } from "@/domain/evidence-export";
+import { calculateReadinessScore } from "@/domain/readiness";
+import { getContentForRole } from "@/domain/role-routing";
 
 const NOW = "2026-10-09T22:00:00.000Z";
 
@@ -66,5 +68,28 @@ describe("evidence export packet generator", () => {
     expect(packet.markdownPacket).toContain("https://github.com/learner/cli-tracker");
     expect(packet.markdownPacket).toContain("a1b2c3d4e5");
     expect(packet.markdownPacket).toContain("pytest passed 4 tests");
+  });
+
+  it("exports the same role-scoped readiness score the app displays", () => {
+    let progress = setRoleTarget(createInitialProgress(NOW), "path-software-foundations", true, NOW);
+    progress = addEvidenceItem(progress, {
+      type: "test-output",
+      title: "Lesson values proof",
+      body: "Captured the values lesson run.",
+      linkedLessonId: "lesson-python-values",
+      testStatus: "passing",
+      verifierOutput: "ok"
+    }, NOW);
+
+    const packet = generateReviewerPortfolioExport(contentPack, progress, NOW);
+    const onScreen = calculateReadinessScore(
+      getContentForRole(contentPack, progress.profile.roleTargetId),
+      progress,
+      NOW
+    );
+
+    expect(packet.roleTarget.readinessScore).toBe(onScreen.score);
+    expect(packet.roleTarget.readinessLabel).toBe(onScreen.label);
+    expect(packet.markdownPacket).toContain(`**Readiness Score (Practice Heuristic):** ${onScreen.score}%`);
   });
 });

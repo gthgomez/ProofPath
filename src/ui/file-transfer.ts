@@ -1,6 +1,6 @@
 import { Platform, Share } from "react-native";
 
-export type TransferOutcome = "downloaded" | "shared" | "clipped" | "unsupported" | "failed";
+export type TransferOutcome = "downloaded" | "shared" | "clipped" | "dismissed" | "unsupported" | "failed";
 
 interface ClipboardLike {
   clipboard?: { writeText?: (value: string) => Promise<void> };
@@ -44,15 +44,23 @@ export async function downloadTextFile(fileName: string, content: string, mimeTy
   }
 }
 
-/** Share text through the platform share sheet (native). */
+/**
+ * Share text through the platform share sheet (native).
+ *
+ * This shares packet TEXT, not a named file attachment: this build has no
+ * filesystem module capable of writing a `.md`/`.json` file outside app
+ * storage. Callers must label it accordingly and offer a copy/save alternative.
+ * A dismissed sheet is reported as a cancellation, never as success.
+ */
 export async function shareText(title: string, message: string): Promise<TransferOutcome> {
   if (Platform.OS === "web") {
     return "unsupported";
   }
 
   try {
-    await Share.share({ title, message });
-    return "shared";
+    const result = await Share.share({ title, message });
+    const action = (result as { action?: string } | undefined)?.action;
+    return action === "dismissedAction" ? "dismissed" : "shared";
   } catch {
     return "failed";
   }

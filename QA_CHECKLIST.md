@@ -91,7 +91,7 @@
 - [ ] `tests/evidence-truth.test.ts` passes (fabricated URLs, random hashes, pasted output, genuine Code Lab passes, failing runs, cross-record stitching, duplicates, legacy reclassification)
 - [ ] `tests/evidence-export-content.test.ts` passes (lesson evidence, provenance labels, empty/large portfolios, unusual text, hidden-check leakage)
 - [ ] Legacy `externally_reproducible` evidence still loads and is remapped, not promoted
-- [ ] Markdown/JSON export performs a real download on web and share on native; clipboard actions are labelled "Copy"
+- [ ] Markdown/JSON export performs a real download on web and shares packet **text** on native (no named file attachment in this build); clipboard actions are labelled "Copy"
 
 **Pass criteria: 4/4**
 
@@ -131,7 +131,26 @@
 
 ---
 
-## 13. Go / No-Go Gate
+## 13. Runtime Truth & Continuity (2026-11-07 campaign)
+
+- [ ] A hidden Python/JS/SQL/TS sentinel is absent from `stdout`, `stderr`, terminal transcript, stored attempt, proof artifact, and Markdown/JSON export (web and native)
+- [ ] A run that truncates output and then throws is reported as failed with a bounded error summary
+- [ ] Truncation alone is labelled in the output and never converts a failure into a pass
+- [ ] Hidden-check counts are zero everywhere (`publicHiddenCheckSummary`), including historical/missing summaries
+- [ ] An unexecuted draft survives remount/reload on web (localStorage) and native (SQLite)
+- [ ] Reset starter writes a durable tombstone; the old executed snapshot does not return after remount/restart
+- [ ] An older async draft save cannot land after a newer edit (per-lesson ordering)
+- [ ] `ReviewEvent.assisted` round-trips through SQLite; legacy rows without the column load as unassisted
+- [ ] Lesson screen survives the loading → hydrated transition without a hook-count change
+- [ ] Exported readiness score/label equal the on-screen role-scoped readiness
+- [ ] Workspace bundle download preserves every file path and content
+- [ ] The Evidence stepper step requires an explicitly saved portfolio artifact, separate from lesson achievement
+
+**Pass criteria: 12/12 (native SQLite/share items require device evidence)**
+
+---
+
+## 14. Go / No-Go Gate
 
 **Ship when all items pass.**
 

@@ -13,7 +13,9 @@ ProofPath Code Lab is a production-style workflow trainer, not a full IDE and no
 - `Run file` executes the learner file and shows output. It never completes progress and never captures proof.
 - `Run checks` runs the lesson verifier. Passing checks can complete the Code Lab gate and create a proof artifact.
 - Hidden checks may affect pass/fail, but raw hidden messages, expected values, hidden code, and edge cases must stay redacted. Neither hidden stdout, hidden stderr, nor hidden failure messages are permitted to leak into learner output, terminal transcripts, or proof artifacts.
+- Public hidden-check disclosure policy: ProofPath publishes **no** hidden-check counts, names, messages, expected values, seeds, or internal identities. Grading still uses the full result set internally; every learner-facing summary, persisted attempt, proof artifact, and export carries a zeroed aggregate (`publicHiddenCheckSummary`). This is a product decision, not an authentication claim.
 - Both stdout and stderr buffers have an enforced cumulative cap (512 KB) per run to prevent memory exhaustion and UI lockups from runaway print loops. The cap is instantiated fresh per run and enforced across JS, Python, SQL, and error output paths.
+- Truncation is never reported as success: a run that hits the cap and then throws is still failed, because execution success is tracked explicitly (`executionError`) independently of whether a buffer retained text. A bounded error summary bypasses the output budget so the failure clue stays visible, and the transcript labels truncated output.
 - Terminal transcripts and proof artifacts must consume redacted check data only.
 - Canonical copied output is generated from structured terminal events, not ad hoc strings.
 - Terminal result events include result status, reason, runtime, and exit-style status when a command ran.
@@ -121,6 +123,13 @@ Known limits:
 - The `typecheck` phase reflects a real compiler pass; it is still not "full compiler validation" of a project (single file, ES2015 lib, `strict` off).
 - Type annotations and simple type/interface declarations are stripped only to prepare code for execution, after the type check has run.
 - Lessons may still ask students to capture external project command evidence, such as `npm run typecheck`, but that is separate from the current Code Lab sandbox runtime.
+
+## Editor drafts and exports
+
+- Web editor drafts are stored in `localStorage` under `proofpath.editor_draft.v1.<lessonId>`.
+- Native editor drafts are stored in a dedicated `proofpath-drafts.db` SQLite database, separate from progress/evidence/proof data. A reset writes a tombstone so a remount or restart cannot resurrect the last executed snapshot; writes are serialized per lesson so an older save cannot overwrite a newer edit. Clearing local progress also clears drafts.
+- Portfolio/workspace export on web downloads a real file with the correct name and content. On native this build shares packet **text** through the platform share sheet; it does not attach a named `.md`/`.json` file, and the UI says so. Copy is offered as the reliable alternative, and a dismissed or failed share is reported as such.
+- Native request IDs correlate a result with the run that produced it; they are not an authentication mechanism. A forged message emitted from inside the same run remains an architectural trust limitation of the WebView boundary.
 
 ## Next Sandbox Priorities
 

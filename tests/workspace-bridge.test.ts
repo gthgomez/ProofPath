@@ -93,6 +93,21 @@ describe("result manifest validation", () => {
     expect(validation.problems.join("\n")).toContain("0.9.0");
   });
 
+  it("rejects a manifest from a different task id as wrong-task", () => {
+    const wrongTask = JSON.stringify({
+      taskId: "some-other-workspace",
+      taskVersion: task.version,
+      filesHash: workspaceFilesHash(task),
+      results: [{ commandId: "verify", passed: true }],
+      ranAt: "2026-09-28T12:00:00.000Z"
+    });
+
+    const validation = validateResultManifest(task, wrongTask);
+    expect(validation.status).toBe("wrong-task");
+    expect(validation.passed).toBe(false);
+    expect(validation.problems.join("\n")).toContain("some-other-workspace");
+  });
+
   it("rejects a manifest whose files hash does not match the current workspace as stale", () => {
     // The manifest must be re-verified when the workspace changes: a hash that
     // does not match the current task files is stale, never credited.
