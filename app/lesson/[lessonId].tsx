@@ -638,6 +638,7 @@ export default function LessonDetailScreen(): ReactElement {
           )}
           <CodeLab
             attemptHistory={lessonCodeRunHistory}
+            historicalAchievement={(progress.durableLessonMiniProjectIds ?? []).includes(lesson.id)}
             isSaving={isSaving}
             latestRun={latestCodeRun}
             lessonId={lesson.id}
@@ -645,11 +646,12 @@ export default function LessonDetailScreen(): ReactElement {
             runnerSpec={lesson.workshop.miniProject.runnerSpec}
           />
           {latestPassingCheckRun ? (
-            <SubPanel accessibilityLabel="Code Lab check passed" accessibilityLiveRegion="polite">
+            <SubPanel accessibilityLabel="Code Lab check passed previously" accessibilityLiveRegion="polite">
               <Row>
-                <Badge tone="green">Check passed</Badge>
+                <Badge tone="green">Previously passed</Badge>
                 <Badge tone="amber">Mission closer</Badge>
               </Row>
+              <MutedText>This is an earlier passing run. The current editor may have changed since then; run checks again to verify the current version.</MutedText>
               <SectionTitle>Add evidence now</SectionTitle>
               <BodyText>{lesson.workshop.miniProject.expectedEvidence}</BodyText>
               <MutedText>{lesson.workshop.miniProject.projectConnection}</MutedText>

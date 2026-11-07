@@ -51,7 +51,8 @@ describe("Code Lab journey", () => {
     await clickRunChecks();
 
     // The status card and the "Code Lab check passed" panel both confirm the pass.
-    expect(await screen.findAllByText("Check passed")).toHaveLength(2);
+    expect(await screen.findAllByText("Check passed")).toHaveLength(1);
+    expect(screen.getByText("Previously passed")).toBeInTheDocument();
     expect(__lastSandboxCall()?.runMode).toBe("run_checks");
 
     // The sticky CTA advances now that the mini project is complete.

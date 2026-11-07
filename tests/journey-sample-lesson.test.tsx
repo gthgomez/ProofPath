@@ -48,7 +48,8 @@ describe("sample lesson journey without onboarding", () => {
     // ...then a corrected line passes and records the mini project.
     __setSandboxOutcome("pass");
     await clickRunChecks();
-    expect(await screen.findAllByText("Check passed")).toHaveLength(2);
+    expect(await screen.findAllByText("Check passed")).toHaveLength(1);
+    expect(screen.getByText("Previously passed")).toBeInTheDocument();
 
     // Checkpoint: answer correctly and pass.
     fireEvent.click(screen.getByRole("button", { name: "Checkpoint step" }));

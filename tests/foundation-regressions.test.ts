@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { contentPack } from "@/content/seed";
-import { normalizeCodeRunAttempt } from "@/domain/code-run";
+import { CURRENT_SANDBOX_DISCLOSURE_VERSION, normalizeCodeRunAttempt } from "@/domain/code-run";
 import {
   createInitialProgress,
   ensureProgressProfile,
@@ -46,6 +46,7 @@ function runAttempt(progress: UserProgress, lessonId: string, passed: boolean, r
     hiddenCheckSummary: { total: 0, passed: 0, failed: 0 },
     diagnostics: [],
     terminalTranscript: [],
+    sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
     createdAt: NOW
   });
 }
@@ -144,15 +145,17 @@ describe("PR02: evidence hygiene measures distinct-target coverage", () => {
 
   it("increases coverage across distinct lessons, not repeated attempts", () => {
     let progress = createInitialProgress(NOW);
-    for (const lesson of contentPack.lessons.slice(0, 4)) {
+    // Two targets leave headroom below the 100-point hygiene cap; four would
+    // already saturate it, making the comparison meaningless.
+    for (const lesson of contentPack.lessons.slice(0, 2)) {
       progress = recordCodeRunAttempt(progress, runAttempt(progress, lesson.id, true), NOW);
     }
-    const fourLessons = calculateReadinessScore(contentPack, progress).breakdown.evidenceHygiene;
+    const twoLessons = calculateReadinessScore(contentPack, progress).breakdown.evidenceHygiene;
 
-    progress = recordCodeRunAttempt(progress, runAttempt(progress, contentPack.lessons[4].id, true), NOW);
-    const fiveLessons = calculateReadinessScore(contentPack, progress).breakdown.evidenceHygiene;
+    progress = recordCodeRunAttempt(progress, runAttempt(progress, contentPack.lessons[2].id, true), NOW);
+    const threeLessons = calculateReadinessScore(contentPack, progress).breakdown.evidenceHygiene;
 
-    expect(fiveLessons).toBeGreaterThan(fourLessons);
+    expect(threeLessons).toBeGreaterThan(twoLessons);
   });
 });
 
