@@ -14,7 +14,7 @@ import {
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle, SubPanel } from "@/ui/primitives";
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
-import { copyToClipboard, downloadTextFile, shareText } from "@/ui/file-transfer";
+import { copyToClipboard, downloadTextFile, shareFile, shareText } from "@/ui/file-transfer";
 import { colors, radius, spacing } from "@/ui/theme";
 
 const WORKSPACE_TASKS: WorkspaceTask[] = [
@@ -93,14 +93,17 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
 
   async function handleExport(): Promise<void> {
     const content = serializeWorkspaceBundle(bundle);
-    const outcome = Platform.OS === "web"
+    let outcome = Platform.OS === "web"
       ? await downloadTextFile(bundle.fileName, content, "application/json")
-      : await shareText(task.title, content);
+      : await shareFile(bundle.fileName, content, "application/json");
+    if (Platform.OS !== "web" && outcome === "unsupported") {
+      outcome = await shareText(task.title, content);
+    }
 
     if (outcome === "downloaded") {
       setTransferStatus(`Downloaded ${bundle.fileName}. Reconstruct the files, preserving paths.`);
     } else if (outcome === "shared") {
-      setTransferStatus("Opened the share sheet with the workspace bundle text. File attachment is not available in this build; use Copy workspace text and save it yourself, preserving paths.");
+      setTransferStatus(`Opened the share sheet with ${bundle.fileName}. Choose a destination to save the workspace file; closing the sheet cancels it.`);
     } else if (outcome === "dismissed") {
       setTransferStatus("Share cancelled. Nothing was exported; use Copy workspace text instead.");
     } else if (outcome === "failed") {
@@ -140,7 +143,9 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
       reflection: undefined
     });
 
-    setSavedStatus(saved ? "Saved as self-reported evidence linked to this project." : "Could not save evidence.");
+    setSavedStatus(saved
+      ? "Saved as self-reported evidence linked to this project. Next: open the mission to see which evidence requirements are still missing before it can complete."
+      : "Could not save evidence.");
   }
 
   return (
@@ -243,6 +248,9 @@ function WorkspaceDetail({ task }: { task: WorkspaceTask }): ReactElement {
         <Panel>
           <SectionTitle>Linked project evidence</SectionTitle>
           <MutedText>{relatedEvidence.length} saved evidence item{relatedEvidence.length === 1 ? "" : "s"} for this project.</MutedText>
+          <MutedText>
+            The mission completes only when its own checklist is satisfied by coherent evidence from one submission. A verifier success on this screen is a record, not a signature.
+          </MutedText>
           <Link href={{ pathname: "/mission/[missionId]", params: { missionId: task.linkedMissionId } }} asChild>
             <ButtonShell accessibilityHint="Opens the linked project mission." tone="teal" variant="secondary">
               Open linked mission

@@ -46,6 +46,7 @@ export default function LessonDetailScreen(): ReactElement {
   const [visitedSteps, setVisitedSteps] = useState<LessonWorkflowStep[]>(["understand"]);
   const [practiceOutputs, setPracticeOutputs] = useState<Record<string, { output: string; running: boolean }>>({});
   const [practiceCodes, setPracticeCodes] = useState<Record<string, string>>({});
+  const [practiceHandoff, setPracticeHandoff] = useState<{ code: string; token: number } | null>(null);
 
   const handleRunPractice = async (key: string, code: string) => {
     if (!lesson?.workshop.miniProject.runnerSpec) return;
@@ -76,7 +77,13 @@ export default function LessonDetailScreen(): ReactElement {
         return;
       }
 
-      finish("This language runs on-device in the Code Lab step below. Open Code Lab and use Run file to experiment with the same sandbox.");
+      // Reuse the Code Lab's supported runtime instead of pretending the
+      // restricted offline runner can execute this language. The edited code
+      // is handed to the editor; nothing is graded until the learner runs
+      // checks there.
+      setPracticeHandoff({ code, token: Date.now() });
+      setCurrentStep("apply");
+      finish("This language runs in the Code Lab on this device. Your practice code is loaded there. Practice runs are not graded; use Run checks when you are ready.");
       return;
     }
 
@@ -418,6 +425,7 @@ export default function LessonDetailScreen(): ReactElement {
                   multiline
                   autoCapitalize="none"
                   autoCorrect={false}
+                  accessibilityLabel="Practice code editor"
                   style={[styles.codeBlock, styles.practiceInput]}
                   value={practiceCodes["main"] ?? ""}
                   onChangeText={(text) => setPracticeCodes((prev) => ({ ...prev, main: text }))}
@@ -433,6 +441,22 @@ export default function LessonDetailScreen(): ReactElement {
                   style={{ alignSelf: "flex-start", marginVertical: spacing.xs }}
                 >
                   {practiceOutputs["main"]?.running ? "Running..." : "▶ Run starter code"}
+                </ButtonShell>
+                <ButtonShell
+                  accessibilityHint="Copies the practice code into the Code Lab editor without running checks or granting an achievement."
+                  onPress={() => {
+                    setPracticeHandoff({
+                      code: practiceCodes["main"] ?? lesson.workshop.practice.starterCode,
+                      token: Date.now()
+                    });
+                    setCurrentStep("apply");
+                  }}
+                  size="compact"
+                  tone="blue"
+                  variant="secondary"
+                  style={{ alignSelf: "flex-start", marginVertical: spacing.xs }}
+                >
+                  Open this code in Code Lab
                 </ButtonShell>
                 {practiceOutputs["main"]?.output ? (
                   <View>
@@ -455,6 +479,7 @@ export default function LessonDetailScreen(): ReactElement {
                   multiline
                   autoCapitalize="none"
                   autoCorrect={false}
+                  accessibilityLabel="Practice code editor"
                   style={[styles.codeBlock, styles.practiceInput]}
                   value={practiceCodes["main"] ?? ""}
                   onChangeText={(text) => setPracticeCodes((prev) => ({ ...prev, main: text }))}
@@ -638,6 +663,7 @@ export default function LessonDetailScreen(): ReactElement {
           )}
           <CodeLab
             attemptHistory={lessonCodeRunHistory}
+            handoff={practiceHandoff}
             historicalAchievement={(progress.durableLessonMiniProjectIds ?? []).includes(lesson.id)}
             isSaving={isSaving}
             latestRun={latestCodeRun}

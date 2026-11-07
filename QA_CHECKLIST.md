@@ -163,15 +163,36 @@
 - [ ] A v10 SQLite fixture upgrades to v11 without losing lessons, evidence, attempts, or review rows; assisted is null for legacy and true round-trips
 - [ ] A backup round-trip preserves profile, achievements, placement, attempts, evidence, reviews/assistance, reports, and draft/reset state
 - [ ] Malformed, wrong-format, newer-version, oversized, and invalid backups are rejected before mutation; restore requires confirmation
-- [ ] Native Copy uses the platform clipboard; web Copy/Download remain functional
+- [ ] Native Copy uses the SDK-matched `expo-clipboard` module; web Copy/Download remain functional
 - [ ] Real-browser journey passes (`scripts/e2e-web-journey.mjs`): incorrect→fail, corrected→pass, edit→unverified, reload→draft+achievement, downloads verified
-- [ ] `npm audit --include=dev` (23: 1 low/12 moderate/10 high) and `npm audit --omit=dev` (19: 1/10/8) are both acknowledged; no forced Expo major upgrade
+- [ ] `npm audit --include=dev` (22: 1 low/11 moderate/10 high) and `npm audit --omit=dev` (18: 1/9/8) are both acknowledged; no forced Expo major upgrade
 
 **Pass criteria: 13/13 (physical-device clipboard/share and SQLite restart still require device evidence)**
 
 ---
 
-## 15. Go / No-Go Gate
+## 16. Reliability Closure (2026-11-07 continuation)
+
+- [ ] Restore and reset confirmations are real modals on web and native; Escape/cancel changes nothing; confirm fires at most once
+- [ ] Restore stages a durable journal; drafts require durable writes; a failed draft or progress write preserves the previous state
+- [ ] A process termination between restore stages is recovered deterministically on the next launch
+- [ ] Export refuses a backup above the shared import limit instead of producing an unrestorable "complete" backup
+- [ ] An imported backup cannot bypass disclosure validation with `sandboxDisclosureVersion`, a passing grade, or an `auto_verified_code_lab` label
+- [ ] Imported attempts do not promote durable achievements; imported proofs are labelled "restored from backup" and are self-reported
+- [ ] Native results with duplicate IDs, a wrong visible-result count, no visible result, or a non-finite score are rejected
+- [ ] Both providers expose `placement` only; placement never awards completion or Code Lab verification
+- [ ] Web Python/SQL/JavaScript/TypeScript execute in disposable Workers; timeout terminates and the next run succeeds
+- [ ] TypeScript typechecking runs in the Worker and still reports real compiler diagnostics
+- [ ] `scripts/e2e-web-journey.mjs` passes: journey, backup download/reset/file import/restore, cancel, invalid input, restored provenance, offline reload
+- [ ] `scripts/e2e-runtime-matrix.mjs` passes: Python/SQL/JS/TS, Python and SQL timeout termination, recovery, TypeScript diagnostics
+- [ ] `npm run build:web` generates `dist/sw.js`; offline reload and lesson navigation work after installation
+- [ ] Native file export/import and clipboard behavior are verified on a physical device or emulator (otherwise listed as unverified)
+
+**Pass criteria: 14/14 (device rows require device evidence)**
+
+---
+
+## 17. Go / No-Go Gate
 
 **Ship when all items pass.**
 

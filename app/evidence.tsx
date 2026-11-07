@@ -13,7 +13,7 @@ import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTit
 import { useOnboardingGate } from "@/ui/onboarding-guard";
 import { useProgress } from "@/state/progress-provider";
 import { generateReviewerPortfolioExport } from "@/domain/evidence-export";
-import { copyToClipboard, downloadTextFile, shareText } from "@/ui/file-transfer";
+import { copyToClipboard, downloadTextFile, shareFile, shareText } from "@/ui/file-transfer";
 import { colors, radius, spacing } from "@/ui/theme";
 
 export default function EvidenceLogScreen(): ReactElement {
@@ -33,6 +33,7 @@ export default function EvidenceLogScreen(): ReactElement {
   const [showProofDetails, setShowProofDetails] = useState(false);
   const [manualDeveloperMode, setManualDeveloperMode] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const [packetPreview, setPacketPreview] = useState<string | null>(null);
   const isGitDone = isGitTrackCompleted(contentPack, progress);
   const developerModeActive = isGitDone || manualDeveloperMode;
   const roleMissions = getMissionsForRole(contentPack, roleTarget.id);
@@ -50,14 +51,17 @@ export default function EvidenceLogScreen(): ReactElement {
 
   const handleExportPacket = async (format: "markdown" | "json"): Promise<void> => {
     const { fileName, content, mimeType } = packetContents(format);
-    const outcome = Platform.OS === "web"
+    let outcome = Platform.OS === "web"
       ? await downloadTextFile(fileName, content, mimeType)
-      : await shareText("ProofPath portfolio", content);
+      : await shareFile(fileName, content, mimeType);
+    if (Platform.OS !== "web" && outcome === "unsupported") {
+      outcome = await shareText("ProofPath portfolio", content);
+    }
 
     if (outcome === "downloaded") {
       setCopyStatus(`Downloaded ${fileName}.`);
     } else if (outcome === "shared") {
-      setCopyStatus("Opened the share sheet with the packet text. File attachment is not available in this build; use Copy to keep the full packet.");
+      setCopyStatus(`Opened the share sheet with ${fileName}. Choose a destination to save the file; closing the sheet cancels it.`);
     } else if (outcome === "dismissed") {
       setCopyStatus("Share cancelled. Nothing was exported; use Copy to keep the packet.");
     } else if (outcome === "failed") {
@@ -65,6 +69,18 @@ export default function EvidenceLogScreen(): ReactElement {
     } else {
       setCopyStatus("This platform cannot share files directly. Use Copy instead.");
     }
+  };
+
+  const handlePreviewPacket = (): void => {
+    if (packetPreview) {
+      setPacketPreview(null);
+      return;
+    }
+    const packet = generateReviewerPortfolioExport(contentPack, progress).markdownPacket;
+    const limit = 6000;
+    setPacketPreview(packet.length > limit
+      ? `${packet.slice(0, limit)}\n\n[...preview truncated. The exported file contains the complete packet.]`
+      : packet);
   };
 
   const handleCopyPacket = async (format: "markdown" | "json"): Promise<void> => {
@@ -227,6 +243,16 @@ export default function EvidenceLogScreen(): ReactElement {
             {Platform.OS === "web" ? "Download JSON packet" : "Share JSON text"}
           </ButtonShell>
           <ButtonShell
+            accessibilityHint={packetPreview ? "Hides the reviewer packet preview." : "Shows the reviewer packet before you export it."}
+            accessibilityLabel="Preview Markdown Packet"
+            onPress={handlePreviewPacket}
+            size="compact"
+            tone="ink"
+            variant="secondary"
+          >
+            {packetPreview ? "Hide packet preview" : "Preview packet"}
+          </ButtonShell>
+          <ButtonShell
             accessibilityHint="Copies the Markdown packet to the clipboard. This is a copy, not a file export."
             accessibilityLabel="Copy Markdown Packet"
             onPress={() => handleCopyPacket("markdown")}
@@ -248,6 +274,15 @@ export default function EvidenceLogScreen(): ReactElement {
           </ButtonShell>
         </Row>
         {copyStatus ? <MutedText style={{ color: colors.teal, fontWeight: "600" }}>{copyStatus}</MutedText> : null}
+        {packetPreview ? (
+          <SubPanel accessibilityLabel="Reviewer packet preview">
+            <SectionTitle>Reviewer packet preview</SectionTitle>
+            <MutedText>
+              Check the classification, command, revision, date, and result for each entry. Locally verified means ProofPath ran it; everything else is self-reported.
+            </MutedText>
+            <Text selectable style={styles.packetPreview}>{packetPreview}</Text>
+          </SubPanel>
+        ) : null}
         <SectionTitle>Add evidence</SectionTitle>
         {roleMissions.length > 0 ? (
           <Row>
@@ -528,6 +563,17 @@ export default function EvidenceLogScreen(): ReactElement {
 }
 
 const styles = StyleSheet.create({
+  packetPreview: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    color: colors.text,
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+    fontSize: 12,
+    lineHeight: 18,
+    padding: spacing.sm
+  },
   input: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,

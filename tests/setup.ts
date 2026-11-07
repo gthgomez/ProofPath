@@ -1,4 +1,8 @@
 import "@testing-library/jest-dom/vitest";
+
+// Expo modules expect React Native's compile-time global. Tests run the web
+// implementations, but the modules still read it at import time.
+(globalThis as typeof globalThis & { __DEV__?: boolean }).__DEV__ = false;
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 import { runInNewContext } from "node:vm";

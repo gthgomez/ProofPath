@@ -15,6 +15,8 @@ export interface ReviewedEvidenceEntry {
   commitHash?: string;
   verifierOutput?: string;
   reflection?: string;
+  /** Present when the record was restored from a learner-supplied backup. */
+  importedAt?: string;
   createdAt: string;
 }
 
@@ -62,13 +64,16 @@ function toEntry(item: EvidenceItem): ReviewedEvidenceEntry {
     id: item.id,
     title: item.title,
     trust: item.trust ?? "manual_note",
-    trustLabel: evidenceTrustLabel(item.trust),
+    trustLabel: item.importedAt
+      ? `${evidenceTrustLabel(item.trust)} (restored from backup; not re-executed here)`
+      : evidenceTrustLabel(item.trust),
     testStatus: item.testStatus,
     command: safeProof?.command,
     repoUrl: item.repoUrl,
     commitHash: item.commitHash,
     verifierOutput: safeProof ? formatProofArtifactVerifierOutput(safeProof) : item.verifierOutput,
     reflection: item.reflection ?? item.body,
+    ...(item.importedAt ? { importedAt: item.importedAt } : {}),
     createdAt: item.createdAt
   };
 }
@@ -99,7 +104,8 @@ function safeProofArtifact(proof: ProofArtifact): ProofArtifact {
     codeHash: safe.codeHash,
     ...(safe.codeSnapshot ? { codeSnapshot: safe.codeSnapshot } : {}),
     terminalTranscript: safe.terminalTranscript,
-    ...(safe.sandboxDisclosureVersion !== undefined ? { sandboxDisclosureVersion: safe.sandboxDisclosureVersion } : {})
+    ...(safe.sandboxDisclosureVersion !== undefined ? { sandboxDisclosureVersion: safe.sandboxDisclosureVersion } : {}),
+    ...(safe.importedAt ? { importedAt: safe.importedAt } : {})
   };
 }
 
@@ -131,7 +137,8 @@ function safeEvidenceItem(item: EvidenceItem): EvidenceItem {
     ...(safeVerifierOutput ? { verifierOutput: safeVerifierOutput } : {}),
     ...(item.reflection ? { reflection: item.reflection } : {}),
     ...(safeProof ? { proofArtifact: safeProof } : {}),
-    ...(item.trust ? { trust: item.trust } : {})
+    ...(item.trust ? { trust: item.trust } : {}),
+    ...(item.importedAt ? { importedAt: item.importedAt } : {})
   };
 }
 
@@ -264,6 +271,9 @@ export function generateReviewerPortfolioExport(
 
   markdownSections.push(
     `## Limitations`,
+    ...(evidenceItems.some((item) => item.importedAt)
+      ? [`- Some evidence was restored from a learner-supplied backup. ProofPath did not re-execute those checks on this device, so their local-verification claim was downgraded.`]
+      : []),
     `- Only entries classified as "Locally verified (Code Lab)" were executed by ProofPath.`,
     `- Reproduction packages, pasted check output, and notes are self-reported and have not been independently verified.`,
     `- The readiness score is a practice-progress heuristic, not a validated hiring prediction.`,

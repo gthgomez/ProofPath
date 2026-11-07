@@ -116,19 +116,19 @@ ProofPath includes a **Learner Sandbox with Defensive Guardrails** for run-testi
 ### Two execution surfaces
 
 * **Mobile (native restricted runner):** A lightweight, regex-based offline Python verifier that parses basic assignments and assertions. Standard control structures (like `if`, `for`, `def`) are intentionally unsupported in this offline fallback. If written, they fail gracefully with clean diagnostic errors instead of throwing crashes.
-* **Web (WebView + Pyodide WASM):** The full Python execution path. Intermediate lessons requiring complete control flow require this browser-based Pyodide environment, so lesson depth differs between mobile and web by design.
-* **SQL:** Runs through the sql.js WASM sandbox on both surfaces.
+* **Web (disposable Workers + Pyodide/sql.js):** The full Python and SQL execution path. Each language runtime runs in its own Worker, so a timeout calls `terminate()` and actually stops the computation instead of leaving it running in the page. Runtime assets are same-origin and offline-capable after first use. Intermediate lessons requiring complete control flow use this browser runtime, so lesson depth differs between mobile and web by design.
+* **SQL:** Runs through the sql.js WASM sandbox in a Worker on web and through the native WebView runtime on device.
 
 Track depth remains uneven — the Python track is the deepest — but the SQL and TypeScript tracks are no longer thin: the SQL track was deepened to 8 lessons and the TypeScript and Git tracks were added with runnable mini-projects (see `npm run report:content`).
 
-* **TypeScript Type Checking:** Runs the real TypeScript compiler (bundled as an offline sandbox asset, ~9 MB) against the learner's file before execution, so type errors fail the check with a line-numbered diagnostic instead of being silently stripped. Checking covers the single submitted file against the ES2015 standard library plus a `console` prelude — it is not a project build, and `strict` is off.
+* **TypeScript Type Checking:** Runs the real TypeScript compiler (bundled as an offline sandbox asset, ~9 MB) against the learner's file before execution, inside the same disposable Worker that runs the file, so type errors fail the check with a line-numbered diagnostic and a pathological compile cannot block the UI. Checking covers the single submitted file against the ES2015 standard library plus a `console` prelude — it is not a project build, and `strict` is off.
 * **API Redaction & Policies:** Explicitly blocks standard browser network calls (like `fetch`), DOM mutations, and malicious filesystem/database operations before execution, providing beginner-focused diagnostic hints instead of generic failures.
 
 ---
 
 ## 6. Verification Commands
 
-Automated checks cover content integrity, sandbox policy, type safety, and the unit/integration test suite. The workspace journey test additionally generates the shipped project into a temporary directory and executes its real Python verifier (with the real TypeScript compiler). Coverage is still not complete across every surface: native device behaviour and the readiness heuristic's real-world calibration are not automatically verified. Current test totals live in CI rather than in prose — see the latest hosted [Actions runs](https://github.com/gthgomez/ProofPath/actions) for per-run results. You can execute these checks from your terminal:
+Automated checks cover content integrity, sandbox policy, type safety, and the unit/integration test suite. The workspace journey test additionally generates the shipped project into a temporary directory and executes its real Python verifier (with the real TypeScript compiler). A hosted Chromium job exercises the exported app against the real worker runtimes, backup/restore, and offline shell. Coverage is still not complete across every surface: native device behaviour and the readiness heuristic's real-world calibration are not automatically verified. Current test totals live in CI rather than in prose — see the latest hosted [Actions runs](https://github.com/gthgomez/ProofPath/actions) for per-run results. You can execute these checks from your terminal:
 
 * **Validate Content Integrity:** Compares the curriculum seed files against Zod schemas and reference locks.
   ```bash
@@ -153,6 +153,15 @@ Automated checks cover content integrity, sandbox policy, type safety, and the u
 * **Full Verification Pipeline:** Executes content verification, content reports, sandbox checks, typechecking, and tests sequentially.
   ```bash
   npm run verify
+  ```
+* **Web Build With Offline Shell:** Exports the web app and generates a versioned service worker that precaches the app shell and runtime-caches sandbox assets.
+  ```bash
+  npm run build:web
+  ```
+* **Real-Browser Gates:** Runs the exported app in Chromium for the learner journey (checks, drafts, backup/restore, provenance, offline) and the runtime matrix (real Python/SQL/JS/TypeScript execution, timeout termination, and recovery).
+  ```bash
+  npx playwright install chromium
+  npm run test:e2e
   ```
 
 ---

@@ -122,6 +122,51 @@ describe("native result integrity binding", () => {
     });
   });
 
+  it("rejects duplicate result identities", () => {
+    expect(validateNativeWebViewResult(attempt({
+      testResults: [
+        { id: "visible", name: "Prints ok", passed: true, visible: true, message: "Passed" },
+        { id: "visible", name: "Prints ok again", passed: true, visible: true, message: "Passed" }
+      ]
+    }), request(), "req-active-1")).toEqual({
+      ok: false,
+      reason: "duplicate-results"
+    });
+  });
+
+  it("rejects a pass with no visible result or the wrong visible result count", () => {
+    expect(validateNativeWebViewResult(attempt({
+      testResults: [{ id: "hidden", name: "Private", passed: true, visible: false, message: "" }]
+    }), request(), "req-active-1")).toEqual({
+      ok: false,
+      reason: "empty-visible-results"
+    });
+
+    expect(validateNativeWebViewResult(attempt({
+      testResults: []
+    }), request(), "req-active-1")).toEqual({
+      ok: false,
+      reason: "empty-results"
+    });
+
+    expect(validateNativeWebViewResult(attempt({
+      testResults: [
+        { id: "visible", name: "Prints ok", passed: true, visible: true, message: "Passed" },
+        { id: "extra", name: "Extra", passed: true, visible: true, message: "Passed" }
+      ]
+    }), request(), "req-active-1")).toEqual({
+      ok: false,
+      reason: "visible-result-count-mismatch"
+    });
+  });
+
+  it("rejects a non-finite score", () => {
+    expect(validateNativeWebViewResult(attempt({ passed: false, score: Number.NaN }), request(), "req-active-1")).toEqual({
+      ok: false,
+      reason: "invalid-score"
+    });
+  });
+
   it("accepts a genuine failing check and a plain file run", () => {
     expect(validateNativeWebViewResult(attempt({
       passed: false,

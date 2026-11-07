@@ -403,7 +403,8 @@ export const quizAttemptSchema = z.object({
   selectedChoiceIndexes: z.array(z.number().int().nonnegative()),
   score: z.number().min(0).max(100),
   passed: z.boolean(),
-  attemptedAt: nonEmptyString
+  attemptedAt: nonEmptyString,
+  importedAt: z.string().optional()
 });
 
 export const codeRunAttemptSchema = z.object({
@@ -423,6 +424,7 @@ export const codeRunAttemptSchema = z.object({
   diagnostics: z.array(problemDiagnosticSchema).default([]),
   terminalTranscript: z.array(terminalEventSchema).default([]),
   sandboxDisclosureVersion: z.number().int().nonnegative().optional(),
+  importedAt: z.string().optional(),
   createdAt: nonEmptyString
 });
 
@@ -445,7 +447,8 @@ export const proofArtifactSchema = z.object({
   codeHash: nonEmptyString,
   codeSnapshot: z.string().optional(),
   terminalTranscript: z.array(terminalEventSchema),
-  sandboxDisclosureVersion: z.number().int().nonnegative().optional()
+  sandboxDisclosureVersion: z.number().int().nonnegative().optional(),
+  importedAt: z.string().optional()
 });
 
 export const projectMissionSchema = z.object({
@@ -493,6 +496,7 @@ export const evidenceItemSchema = z.object({
     "manual_note",
     "independently_verified"
   ]).default("manual_note"),
+  importedAt: z.string().optional(),
   createdAt: nonEmptyString
 });
 

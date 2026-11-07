@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { downloadTextFile } from "@/ui/file-transfer";
+import * as ExpoClipboard from "expo-clipboard";
+import { Platform } from "react-native";
+import { copyToClipboard, downloadTextFile } from "@/ui/file-transfer";
 import { studyTrackerFullJourneyTask } from "@/content/workspace-tasks";
 import { createWorkspaceBundle, serializeWorkspaceBundle } from "@/domain/workspace-bridge";
 
@@ -26,6 +28,53 @@ function stubDownloadEnvironment() {
 
   return { anchors, createObjectURL, revokeObjectURL };
 }
+
+vi.mock("expo-clipboard", () => ({
+  setStringAsync: vi.fn(async () => undefined)
+}));
+
+describe("clipboard", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("uses the browser clipboard on web", async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(globalThis.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText }
+    });
+
+    await expect(copyToClipboard("packet text")).resolves.toBe("clipped");
+    expect(writeText).toHaveBeenCalledWith("packet text");
+  });
+
+  it("uses the supported Expo clipboard module on native", async () => {
+    const originalOs = Platform.OS;
+    Object.defineProperty(Platform, "OS", { configurable: true, value: "android" });
+    const setStringAsync = vi.mocked(ExpoClipboard.setStringAsync);
+    setStringAsync.mockClear();
+
+    try {
+      await expect(copyToClipboard("native packet")).resolves.toBe("clipped");
+      expect(setStringAsync).toHaveBeenCalledWith("native packet");
+    } finally {
+      Object.defineProperty(Platform, "OS", { configurable: true, value: originalOs });
+    }
+  });
+
+  it("reports a clipboard failure instead of false success", async () => {
+    const originalOs = Platform.OS;
+    Object.defineProperty(Platform, "OS", { configurable: true, value: "android" });
+    vi.mocked(ExpoClipboard.setStringAsync).mockRejectedValueOnce(new Error("clipboard unavailable"));
+
+    try {
+      await expect(copyToClipboard("native packet")).resolves.toBe("failed");
+    } finally {
+      Object.defineProperty(Platform, "OS", { configurable: true, value: originalOs });
+    }
+  });
+});
 
 describe("web file download", () => {
   afterEach(() => {

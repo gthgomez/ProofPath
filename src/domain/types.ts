@@ -264,6 +264,11 @@ export interface CodeRunAttempt {
    * their raw output cannot be assumed safe to publish.
    */
   sandboxDisclosureVersion?: number;
+  /**
+   * Set when the record was restored from a learner-supplied backup. Imported
+   * records are never treated as execution performed by this device.
+   */
+  importedAt?: string;
   createdAt: string;
 }
 
@@ -299,6 +304,8 @@ export interface QuizAttempt {
   score: number;
   passed: boolean;
   attemptedAt: string;
+  /** Set when restored from a backup; not executed by this device. */
+  importedAt?: string;
 }
 
 export interface ProjectMission {
@@ -356,6 +363,8 @@ export interface EvidenceItem {
   reflection?: string;
   proofArtifact?: ProofArtifact;
   trust?: EvidenceTrustClassification;
+  /** Set when this evidence came from an imported backup, not this device. */
+  importedAt?: string;
   createdAt: string;
 }
 
@@ -380,6 +389,8 @@ export interface ProofArtifact {
   terminalTranscript: TerminalEvent[];
   /** Same disclosure marker as the originating run attempt. */
   sandboxDisclosureVersion?: number;
+  /** Set when the artifact was restored from an imported backup. */
+  importedAt?: string;
 }
 
 export interface UserProfile {

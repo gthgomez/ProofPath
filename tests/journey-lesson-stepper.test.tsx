@@ -82,6 +82,20 @@ describe("lesson stepper journey", () => {
     expect(screen.getByRole("button", { name: "Checkpoint step" })).toBeEnabled();
   });
 
+  it("hands edited practice code to the Code Lab without grading it", async () => {
+    renderLessonScreen(LESSON_ID);
+    await continueForward();
+
+    const practiceInput = await screen.findByLabelText("Practice code editor");
+    fireEvent.change(practiceInput, { target: { value: "print('practice transfer')" } });
+    fireEvent.click(screen.getByRole("button", { name: "Open this code in Code Lab" }));
+
+    expect(await screen.findByText("Step 3 of 5: CODE LAB")).toBeInTheDocument();
+    expect(screen.getByLabelText("python code editor")).toHaveValue("print('practice transfer')");
+    // Handoff only moves code; it must not fabricate a passing check.
+    expect(screen.queryByText("Check passed")).not.toBeInTheDocument();
+  });
+
   it("renders fluency reps on a depth-bearing lesson's practice step", async () => {
     // This lesson has a `depth` block and two practice reps. The reps used to
     // render only in the non-depth branch, so depth lessons never saw them.

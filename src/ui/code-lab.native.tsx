@@ -45,7 +45,8 @@ function formatVisibleTestExpectation(expectedOutputIncludes?: string[]): string
   return parts.length ? ` - ${parts.join("; ")}` : "";
 }
 
-export function CodeLab({ attemptHistory = [], historicalAchievement = false, isSaving, latestRun, lessonId, onRunPassed, runnerSpec }: CodeLabProps): ReactElement {
+export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = false, isSaving, latestRun, lessonId, onRunPassed, runnerSpec }: CodeLabProps): ReactElement {
+  const lastHandoffToken = useRef<number | null>(null);
   const webViewRef = useRef<React.ElementRef<typeof WebView>>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,6 +103,18 @@ export function CodeLab({ attemptHistory = [], historicalAchievement = false, is
       cancelled = true;
     };
   }, [runnerSpec.starterCode, lessonId]);
+
+  useEffect(() => {
+    if (!handoff || handoff.token === lastHandoffToken.current) {
+      return;
+    }
+    lastHandoffToken.current = handoff.token;
+    editedRef.current = true;
+    setCode(handoff.code);
+    setRunError(null);
+    setDraftStatus("Practice code loaded. Practice runs are not graded; use Run checks here when you are ready to verify.");
+    void saveEditorDraft(lessonId, handoff.code);
+  }, [handoff, lessonId]);
 
   const persistDraft = (nextCode: string): void => {
     editedRef.current = true;

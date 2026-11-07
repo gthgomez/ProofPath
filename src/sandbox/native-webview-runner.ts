@@ -991,12 +991,31 @@ export function validateNativeWebViewResult(
     return { ok: false, reason: "invalid-timestamp" };
   }
 
+  if (!Number.isFinite(attempt.score)) {
+    return { ok: false, reason: "invalid-score" };
+  }
+
+  const resultIds = attempt.testResults.map((result) => result.id);
+  if (new Set(resultIds).size !== resultIds.length) {
+    return { ok: false, reason: "duplicate-results" };
+  }
+
   if (attempt.runMode === "run_checks" && attempt.passed) {
     if (attempt.testResults.length === 0) {
       return { ok: false, reason: "empty-results" };
     }
     if (attempt.testResults.some((result) => result.visible && !result.passed)) {
       return { ok: false, reason: "contradictory-visible-failure" };
+    }
+    // The webview strips hidden results before sending. A passing message must
+    // therefore contain exactly the visible checks the host asked for; a
+    // missing, extra, or relabelled result is not the run we requested.
+    const visibleResults = attempt.testResults.filter((result) => result.visible);
+    if (visibleResults.length === 0) {
+      return { ok: false, reason: "empty-visible-results" };
+    }
+    if (visibleResults.length !== request.spec.visibleTests.length) {
+      return { ok: false, reason: "visible-result-count-mismatch" };
     }
     if (attempt.score !== 100) {
       return { ok: false, reason: "contradictory-score" };

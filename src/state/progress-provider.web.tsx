@@ -6,7 +6,6 @@ import {
   addEvidenceItem,
   createInitialProgress,
   dismissDashboardTour,
-  fastTrackLessons,
   generateWeeklyReport,
   placementSkip,
   recordCodeRunAttempt,
@@ -16,6 +15,8 @@ import {
   submitQuizAttempt,
   validateEvidenceDraft
 } from "@/domain/progress";
+import { coordinatedProgressRestore, recoverPendingProgressRestore } from "@/domain/progress-restore";
+import type { ProgressBackup } from "@/domain/progress-backup";
 import { calculateReadinessScore } from "@/domain/readiness";
 import { getContentForRole, getRoleTarget } from "@/domain/role-routing";
 import { editorDraftStore } from "@/storage/draft-store";
@@ -51,7 +52,7 @@ interface EvidenceInput {
   reflection?: string;
 }
 
-interface ProgressContextValue {
+export interface ProgressContextValue {
   progress: UserProgress;
   profile: UserProfile;
   roleTarget: RoleTarget;
@@ -67,11 +68,10 @@ interface ProgressContextValue {
   addEvidence: (input: EvidenceInput) => boolean;
   generateWeeklyCareerReport: () => void;
   resetLocalProgress: () => Promise<void>;
-  /** Replace all local progress from a validated backup. Explicit, not a merge. */
-  restoreProgress: (next: UserProgress) => Promise<{ ok: boolean; error?: string }>;
+  restoreBackup: (backup: ProgressBackup) => Promise<{ ok: boolean; error?: string }>;
   dismissTour: () => void;
+  /** Placement only: never awards lesson, quiz, or Code Lab completion. */
   placement: (lessonIds: string[], quizIds: string[]) => void;
-  fastTrack: (lessonIds: string[], quizIds: string[]) => void;
 }
 
 const ProgressContext = createContext<ProgressContextValue | null>(null);
@@ -115,7 +115,7 @@ function createInitialProgressSafe(serializedProgress: string): UserProgress {
   }
 }
 
-function loadWebProgress(): UserProgress {
+function readStoredProgress(): UserProgress {
   if (typeof window === "undefined") {
     return createInitialProgress();
   }
@@ -142,14 +142,25 @@ function loadWebProgress(): UserProgress {
 }
 
 function saveWebProgress(progress: UserProgress): void {
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(WEB_PROGRESS_KEY, JSON.stringify(progress));
+  if (typeof window === "undefined") {
+    throw new Error("Browser storage is unavailable.");
+  }
+  window.localStorage.setItem(WEB_PROGRESS_KEY, JSON.stringify(progress));
+}
+
+/** Write and verify the exact bytes, so a quota failure cannot look like success. */
+function saveWebProgressDurably(progress: UserProgress): void {
+  const serialized = JSON.stringify(progress);
+  saveWebProgress(progress);
+  const readBack = typeof window === "undefined" ? null : window.localStorage.getItem(WEB_PROGRESS_KEY);
+  if (readBack !== serialized) {
+    throw new Error("Browser storage did not retain the restored progress.");
   }
 }
 
 export function ProgressProvider({ children }: PropsWithChildren): ReactElement {
   const [progress, setProgress] = useState<UserProgress>(() => {
-    const storedProgress = loadWebProgress();
+    const storedProgress = readStoredProgress();
     return reconcileDerivedProgress(getContentForRole(contentPack, storedProgress.profile.roleTargetId), storedProgress, storedProgress.updatedAt);
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -159,6 +170,22 @@ export function ProgressProvider({ children }: PropsWithChildren): ReactElement 
   useEffect(() => {
     progressRef.current = progress;
   }, [progress]);
+
+  useEffect(() => {
+    let isMounted = true;
+    // Finish or roll back a restore interrupted between its draft and progress
+    // stages. Progress is already durable; only drafts need reconciliation.
+    void recoverPendingProgressRestore(editorDraftStore, {
+      readUpdatedAt: async () => readStoredProgress().updatedAt
+    }).then((recovery) => {
+      if (isMounted && recovery.error) {
+        setError(recovery.error);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const updateProgress = useCallback((createNextProgress: (currentProgress: UserProgress) => UserProgress): void => {
     const rawNextProgress = createNextProgress(progressRef.current);
@@ -220,9 +247,6 @@ export function ProgressProvider({ children }: PropsWithChildren): ReactElement 
       placement: (lessonIds, quizIds) => {
         updateProgress((currentProgress) => placementSkip(currentProgress, lessonIds, quizIds));
       },
-      fastTrack: (lessonIds, quizIds) => {
-        updateProgress((currentProgress) => fastTrackLessons(currentProgress, lessonIds, quizIds));
-      },
       resetLocalProgress: async () => {
         const initialProgress = createInitialProgress();
         progressRef.current = initialProgress;
@@ -242,18 +266,36 @@ export function ProgressProvider({ children }: PropsWithChildren): ReactElement 
           setError(caughtError instanceof Error ? caughtError.message : "Unable to reset progress.");
         }
       },
-      restoreProgress: async (restored) => {
-        const nextProgress = reconcileDerivedProgress(getContentForRole(contentPack, restored.profile.roleTargetId), restored);
-        progressRef.current = nextProgress;
-        setProgress(nextProgress);
+      restoreBackup: async (backup) => {
+        setIsSaving(true);
         try {
-          saveWebProgress(nextProgress);
-          setError(null);
-          return { ok: true };
-        } catch (caughtError) {
-          const message = caughtError instanceof Error ? caughtError.message : "Unable to restore progress.";
+          const result = await coordinatedProgressRestore({
+            backup,
+            content: contentPack,
+            draftStore: editorDraftStore,
+            progressPort: {
+              readUpdatedAt: async () => readStoredProgress().updatedAt,
+              read: async () => readStoredProgress(),
+              write: async (nextProgress) => saveWebProgressDurably(nextProgress)
+            }
+          });
+
+          if (result.ok && result.progress) {
+            progressRef.current = result.progress;
+            setProgress(result.progress);
+            setError(null);
+            return { ok: true };
+          }
+
+          const message = result.error ?? "Unable to restore the backup.";
           setError(message);
           return { ok: false, error: message };
+        } catch (caughtError) {
+          const message = caughtError instanceof Error ? caughtError.message : "Unable to restore the backup.";
+          setError(message);
+          return { ok: false, error: message };
+        } finally {
+          setIsSaving(false);
         }
       }
     };

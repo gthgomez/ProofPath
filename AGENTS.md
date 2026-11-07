@@ -55,6 +55,10 @@ Never mark work complete without evidence.
 - `npm run verify` owns the aggregate content/type/test gate; inspect package
   scripts and do not rerun every constituent without a diagnostic reason.
   Use individual content/report/redaction/test scripts for diagnosis.
+- Browser behavior needs browser evidence. `npm run build:web` exports the app
+  and generates the offline service worker; `npm run test:e2e` runs the real
+  Chromium learner journey and runtime matrix. Unit tests do not establish
+  worker execution, service-worker offline behavior, or real backups.
 - Rendering, native packaging, export, and device claims need their own
   corresponding evidence; a test passing does not establish physical-device
   behavior.
@@ -137,9 +141,14 @@ is optional.
 
 - **Native regex runner** (`native-python-proof-runner.ts`) — offline fallback,
   basic Python only: NO `if`/`for`/`def`; levels 0–1.
-- **WebView Pyodide runner** (`native-webview-runner.ts`) — full Python via
-  Pyodide WASM; levels 2+.
-- **SQL runner** — sql.js WASM for SQL exercises.
+- **Native WebView runner** (`native-webview-runner.ts`) — full Python, SQL,
+  JavaScript, and TypeScript on device; results are correlated to the active
+  request and shape-validated by the host.
+- **Web worker runtime** (`execution-worker.ts`) — disposable, token-correlated
+  Workers for Pyodide, sql.js, JavaScript, and the real TypeScript typecheck.
+  `terminate()` is the timeout boundary; do not move execution back into the
+  page realm or claim a timeout stopped work it only stopped awaiting.
+- **SQL runner** — sql.js WASM for SQL exercises (worker on web).
 - **Policy** (`src/sandbox/policy.ts`) — blocks network, DOM manipulation, and
   filesystem access in all runners.
 - Runner adapters must agree on the meaning of evidence and rejection cases.

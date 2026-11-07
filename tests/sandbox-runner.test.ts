@@ -15,6 +15,21 @@ import {
 } from "@/sandbox/runner";
 
 describe("lesson sandbox runner", () => {
+  it("rejects an oversized submission before parsing it", async () => {
+    const lesson = contentPack.lessons.find((candidate) => candidate.id === "lesson-python-values")!;
+    const result = await runLessonSandbox(
+      lesson.workshop.miniProject.runnerSpec,
+      lesson.id,
+      "x".repeat(20_001),
+      "2026-11-07T12:00:00.000Z"
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.stderr).toMatch(/too large/i);
+    expect(result.testResults[0]?.id).toBe("policy-max-code-length");
+    expect(result.runtimeMs).toBeLessThan(2000);
+  });
+
   beforeAll(() => {
     // The TypeScript runner imports its compiler through the same Node test seam
     // the Python and SQL runners use; the sandbox's `new Function` dynamic import

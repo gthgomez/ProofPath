@@ -33,7 +33,13 @@ export const CURRENT_SANDBOX_DISCLOSURE_VERSION = 2;
 export const LEGACY_OUTPUT_QUARANTINE_NOTICE =
   "Legacy sandbox output withheld because it predates per-check disclosure boundaries. Visible check results and the learner's own code are preserved; raw stdout, stderr, diagnostics, and terminal text are omitted.";
 
-function hasTrustedDisclosure(version: number | undefined): boolean {
+function hasTrustedDisclosure(version: number | undefined, importedAt: string | undefined): boolean {
+  // A marker that arrived inside a backup is an assertion by the document, not
+  // evidence that this device's sanitizing runner produced the buffer. Imported
+  // records are always quarantined regardless of the supplied version.
+  if (importedAt) {
+    return false;
+  }
   return typeof version === "number" && version >= CURRENT_SANDBOX_DISCLOSURE_VERSION;
 }
 
@@ -208,7 +214,7 @@ export function normalizeCodeRunAttempt(attempt: Partial<CodeRunAttempt> & Pick<
   // Deliberately ignore any supplied summary: the public policy is zero counts.
   // A sanitized aggregate passed by an older runner must not resurrect counts.
   const hiddenCheckSummary = publicHiddenCheckSummary();
-  const trustedDisclosure = hasTrustedDisclosure(attempt.sandboxDisclosureVersion);
+  const trustedDisclosure = hasTrustedDisclosure(attempt.sandboxDisclosureVersion, attempt.importedAt);
 
   // A supplied terminalTranscript is never trusted on its own: it may be a
   // legacy transcript that embedded hidden stdout/stderr. Even with a trusted
@@ -255,7 +261,7 @@ export function normalizeCodeRunAttempt(attempt: Partial<CodeRunAttempt> & Pick<
  * their raw buffers and gain an explanatory transcript event.
  */
 export function sanitizeProofArtifactForDisclosure(proof: ProofArtifact): ProofArtifact {
-  if (hasTrustedDisclosure(proof.sandboxDisclosureVersion)) {
+  if (hasTrustedDisclosure(proof.sandboxDisclosureVersion, proof.importedAt)) {
     return proof;
   }
 
@@ -419,7 +425,7 @@ export function createProofArtifactFromAttempt(attempt: CodeRunAttempt, missionI
     stderr: normalizedAttempt.stderr,
     visibleCheckResults: normalizedAttempt.testResults,
     hiddenCheckSummary: normalizedAttempt.hiddenCheckSummary,
-    codeHash: hashCodeSnapshot(normalizedAttempt.codeSnapshot),
+    codeHash: computeCodeHash(normalizedAttempt.codeSnapshot),
     ...(normalizedAttempt.codeSnapshot.length <= MAX_PROOF_CODE_SNAPSHOT_LENGTH ? { codeSnapshot: normalizedAttempt.codeSnapshot } : {}),
     terminalTranscript: normalizedAttempt.terminalTranscript,
     sandboxDisclosureVersion: normalizedAttempt.sandboxDisclosureVersion ?? CURRENT_SANDBOX_DISCLOSURE_VERSION
@@ -625,7 +631,7 @@ function phaseStatusForReason(
   return "failed";
 }
 
-function hashCodeSnapshot(code: string): string {
+export function computeCodeHash(code: string): string {
   let hash = 5381;
   for (let index = 0; index < code.length; index += 1) {
     hash = ((hash << 5) + hash) ^ code.charCodeAt(index);

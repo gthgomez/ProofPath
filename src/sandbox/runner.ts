@@ -22,6 +22,12 @@ import {
   type TypeScriptCompiler,
   type TypeScriptTypeCheckResult
 } from "@/sandbox/typescript-typecheck";
+import {
+  canUsePreemptibleSandbox,
+  getSandboxWorkerRuntime,
+  SandboxStartupError,
+  SandboxTerminatedError
+} from "@/sandbox/execution-worker";
 
 type SqlJsModule = {
   Database: new () => {
@@ -793,6 +799,107 @@ async function runJavaScriptLike(spec: LessonRunnerSpec, code: string, runMode: 
   return runJavaScriptInWorker(spec, runtimeCode, runMode);
 }
 
+/**
+ * Browser execution path. Every supported language runs in a disposable Worker,
+ * so a timeout terminates the computation instead of merely abandoning it.
+ * Check semantics stay here: the worker returns raw output for one check and
+ * this function decides pass/fail and which output may be published.
+ */
+async function runPreemptible(
+  spec: LessonRunnerSpec,
+  code: string,
+  runMode: CodeRunMode
+): Promise<RunnerExecution> {
+  const runtime = getSandboxWorkerRuntime(spec.language);
+  // Runtime/assets boot is not learner work, so it is not charged to the
+  // lesson's execution timeout. A boot failure gets its own honest message.
+  await runtime.ensureBooted();
+
+  const deadline = Date.now() + spec.timeoutMs;
+  const remaining = (): number => Math.max(1, deadline - Date.now());
+
+  if (spec.language === "typescript") {
+    assertTypeScriptSourceWithinLimit(code);
+    const typeCheck = await runtime.typecheck(code, defaultFileName("typescript"), remaining());
+    if (typeCheck.diagnostics.length > 0) {
+      return typeCheckFailureResult(spec, runMode, {
+        diagnostics: typeCheck.diagnostics,
+        stderr: typeCheck.stderr,
+        learnerMessage: typeCheck.learnerMessage
+      });
+    }
+  }
+
+  const runtimeCode = spec.language === "typescript" ? stripTypeScript(code) : code;
+
+  if (runMode === "run_file") {
+    const result = await runtime.exec({
+      language: spec.language,
+      code: runtimeCode,
+      mode: "file",
+      setupCode: spec.setupCode
+    }, remaining());
+    return {
+      stdout: result.stdout,
+      stderr: result.stderr,
+      testResults: [],
+      executionError: result.executionError,
+      outputTruncated: result.outputTruncated
+    };
+  }
+
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const capper = createOutputCapper();
+  const testResults: CodeRunTestResult[] = [];
+
+  for (const [index, test] of [...spec.visibleTests, ...spec.hiddenTests].entries()) {
+    const visible = index < spec.visibleTests.length;
+    const harnessCode = spec.language === "sql" && test.code && isTrustedSqlHarness(test.code)
+      ? test.code
+      : undefined;
+    const result = await runtime.exec({
+      language: spec.language,
+      code: runtimeCode,
+      testCode: spec.language === "sql" ? undefined : test.code,
+      harnessCode,
+      setupCode: spec.setupCode,
+      mode: "checks"
+    }, remaining());
+
+    const output = result.stdout;
+    const checkPassed = result.executionError === null && passesOutputCheck(output, test);
+
+    // Hidden checks publish neither their output nor their failure detail.
+    if (visible) {
+      if (output) capper.append(stdout, output);
+      if (result.stderr) capper.append(stderr, result.stderr);
+      if (!checkPassed && !result.stderr) {
+        capper.appendError(stderr, result.executionError ?? "Output missing");
+      }
+    }
+
+    if (checkPassed) {
+      testResults.push(passResult(test, visible));
+    } else {
+      testResults.push(failResult(
+        test,
+        visible,
+        result.executionError ? new Error(result.executionError) : new Error("Output missing"),
+        spec.language
+      ));
+    }
+  }
+
+  return {
+    stdout: stdout.join("\n"),
+    stderr: stderr.join("\n"),
+    testResults,
+    executionError: null,
+    outputTruncated: capper.truncated
+  };
+}
+
 async function getPyodide(): Promise<any> {
   if (pyodideRuntime) {
     return pyodideRuntime;
@@ -1143,6 +1250,10 @@ export async function runLessonSandbox(
   }
 
   const runner = async (): Promise<RunnerExecution> => {
+    if (canUsePreemptibleSandbox()) {
+      return runPreemptible(spec, code, runMode);
+    }
+
     if (runMode === "run_file") {
       if (spec.language === "python") {
         return runPythonFile(code);
@@ -1217,20 +1328,25 @@ export async function runLessonSandbox(
   } catch (error) {
     const rawError = error instanceof Error ? error.message : normalizeOutput(error);
     const errorKind = classifySandboxError(error);
-    const message = errorKind === "timeout"
-      ? formatSandboxTimeoutFeedback(spec.language, spec.timeoutMs, spec.language === "javascript" || spec.language === "typescript")
-      : formatSandboxFailureFeedback({
-        kind: errorKind,
-        language: spec.language,
-        detail: rawError
-      });
+    const terminated = error instanceof SandboxTerminatedError;
+    const startupFailure = error instanceof SandboxStartupError;
+    const sourceTooLarge = /too large to run/i.test(rawError);
+    const message = terminated
+      ? formatSandboxTimeoutFeedback(spec.language, spec.timeoutMs, true)
+      : startupFailure || sourceTooLarge
+        ? rawError
+        : formatSandboxFailureFeedback({
+          kind: errorKind,
+          language: spec.language,
+          detail: rawError
+        });
     const stderrContent = runMode === "run_file" ? rawError : message;
     const runtimeMs = Date.now() - startedAt;
     const diagnostics = buildProblemDiagnostics({
       language: spec.language,
       errorMessage: rawError,
       stderr: stderrContent,
-      timedOut: classifySandboxError(error) === "timeout"
+      timedOut: terminated
     });
     const testResults = runMode === "run_checks" ? [
       {
@@ -1276,6 +1392,12 @@ export async function runLessonSandbox(
 
 export function preloadSandbox(language: string): void {
   if (typeof window === "undefined" || typeof document === "undefined") {
+    return;
+  }
+  if (canUsePreemptibleSandbox() && (language === "python" || language === "sql" || language === "typescript")) {
+    void getSandboxWorkerRuntime(language).ensureBooted().catch((err) => {
+      console.warn("Failed to preload the sandbox worker:", err);
+    });
     return;
   }
   if (language === "python") {

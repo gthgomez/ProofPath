@@ -23,8 +23,11 @@ ProofPath Code Lab is a production-style workflow trainer, not a full IDE and no
 - A versioned disclosure boundary (`sandboxDisclosureVersion`) distinguishes current, source-sanitized output from legacy records. Attempts or proof artifacts without the marker are quarantined on normalization, load, backup, and export: raw stdout, stderr, diagnostics, and terminal text are withheld, visible result text is neutralized, and the already-computed grade plus the learner's code snapshot are preserved. Ambiguous legacy text is never guessed apart.
 - The editor's “Check passed” state requires byte-for-byte equality with the checked snapshot. A previous pass is a separate historical achievement; editing or resetting shows “Unverified changes” until the current draft is re-run.
 - Draft clearing is a generation-fenced barrier: saves issued before a reset are dropped, in-flight writes settle before clearing, and edits issued after the reset survive. Native drafts live in `proofpath-drafts.db`; web drafts use localStorage with an in-memory mirror.
-- SQL results are formatted through an early 512 KB cap, TypeScript diagnostics are capped (200 formatted errors plus a count), and failure messages are bounded. Pyodide and sql.js still run on the main page and cannot be preempted; their timeout text says the UI “stopped waiting” rather than claiming a hard stop.
-- Versioned progress backups (`proofpath-progress-backup` v1) validate before mutation, include drafts and reset tombstones, and require explicit confirmation. A progress backup is not a reviewer portfolio packet.
+- SQL results are formatted through an early 512 KB cap, TypeScript diagnostics are capped (200 formatted errors plus a count), and failure messages are bounded. On web, Python, SQL, JavaScript, and TypeScript all execute in disposable Workers, so a timeout calls `terminate()` and genuinely stops the computation. Runtime/assets boot has its own 45 s allowance and is not charged to the lesson's execution timeout.
+- Versioned progress backups (`proofpath-progress-backup` v1) validate before mutation, include drafts and reset tombstones, and require explicit confirmation. Export and import share a measured 20,000,000-character ceiling, so the app never produces a “complete” backup it cannot restore.
+- Restore is a verified two-phase replacement, not a sequence of independent writes: it stages a durable recovery journal (old and new draft snapshots plus the old/new progress identities), replaces drafts with per-write durability checks and rollback, replaces progress atomically, then clears the journal. A process termination between stages is resolved deterministically at startup by comparing the persisted progress identity.
+- Imported backup records are untrusted input. A disclosure marker, passing grade, `auto_verified_code_lab` label, code hash, or proof identity that arrives inside a document is not evidence that this device executed it. Imported output is quarantined, visible check labels are neutralized, hashes are recomputed from preserved code, attempts are excluded from durable-achievement promotion, and proof-backed evidence is downgraded to self-reported with an explicit “restored from backup” label in the reviewer packet.
+- A progress backup is not a reviewer portfolio packet.
 - Policy blocks are shown as pre-execution blocks; skipped phases are intentional and are not fake failures.
 - Problems diagnostics should use deterministic parser/runtime/policy signals first, then lesson-authored hints.
 - Problems should show line numbers only when known or high-confidence. Otherwise the UI should say `Location unknown`.
@@ -81,6 +84,17 @@ Known limits:
 - Mutation statements are blocked for read-only labs.
 - Diagnostics distinguish SQLite syntax, missing-table, and missing-column failures when the runtime message is deterministic.
 
+## Web execution boundary (all languages)
+
+Current status:
+
+- Python (Pyodide), SQL (sql.js), JavaScript, and TypeScript run in dedicated disposable Workers created from a same-origin Blob. The page realm no longer executes learner code or synchronously compiles TypeScript.
+- A per-run token correlates each worker message; stale or mismatched messages are discarded. A timeout rejects the pending request, terminates the Worker, revokes the Blob URL, and drops the runtime so the next legitimate run boots fresh.
+- Worker startup failure is reported as a startup failure, not as the learner's code timing out. The 45 s boot allowance is separate from the lesson execution timeout.
+- Runtime and library assets are same-origin files under `sandbox-assets/`, so execution remains available offline after the browser has cached the assets (the offline shell service worker runtime-caches them on first use).
+- Worker memory is reclaimed by termination after a timeout or runner error. Successful runtimes are reused to avoid repeated cold boots.
+- In Node-based unit tests, execution intentionally uses the in-process runner so Pyodide/sql.js can be imported directly; the browser path is covered by `scripts/e2e-runtime-matrix.mjs`.
+
 ## JavaScript
 
 Current status:
@@ -103,14 +117,13 @@ Known limits:
 - Diagnostics cover deterministic SyntaxError, ReferenceError, and TypeError signals first.
 - Execution stopping boundaries:
   - Native Android: On timeout, the host terminates execution by destroying and recreating the WebView instance (`setWebViewKey`), resetting runtime state and discarding orphaned results via `requestId`.
-  - Web JavaScript: On timeout, `worker.terminate()` halts the worker thread immediately.
-  - Web Python & SQL: Pyodide and sql.js execute in the browser page context. `Promise.race` enforces an asynchronous timeout boundary and returns failure feedback to the learner, but because single-threaded WebAssembly execution lacks preemptive interruption, an unyielding infinite loop cannot be preempted without dedicated Web Worker threads or a page reload.
+  - Web JavaScript, TypeScript, Python, and SQL: On timeout, `worker.terminate()` halts the worker thread immediately. The browser E2E matrix verifies non-terminating Python and SQL queries, termination feedback, and successful recovery on the next run.
 
 ## TypeScript
 
 Current status:
 
-- TypeScript runs the real compiler (`typecheck`) before execution, then strips annotations for running.
+- TypeScript runs the real compiler (`typecheck`) before execution, then strips annotations for running. On web, the compiler and the standard-library asset load inside the same disposable Worker that runs the file, so a slow or pathological compile cannot block the UI.
 - The compiler is bundled offline in `sandbox-assets/typescript/`; no network access is required.
 - Checking covers the single learner file against the ES2015 standard library plus a `console` prelude. It is not a project build, `strict` is off, and harness test code is not type-checked.
 - UI should describe this as `typecheck + transform + run + verify`.
@@ -133,7 +146,8 @@ Known limits:
 
 - Web editor drafts are stored in `localStorage` under `proofpath.editor_draft.v1.<lessonId>`.
 - Native editor drafts are stored in a dedicated `proofpath-drafts.db` SQLite database, separate from progress/evidence/proof data. A reset writes a tombstone so a remount or restart cannot resurrect the last executed snapshot; writes are serialized per lesson so an older save cannot overwrite a newer edit. Clearing local progress also clears drafts.
-- Portfolio/workspace export on web downloads a real file with the correct name and content. On native this build shares packet **text** through the platform share sheet; it does not attach a named `.md`/`.json` file, and the UI says so. Copy is offered as the reliable alternative, and a dismissed or failed share is reported as such.
+- Portfolio/workspace/progress export on web downloads a real file with the correct name and content. On native, the app writes a named file to app cache with `expo-file-system` and opens the system share sheet with `expo-sharing`; if file sharing is unavailable it falls back to explicitly-labelled text sharing. The share API cannot distinguish a completed share from a dismissed sheet, so the UI says the sheet closed and tells the learner to choose a destination rather than claiming the file was saved.
+- Backup import offers a real file picker on web (a file input whose cancel event resolves) and `expo-document-picker` on native, in addition to the paste field.
 - Native request IDs correlate a result with the run that produced it; they are not an authentication mechanism. A forged message emitted from inside the same run remains an architectural trust limitation of the WebView boundary.
 
 ## Next Sandbox Priorities

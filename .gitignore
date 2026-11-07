@@ -39,6 +39,7 @@ pnpm-debug.log*
 
 # Test runs and temporary artifacts
 runs/
+artifacts/
 ProofPath_Review.zip
 val_err.txt
 

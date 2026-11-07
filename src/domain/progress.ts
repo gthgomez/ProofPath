@@ -331,14 +331,17 @@ export function ensureProgressProfile(progress: StoredProgress, now = new Date()
     ...(progress.durableLessonMiniProjectIds ?? []),
     ...(progress.completedLessonMiniProjectIds ?? []),
     ...(progress.codeRunAttempts ?? [])
-      .filter((attempt) => (attempt.runMode ?? "run_checks") === "run_checks" && attempt.passed)
+      // Imported attempts are assertions from another file. They may keep their
+      // recorded grade and code, but they must not create a durable achievement
+      // this device never executed.
+      .filter((attempt) => !attempt.importedAt && (attempt.runMode ?? "run_checks") === "run_checks" && attempt.passed)
       .map((attempt) => attempt.lessonId)
   ]);
   const durableQuizIds = uniqueValues([
     ...(progress.durableQuizIds ?? []),
     ...(progress.completedQuizIds ?? []),
     ...(progress.quizAttempts ?? [])
-      .filter((attempt) => attempt.passed)
+      .filter((attempt) => attempt.passed && !attempt.importedAt)
       .map((attempt) => attempt.quizId)
   ]);
 

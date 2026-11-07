@@ -1,10 +1,12 @@
 import { z } from "zod";
 import {
+  computeCodeHash,
   formatProofArtifactVerifierOutput,
   normalizeCodeRunAttempt,
   sanitizeProofArtifactForDisclosure
 } from "@/domain/code-run";
-import type { ContentPack, EvidenceItem, UserProgress } from "@/domain/types";
+import { classifyEvidenceTrust } from "@/domain/evidence-trust";
+import type { ContentPack, EvidenceItem, ProofArtifact, UserProgress } from "@/domain/types";
 import { ensureProgressProfile, reconcileDerivedProgress } from "@/domain/progress";
 import { userProgressSchema } from "@/domain/schemas";
 import type { DraftState } from "@/storage/draft-store.shared";
@@ -19,9 +21,34 @@ import type { DraftState } from "@/storage/draft-store.shared";
  */
 export const PROGRESS_BACKUP_FORMAT = "proofpath-progress-backup";
 export const PROGRESS_BACKUP_VERSION = 1;
-export const MAX_PROGRESS_BACKUP_CHARS = 5_000_000;
+
+/**
+ * Measured ceiling shared by export and import.
+ *
+ * The app keeps at most 250 code-run attempts and 250 quiz attempts. A maximal
+ * attempt today is roughly 12 KB of code plus a bounded transcript (~1 KB), so
+ * attempts cost < 4 MB even before evidence. Evidence may duplicate a proof's
+ * buffers, roughly doubling that. Drafts are capped at 200 KB each and 5,000
+ * entries, but real drafts are a few KB. 20 million characters leaves ample
+ * headroom for legitimate history while still refusing a document that cannot
+ * be restored in one operation. The important invariant is that the exporter
+ * rejects the *same* document the importer would reject.
+ */
+export const MAX_PROGRESS_BACKUP_CHARS = 20_000_000;
 const MAX_DRAFT_CODE_CHARS = 200_000;
 const MAX_DRAFT_COUNT = 5_000;
+
+export class ProgressBackupTooLargeError extends Error {
+  readonly characters: number;
+  readonly limit: number;
+
+  constructor(characters: number, limit = MAX_PROGRESS_BACKUP_CHARS) {
+    super(`This backup is ${characters.toLocaleString()} characters, above the ${limit.toLocaleString()}-character restore limit.`);
+    this.name = "ProgressBackupTooLargeError";
+    this.characters = characters;
+    this.limit = limit;
+  }
+}
 
 export type ProgressBackupDraft =
   | { status: "draft"; code: string }
@@ -76,6 +103,83 @@ function sanitizeProgressForBackup(progress: UserProgress): UserProgress {
   };
 }
 
+/**
+ * Treat every record in an imported document as untrusted input.
+ *
+ * A `sandboxDisclosureVersion` (or an `auto_verified_code_lab` label, or a
+ * passing grade) that arrives inside a backup is an assertion by the document,
+ * not evidence that this device's sanitizing runner produced it. Import forces
+ * the legacy-disclosure path, which withholds ambiguous raw buffers, neutralizes
+ * visible check labels, and recomputes the code hash from the preserved code.
+ * Grades and learner code are preserved; provenance is downgraded to
+ * self-reported so no imported record is presented as locally verified.
+ */
+export function sanitizeImportedProgress(progress: UserProgress, now: string): UserProgress {
+  const codeRunAttempts = (progress.codeRunAttempts ?? []).map((attempt) => ({
+    ...normalizeCodeRunAttempt({
+      ...attempt,
+      sandboxDisclosureVersion: undefined,
+      importedAt: now
+    }),
+    importedAt: now
+  }));
+
+  const quizAttempts = (progress.quizAttempts ?? []).map((attempt) => ({
+    ...attempt,
+    importedAt: now
+  }));
+
+  const evidenceItems = progress.evidenceItems.map((item): EvidenceItem => {
+    if (!item.proofArtifact) {
+      return {
+        ...item,
+        trust: classifyEvidenceTrust({
+          repoUrl: item.repoUrl,
+          commitHash: item.commitHash,
+          verifierOutput: item.verifierOutput
+        }),
+        importedAt: now
+      };
+    }
+
+    const proofArtifact = sanitizeImportedProofArtifact(item.proofArtifact, now);
+    return {
+      ...item,
+      // A proof restored from a file is useful history, but this device did not
+      // execute it. Never keep the stronger local-verification label.
+      trust: "manual_verifier_output",
+      importedAt: now,
+      verifierOutput: formatProofArtifactVerifierOutput(proofArtifact),
+      proofArtifact
+    };
+  });
+
+  return {
+    ...progress,
+    codeRunAttempts,
+    quizAttempts,
+    evidenceItems
+  };
+}
+
+function sanitizeImportedProofArtifact(proof: ProofArtifact, now: string): ProofArtifact {
+  const sanitized = sanitizeProofArtifactForDisclosure({
+    ...proof,
+    sandboxDisclosureVersion: undefined,
+    importedAt: now
+  });
+
+  return {
+    ...sanitized,
+    importedAt: now,
+    // Identity must match the code that was preserved, not a hash supplied by
+    // the document. Without a snapshot there is nothing to recompute from.
+    ...(sanitized.codeSnapshot !== undefined
+      ? { codeHash: computeCodeHash(sanitized.codeSnapshot) }
+      : {})
+  };
+}
+
 export function createProgressBackup(
   progress: UserProgress,
   drafts: Record<string, DraftState>,
@@ -102,13 +206,21 @@ export function createProgressBackup(
   };
 }
 
+/**
+ * Serialize a backup but refuse to produce a document that the importer would
+ * reject. Export must never advertise a "complete" backup it cannot restore.
+ */
 export function serializeProgressBackup(backup: ProgressBackup): string {
-  return JSON.stringify(backup, null, 2);
+  const json = JSON.stringify(backup, null, 2);
+  if (json.length > MAX_PROGRESS_BACKUP_CHARS) {
+    throw new ProgressBackupTooLargeError(json.length);
+  }
+  return json;
 }
 
 export function parseProgressBackup(raw: string, now = new Date().toISOString()): ProgressBackupParseResult {
   if (raw.length > MAX_PROGRESS_BACKUP_CHARS) {
-    return { error: "This backup is too large to restore safely." };
+    return { error: `This backup is too large to restore safely (${raw.length.toLocaleString()} characters; limit ${MAX_PROGRESS_BACKUP_CHARS.toLocaleString()}).` };
   }
 
   let parsed: unknown;
@@ -137,8 +249,14 @@ export function parseProgressBackup(raw: string, now = new Date().toISOString())
     }
   }
 
+  // Sanitize before profile reconciliation so a forged passing attempt cannot
+  // be promoted into a durable achievement first and then marked imported.
+  const importedProgress = sanitizeImportedProgress(
+    result.data.progress as unknown as UserProgress,
+    now
+  );
   const normalizedProgress = ensureProgressProfile(
-    result.data.progress as unknown as Parameters<typeof ensureProgressProfile>[0],
+    importedProgress as unknown as Parameters<typeof ensureProgressProfile>[0],
     now
   );
 
@@ -157,14 +275,19 @@ export function parseProgressBackup(raw: string, now = new Date().toISOString())
  * Produce the progress to install after a confirmed restore. Derived fields
  * (completed lessons/missions, review items) are reconciled against the current
  * content pack so the restored state is internally consistent.
+ *
+ * Sanitization is repeated here because callers may construct a backup object
+ * directly instead of going through `parseProgressBackup`; the operation is
+ * idempotent for already-imported records.
  */
 export function restoreProgressBackup(
   content: ContentPack,
   backup: ProgressBackup,
   now = new Date().toISOString()
 ): UserProgress {
+  const importedProgress = sanitizeImportedProgress(backup.progress, now);
   const normalized = ensureProgressProfile(
-    backup.progress as unknown as Parameters<typeof ensureProgressProfile>[0],
+    importedProgress as unknown as Parameters<typeof ensureProgressProfile>[0],
     now
   );
   return reconcileDerivedProgress(content, normalized, now);

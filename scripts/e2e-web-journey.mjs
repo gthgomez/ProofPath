@@ -12,8 +12,7 @@
  * checks the learner journey with actual sandbox execution and localStorage.
  */
 import { createServer } from "node:http";
-import { createReadStream, existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { createRequire } from "node:module";
 
@@ -25,6 +24,9 @@ const DIST = process.env.E2E_DIST ?? "dist";
 const PORT = Number(process.env.E2E_PORT ?? 8099);
 const LESSON_ID = "lesson-git-stage-commit-inspect";
 const BASE = `http://127.0.0.1:${PORT}`;
+const ARTIFACT_DIR = process.env.E2E_ARTIFACT_DIR ?? "artifacts/e2e";
+const browserErrors = [];
+let activePage = null;
 
 const STARTER = `const repo = { index: {}, log: [] };
 
@@ -178,6 +180,11 @@ async function main() {
   }, seedProgress());
 
   const page = await context.newPage();
+  activePage = page;
+  page.on("console", (message) => {
+    if (message.type() === "error") browserErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => browserErrors.push(`pageerror: ${error.message}`));
   try {
     await page.goto(`${BASE}/lesson/${LESSON_ID}`, { waitUntil: "domcontentloaded" });
     await waitForText(page, "Code Lab", 60000);
@@ -266,6 +273,125 @@ async function main() {
       autoVerifiedCount: packet.summary.autoVerifiedCount
     };
 
+    // 6. Backup: download the real file, reset, import the file, confirm,
+    // reload, and verify drafts and achievements survive.
+    await page.goto(`${BASE}/settings`, { waitUntil: "domcontentloaded" });
+    await waitForText(page, "Back up or restore progress", 60000);
+
+    const backupDownload = page.waitForEvent("download");
+    await page.getByText("Download backup", { exact: true }).click();
+    const backupFile = await backupDownload;
+    const backupPath = await backupFile.path();
+    const backupText = readFileSync(backupPath, "utf8");
+    if (backupFile.suggestedFilename() !== "proofpath-progress-backup.json") {
+      throw new Error(`Unexpected backup filename: ${backupFile.suggestedFilename()}`);
+    }
+    const backup = JSON.parse(backupText);
+    if (backup.format !== "proofpath-progress-backup" || !backup.progress) {
+      throw new Error("Downloaded backup did not contain a progress document");
+    }
+    results.backup = { bytes: Buffer.byteLength(backupText), drafts: Object.keys(backup.drafts ?? {}).length };
+
+    // Cancel a restore first: everything must remain unchanged.
+    await page.getByLabel("Progress backup JSON").fill(backupText);
+    await page.getByText("Restore from backup", { exact: true }).click();
+    await waitForText(page, "Replace local progress?", 15000);
+    await page.getByText("Keep my data", { exact: true }).click();
+    await page.waitForTimeout(300);
+    const beforeResetAttempts = await page.evaluate(() => {
+      const stored = JSON.parse(window.localStorage.getItem("proofpath.progress.v1") || "{}");
+      return Array.isArray(stored.codeRunAttempts) ? stored.codeRunAttempts.length : 0;
+    });
+    if (beforeResetAttempts < 1) {
+      throw new Error("Cancelling a restore changed local progress");
+    }
+    results.restoreCancelled = "progress preserved";
+
+    // Invalid input is rejected without opening a confirmation.
+    await page.getByLabel("Progress backup JSON").fill("{not-json");
+    await page.getByText("Restore from backup", { exact: true }).click();
+    await waitForText(page, "not valid JSON", 15000);
+    results.invalidBackup = "rejected";
+
+    // Reset through the real dialog.
+    await page.getByText("Show reset action", { exact: true }).click();
+    await page.getByText("Reset progress", { exact: true }).click();
+    await waitForText(page, "Reset saved work?", 15000);
+    await page.getByText("Erase everything", { exact: true }).click();
+    await page.waitForTimeout(800);
+    const afterReset = await page.evaluate(() => {
+      const stored = JSON.parse(window.localStorage.getItem("proofpath.progress.v1") || "{}");
+      return {
+        lessons: Array.isArray(stored.completedLessonIds) ? stored.completedLessonIds.length : 0,
+        attempts: Array.isArray(stored.codeRunAttempts) ? stored.codeRunAttempts.length : 0,
+        drafts: Object.keys(window.localStorage).filter((key) => key.startsWith("proofpath.editor_draft.v1.")).length
+      };
+    });
+    if (afterReset.lessons !== 0 || afterReset.attempts !== 0 || afterReset.drafts !== 0) {
+      throw new Error(`Reset left data behind: ${JSON.stringify(afterReset)}`);
+    }
+    results.reset = afterReset;
+
+    // Import the actual file through the file picker and confirm.
+    const chooserPromise = page.waitForEvent("filechooser");
+    await page.getByText("Import backup file", { exact: true }).click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles(backupPath);
+    await waitForText(page, "Replace local progress?", 20000);
+    await page.getByText("Replace with backup", { exact: true }).click();
+    await waitForText(page, "restored from the backup", 60000);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.goto(`${BASE}/lesson/${LESSON_ID}`, { waitUntil: "domcontentloaded" });
+    await waitForText(page, "Code Lab", 60000);
+    await openCodeLab(page);
+    await page.waitForFunction(
+      (expected) => document.querySelector('textarea[aria-label="javascript code editor"]')?.value === expected,
+      EDITED_DRAFT,
+      { timeout: 30000 }
+    );
+    await waitForCodeLabStatus(page, "Lesson passed previously", 30000);
+    results.restore = "draft and achievement restored";
+
+    // Restored Code Lab proof must be labelled as restored/self-reported, not
+    // as independently verified on this device.
+    await page.goto(`${BASE}/evidence`, { waitUntil: "domcontentloaded" });
+    await waitForText(page, "Interview-ready evidence", 60000);
+    const restoredDownload = page.waitForEvent("download");
+    await page.getByText("Download JSON packet", { exact: true }).click();
+    const restoredPacketFile = await restoredDownload;
+    const restoredPacket = JSON.parse(readFileSync(await restoredPacketFile.path(), "utf8"));
+    if (restoredPacket.summary.autoVerifiedCount !== 0) {
+      throw new Error("Restored evidence was still advertised as locally verified");
+    }
+    if (!JSON.stringify(restoredPacket).includes("restored from backup")) {
+      throw new Error("Restored evidence was not labelled as restored");
+    }
+    results.restoredProvenance = "restored records downgraded and labelled";
+
+    // 7. Offline shell: after installation, the app shell and route navigation
+    // must work with the network disabled. Sandbox runtimes are runtime-cached
+    // after first use, so this checks a lesson screen, not a cold WASM boot.
+    const controlled = await page.evaluate(async () => {
+      if (!("serviceWorker" in navigator)) return false;
+      await navigator.serviceWorker.ready;
+      return Boolean(navigator.serviceWorker.controller);
+    });
+    if (!controlled) {
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), { timeout: 20000 });
+    }
+
+    await context.setOffline(true);
+    try {
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await page.goto(`${BASE}/lesson/${LESSON_ID}`, { waitUntil: "domcontentloaded" });
+      await waitForText(page, "Code Lab", 30000);
+      results.offline = "shell and lesson route available without network";
+    } finally {
+      await context.setOffline(false);
+    }
+
     console.log(JSON.stringify({ ok: true, results }, null, 2));
   } finally {
     await browser.close();
@@ -273,8 +399,22 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }, null, 2));
+main().catch(async (error) => {
+  try {
+    mkdirSync(ARTIFACT_DIR, { recursive: true });
+    if (activePage) {
+      await activePage.screenshot({ path: join(ARTIFACT_DIR, "journey-failure.png"), fullPage: true });
+      const body = await activePage.locator("body").innerText().catch(() => "<unavailable>");
+      writeFileSync(join(ARTIFACT_DIR, "journey-failure.txt"), `${body}\n\nBrowser errors:\n${browserErrors.join("\n")}`);
+    }
+  } catch {
+    // Artifact capture must never mask the original failure.
+  }
+  console.error(JSON.stringify({
+    ok: false,
+    error: error instanceof Error ? error.message : String(error),
+    browserErrors
+  }, null, 2));
   server.close();
   process.exit(1);
 });
