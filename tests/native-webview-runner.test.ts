@@ -5,6 +5,7 @@ import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec } from "@/domain/typ
 import {
   createNativeWebViewRunnerHtml,
   NATIVE_ANDROID_SANDBOX_BASE_URL,
+  NATIVE_SANDBOX_WEBVIEW_SECURITY_PROPS,
   nativeWebViewTrustedSqlHarness,
   parseNativeWebViewRunnerMessage,
   parseNativeWebViewRunnerResult,
@@ -38,6 +39,13 @@ describe("native WebView sandbox runner bridge", () => {
     expect(html).toContain('window.PROOFPATH_SANDBOX_ASSETS.typescript + "typescript.js"');
     expect(html).toContain('window.PROOFPATH_SANDBOX_ASSETS.typescript + "typescript-libs.js"');
     expect(NATIVE_ANDROID_SANDBOX_BASE_URL).toBe("file:///android_asset/");
+  });
+
+  it("does not grant file-origin JavaScript access to other file or web origins", () => {
+    expect(NATIVE_SANDBOX_WEBVIEW_SECURITY_PROPS).toEqual({
+      allowFileAccessFromFileURLs: false,
+      allowUniversalAccessFromFileURLs: false
+    });
   });
 
   it("embeds the shared TypeScript type-check source", () => {

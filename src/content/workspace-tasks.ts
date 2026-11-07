@@ -87,25 +87,58 @@ def fail(checks, name, detail):
 
 
 def checks_on(checks, text):
+    if "deploy:" not in text:
+        checks.append({
+            "commandId": "verify",
+            "name": "deploy-gated",
+            "passed": False,
+            "detail": "The deploy job is missing from the workflow."
+        })
+        return
+
     deploy_block = text.split("deploy:", 1)[1]
-    if "needs:" not in deploy_block:
+    active_lines = [line for line in deploy_block.splitlines() if not line.strip().startswith("#")]
+
+    needs_idx = -1
+    for i, line in enumerate(active_lines):
+        if line.strip().startswith("needs:"):
+            needs_idx = i
+            break
+
+    if needs_idx == -1:
         checks.append({
             "commandId": "verify",
             "name": "deploy-gated",
             "passed": False,
             "detail": "The deploy job has no 'needs:' — it can run before lint and test."
         })
+        return
+
+    needs_tokens = []
+    first_line = active_lines[needs_idx].strip()
+    after_colon = first_line[len("needs:"):].strip()
+    if after_colon:
+        needs_tokens.append(after_colon)
+
+    for line in active_lines[needs_idx + 1:]:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("-"):
+            needs_tokens.append(stripped.lstrip("-").strip())
+        elif ":" in stripped:
+            break
+
+    combined_needs = " ".join(needs_tokens)
+    if "lint" not in combined_needs or "test" not in combined_needs:
+        checks.append({
+            "commandId": "verify",
+            "name": "deploy-gated",
+            "passed": False,
+            "detail": f"deploy must need both lint and test, found: {combined_needs or first_line}"
+        })
     else:
-        needs_line = [line for line in deploy_block.splitlines() if "needs:" in line][0]
-        if "lint" not in needs_line or "test" not in needs_line:
-            checks.append({
-                "commandId": "verify",
-                "name": "deploy-gated",
-                "passed": False,
-                "detail": f"deploy must need both lint and test, found: {needs_line.strip()}"
-            })
-        else:
-            checks.append({"commandId": "verify", "name": "deploy-gated", "passed": True, "detail": "deploy is gated on lint and test"})
+        checks.append({"commandId": "verify", "name": "deploy-gated", "passed": True, "detail": "deploy is gated on lint and test"})
 
 
 def main():

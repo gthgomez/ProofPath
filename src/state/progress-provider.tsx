@@ -58,6 +58,7 @@ interface ProgressContextValue {
   resetLocalProgress: () => Promise<void>;
   dismissTour: () => void;
   placement: (lessonIds: string[], quizIds: string[]) => void;
+  fastTrack?: (lessonIds: string[], quizIds: string[]) => void;
 }
 
 const ProgressContext = createContext<ProgressContextValue | null>(null);
@@ -179,6 +180,9 @@ function SQLiteProgressProvider({ children }: PropsWithChildren): ReactElement {
         updateProgress((currentProgress) => dismissDashboardTour(currentProgress));
       },
       placement: (lessonIds, quizIds) => {
+        updateProgress((currentProgress) => placementSkip(currentProgress, lessonIds, quizIds));
+      },
+      fastTrack: (lessonIds, quizIds) => {
         updateProgress((currentProgress) => placementSkip(currentProgress, lessonIds, quizIds));
       },
       resetLocalProgress: async () => {
@@ -346,6 +350,9 @@ function WebProgressProvider({ children }: PropsWithChildren): ReactElement {
         updateProgress((currentProgress) => dismissDashboardTour(currentProgress));
       },
       placement: (lessonIds, quizIds) => {
+        updateProgress((currentProgress) => placementSkip(currentProgress, lessonIds, quizIds));
+      },
+      fastTrack: (lessonIds, quizIds) => {
         updateProgress((currentProgress) => placementSkip(currentProgress, lessonIds, quizIds));
       },
       resetLocalProgress: async () => {

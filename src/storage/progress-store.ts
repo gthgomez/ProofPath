@@ -358,6 +358,18 @@ async function createNormalizedSchema(db: SQLiteDatabase): Promise<void> {
       completed_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS placed_out_lessons (
+      lesson_id TEXT PRIMARY KEY NOT NULL,
+      sort_order INTEGER NOT NULL,
+      completed_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS placed_out_quizzes (
+      quiz_id TEXT PRIMARY KEY NOT NULL,
+      sort_order INTEGER NOT NULL,
+      completed_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS completed_project_missions (
       project_mission_id TEXT PRIMARY KEY NOT NULL,
       sort_order INTEGER NOT NULL,
@@ -902,6 +914,8 @@ async function deleteUserProgressRows(db: SQLiteDatabase): Promise<void> {
     "completed_project_mission_phases",
     "completed_project_missions",
     "completed_quizzes",
+    "placed_out_quizzes",
+    "placed_out_lessons",
     "completed_lesson_mini_projects",
     "completed_lessons",
     "readiness_snapshots",
@@ -1172,6 +1186,8 @@ async function saveNormalizedProgress(db: SQLiteDatabase, progress: UserProgress
     await saveCompletionIds(transactionDb, "completed_lessons", "lesson_id", parsedProgress.completedLessonIds, parsedProgress.updatedAt);
     await saveCompletionIds(transactionDb, "completed_lesson_mini_projects", "lesson_id", parsedProgress.completedLessonMiniProjectIds, parsedProgress.updatedAt);
     await saveCompletionIds(transactionDb, "completed_quizzes", "quiz_id", parsedProgress.completedQuizIds, parsedProgress.updatedAt);
+    await saveCompletionIds(transactionDb, "placed_out_lessons", "lesson_id", parsedProgress.placedOutLessonIds ?? [], parsedProgress.updatedAt);
+    await saveCompletionIds(transactionDb, "placed_out_quizzes", "quiz_id", parsedProgress.placedOutQuizIds ?? [], parsedProgress.updatedAt);
     await saveCompletionIds(
       transactionDb,
       "completed_project_missions",
@@ -1226,6 +1242,12 @@ async function loadNormalizedProgress(db: SQLiteDatabase): Promise<UserProgress 
   );
   const completedQuizRows = await db.getAllAsync<CompletionRow>(
     "SELECT quiz_id AS entity_id FROM completed_quizzes ORDER BY sort_order ASC"
+  );
+  const placedOutLessonRows = await db.getAllAsync<CompletionRow>(
+    "SELECT lesson_id AS entity_id FROM placed_out_lessons ORDER BY sort_order ASC"
+  );
+  const placedOutQuizRows = await db.getAllAsync<CompletionRow>(
+    "SELECT quiz_id AS entity_id FROM placed_out_quizzes ORDER BY sort_order ASC"
   );
   const completedLessonMiniProjectRows = await db.getAllAsync<CompletionRow>(
     "SELECT lesson_id AS entity_id FROM completed_lesson_mini_projects ORDER BY sort_order ASC"
@@ -1306,6 +1328,8 @@ async function loadNormalizedProgress(db: SQLiteDatabase): Promise<UserProgress 
     completedLessonIds: completedLessonRows.map((row) => row.entity_id),
     completedLessonMiniProjectIds: completedLessonMiniProjectRows.map((row) => row.entity_id),
     completedQuizIds: completedQuizRows.map((row) => row.entity_id),
+    placedOutLessonIds: placedOutLessonRows.map((row) => row.entity_id),
+    placedOutQuizIds: placedOutQuizRows.map((row) => row.entity_id),
     completedProjectMissionIds: completedMissionRows.map((row) => row.entity_id),
     completedProjectMissionDeliverableIds: completedMissionDeliverableRows.map((row) => `${row.mission_id}:${row.deliverable_index}`),
     completedProjectMissionPhaseIds: completedMissionPhaseRows.map((row) => `${row.mission_id}:${row.phase_id}`),

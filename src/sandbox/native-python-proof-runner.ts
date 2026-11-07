@@ -60,6 +60,13 @@ function isSupportedLearnerLine(line: string): boolean {
 }
 
 function isSupportedVerifierLine(line: string): boolean {
+  // Method calls (e.g. clean.strip().lower()) are unsupported in the native
+  // regex evaluator; verifier lines containing method calls must run in the
+  // full WebView runtime instead of failing honestly but falsely on native.
+  if (/\.\w+\(/.test(line)) {
+    return false;
+  }
+
   // Comment-only checks are supported: the verifier executes them as no-ops
   // and passes/fails on the captured learner stdout via expectedOutputIncludes.
   // Excluding them forced every comment-checked level-0/1 lesson (including the
@@ -171,7 +178,12 @@ function evaluateExpression(expression: string, scope: PythonScope): PythonValue
 
   if ((value.startsWith('f"') && value.endsWith('"')) || (value.startsWith("f'") && value.endsWith("'"))) {
     const template = unquote(value.slice(1));
-    return template.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name: string) => normalizeOutput(scope[name] ?? ""));
+    return template.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name: string) => {
+      if (!Object.prototype.hasOwnProperty.call(scope, name)) {
+        throw new Error(`NameError: name '${name}' is not defined`);
+      }
+      return normalizeOutput(scope[name]!);
+    });
   }
 
   if (/^-?\d+$/.test(value)) {

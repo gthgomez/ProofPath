@@ -26,6 +26,7 @@ describe("native python runner selection", () => {
   // pass and fail honestly on the offline runner.
   const WEBVIEW_PYTHON_LESSONS = new Set([
     "lesson-python-literals",
+    "lesson-python-strings",
     "lesson-python-list-of-dicts",
     "lesson-python-loops",
     "lesson-python-foundation-capstone",
@@ -58,6 +59,7 @@ describe("native python runner selection", () => {
     "lesson-python-json-reports",
     "lesson-python-logging-errors",
     "lesson-python-pyproject-metadata",
+    "lesson-python-pytest-ci",
     "lesson-python-installable-cli",
     "lesson-python-virtual-env",
     "lesson-python-config-files",
@@ -129,5 +131,29 @@ describe("native python runner selection", () => {
 
     const fixed = runNativePythonProof(spec, lesson!.id, 'print("fixed syntax")', "2026-10-11T12:00:00.000Z");
     expect(fixed.passed).toBe(true);
+  });
+
+  it("routes lesson-python-strings to the WebView runner because its checks use method chains", () => {
+    const lesson = contentPack.lessons.find((candidate) => candidate.id === "lesson-python-strings");
+    expect(lesson).toBeDefined();
+    const spec = lesson!.workshop.miniProject.runnerSpec as LessonRunnerSpec;
+    expect(canRunNativePythonProof(spec)).toBe(false);
+  });
+
+  it("fails and awards no proof when learner code references an undefined variable in an f-string", () => {
+    const lesson = contentPack.lessons.find((candidate) => candidate.id === "lesson-python-zero-first-script");
+    expect(lesson).toBeDefined();
+    const spec = lesson!.workshop.miniProject.runnerSpec as LessonRunnerSpec;
+
+    const invalidFStringCode = [
+      'message = f"Hello {non_existent_var}"',
+      "print(message)"
+    ].join("\n");
+
+    const result = runNativePythonProof(spec, lesson!.id, invalidFStringCode, "2026-11-06T12:00:00.000Z");
+    expect(result.passed).toBe(false);
+    expect(result.score).toBe(0);
+    expect(result.stderr).toContain("NameError: name 'non_existent_var' is not defined");
+    expect(result.diagnostics.some((d) => d.id === "python-name-error")).toBe(true);
   });
 });
