@@ -101,6 +101,8 @@ class FakeSQLiteDatabase {
   public completedLessons: CompletionRecord[] = [];
   public completedLessonMiniProjects: CompletionRecord[] = [];
   public completedQuizzes: CompletionRecord[] = [];
+  public placedOutLessons: CompletionRecord[] = [];
+  public placedOutQuizzes: CompletionRecord[] = [];
   public completedProjectMissions: CompletionRecord[] = [];
   public completedProjectMissionDeliverables: MissionDeliverableRecord[] = [];
   public completedProjectMissionPhases: MissionPhaseRecord[] = [];
@@ -155,8 +157,16 @@ class FakeSQLiteDatabase {
       return sortByOrder(this.completedLessonMiniProjects) as T[];
     }
 
+    if (normalizedSql.startsWith("SELECT lesson_id AS entity_id FROM placed_out_lessons")) {
+      return sortByOrder(this.placedOutLessons) as T[];
+    }
+
     if (normalizedSql.startsWith("SELECT lesson_id AS entity_id")) {
       return sortByOrder(this.completedLessons) as T[];
+    }
+
+    if (normalizedSql.startsWith("SELECT quiz_id AS entity_id FROM placed_out_quizzes")) {
+      return sortByOrder(this.placedOutQuizzes) as T[];
     }
 
     if (normalizedSql.startsWith("SELECT quiz_id AS entity_id")) {
@@ -360,6 +370,16 @@ class FakeSQLiteDatabase {
 
     if (normalizedSql.startsWith("INSERT INTO completed_quizzes")) {
       this.completedQuizzes.push({ entity_id: params[0] as string, sort_order: params[1] as number });
+      return;
+    }
+
+    if (normalizedSql.startsWith("INSERT INTO placed_out_lessons")) {
+      this.placedOutLessons.push({ entity_id: params[0] as string, sort_order: params[1] as number });
+      return;
+    }
+
+    if (normalizedSql.startsWith("INSERT INTO placed_out_quizzes")) {
+      this.placedOutQuizzes.push({ entity_id: params[0] as string, sort_order: params[1] as number });
       return;
     }
 
@@ -569,6 +589,12 @@ class FakeSQLiteDatabase {
         break;
       case "completed_quizzes":
         this.completedQuizzes = [];
+        break;
+      case "placed_out_lessons":
+        this.placedOutLessons = [];
+        break;
+      case "placed_out_quizzes":
+        this.placedOutQuizzes = [];
         break;
       case "completed_project_missions":
         this.completedProjectMissions = [];
@@ -840,5 +866,23 @@ describe("progress-store", () => {
 
     const loaded = await loadProgress(db);
     expect(loaded.completedLessonIds).toEqual(["lesson-python-functions"]);
+  });
+
+  it("persists placedOutLessonIds and placedOutQuizIds through SQLite save and load", async () => {
+    const db = createDb();
+    await migrateProgressDb(db);
+
+    const initial = createInitialProgress("2026-11-06T12:00:00.000Z");
+    const progressWithPlacement: UserProgress = {
+      ...initial,
+      placedOutLessonIds: ["lesson-python-variables", "lesson-python-numbers"],
+      placedOutQuizIds: ["quiz-python-variables", "quiz-python-numbers"]
+    };
+
+    await saveProgress(db, progressWithPlacement);
+    const loaded = await loadProgress(db);
+
+    expect(loaded.placedOutLessonIds).toEqual(["lesson-python-variables", "lesson-python-numbers"]);
+    expect(loaded.placedOutQuizIds).toEqual(["quiz-python-variables", "quiz-python-numbers"]);
   });
 });

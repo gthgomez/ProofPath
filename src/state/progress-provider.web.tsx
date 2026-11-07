@@ -8,6 +8,7 @@ import {
   dismissDashboardTour,
   fastTrackLessons,
   generateWeeklyReport,
+  placementSkip,
   recordCodeRunAttempt,
   recordReview,
   reconcileDerivedProgress,
@@ -66,6 +67,7 @@ interface ProgressContextValue {
   generateWeeklyCareerReport: () => void;
   resetLocalProgress: () => Promise<void>;
   dismissTour: () => void;
+  placement: (lessonIds: string[], quizIds: string[]) => void;
   fastTrack: (lessonIds: string[], quizIds: string[]) => void;
 }
 
@@ -86,6 +88,8 @@ function createInitialProgressFromStored(storedProgress: Partial<UserProgress>):
     completedLessonIds: storedProgress.completedLessonIds ?? [],
     completedLessonMiniProjectIds: storedProgress.completedLessonMiniProjectIds ?? [],
     completedQuizIds: storedProgress.completedQuizIds ?? [],
+    placedOutLessonIds: storedProgress.placedOutLessonIds ?? [],
+    placedOutQuizIds: storedProgress.placedOutQuizIds ?? [],
     completedProjectMissionIds: storedProgress.completedProjectMissionIds ?? [],
     completedProjectMissionDeliverableIds: storedProgress.completedProjectMissionDeliverableIds ?? [],
     completedProjectMissionPhaseIds: storedProgress.completedProjectMissionPhaseIds ?? [],
@@ -209,6 +213,9 @@ export function ProgressProvider({ children }: PropsWithChildren): ReactElement 
       },
       dismissTour: () => {
         updateProgress((currentProgress) => dismissDashboardTour(currentProgress));
+      },
+      placement: (lessonIds, quizIds) => {
+        updateProgress((currentProgress) => placementSkip(currentProgress, lessonIds, quizIds));
       },
       fastTrack: (lessonIds, quizIds) => {
         updateProgress((currentProgress) => fastTrackLessons(currentProgress, lessonIds, quizIds));

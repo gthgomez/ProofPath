@@ -553,6 +553,8 @@ export const userProgressSchema = z.object({
   durableLessonMiniProjectIds: z.array(nonEmptyString).optional(),
   completedQuizIds: z.array(nonEmptyString),
   durableQuizIds: z.array(nonEmptyString).optional(),
+  placedOutLessonIds: z.array(nonEmptyString).optional().default([]),
+  placedOutQuizIds: z.array(nonEmptyString).optional().default([]),
   completedProjectMissionIds: z.array(nonEmptyString),
   completedProjectMissionDeliverableIds: z.array(nonEmptyString).optional(),
   completedProjectMissionPhaseIds: z.array(nonEmptyString).optional(),
