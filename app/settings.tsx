@@ -1,13 +1,106 @@
 import { useState, type ReactElement } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { Alert, Platform, StyleSheet, TextInput, View } from "react-native";
 import { Badge, BodyText, ButtonShell, MutedText, Panel, Row, Screen, SectionTitle } from "@/ui/primitives";
 import { PATH_AI_PRODUCT_ENGINEERING_ID, PATH_BACKEND_API_DATA_ID, PATH_SECURE_SOFTWARE_APPSEC_ID } from "@/content/roles";
+import { contentPack } from "@/content/seed";
+import {
+  createProgressBackup,
+  parseProgressBackup,
+  restoreProgressBackup,
+  serializeProgressBackup,
+  type ProgressBackup
+} from "@/domain/progress-backup";
+import { editorDraftStore } from "@/storage/draft-store";
 import { useProgress } from "@/state/progress-provider";
+import { copyToClipboard, downloadTextFile } from "@/ui/file-transfer";
 import { colors, radius, spacing } from "@/ui/theme";
 
 export default function SettingsScreen(): ReactElement {
   const [showDangerActions, setShowDangerActions] = useState(false);
-  const { availableRoleTargets, error, isSaving, progress, resetLocalProgress, roleTarget, selectRoleTarget } = useProgress();
+  const [backupText, setBackupText] = useState("");
+  const [backupStatus, setBackupStatus] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const {
+    availableRoleTargets,
+    error,
+    isSaving,
+    progress,
+    resetLocalProgress,
+    restoreProgress,
+    roleTarget,
+    selectRoleTarget
+  } = useProgress();
+
+  async function buildBackupJson(): Promise<string> {
+    const drafts = await editorDraftStore.exportAll();
+    return serializeProgressBackup(createProgressBackup(progress, drafts, new Date().toISOString()));
+  }
+
+  async function handleCopyBackup(): Promise<void> {
+    try {
+      const json = await buildBackupJson();
+      const outcome = await copyToClipboard(json);
+      setBackupStatus(outcome === "clipped"
+        ? "Progress backup JSON copied. It includes editor drafts and reset markers."
+        : "Clipboard is not available here. Use Download on web.");
+    } catch {
+      setBackupStatus("Could not build the progress backup.");
+    }
+  }
+
+  async function handleDownloadBackup(): Promise<void> {
+    try {
+      const json = await buildBackupJson();
+      const outcome = await downloadTextFile("proofpath-progress-backup.json", json, "application/json");
+      setBackupStatus(outcome === "downloaded"
+        ? "Downloaded proofpath-progress-backup.json."
+        : "Download is only available in the browser build. Use Copy instead.");
+    } catch {
+      setBackupStatus("Could not build the progress backup.");
+    }
+  }
+
+  function handleRestore(): void {
+    const parsed = parseProgressBackup(backupText, new Date().toISOString());
+    if (!parsed.backup) {
+      setBackupStatus(parsed.error ?? "This backup is not valid.");
+      return;
+    }
+
+    const backup = parsed.backup;
+    Alert.alert(
+      "Replace local progress?",
+      "This replaces all local progress and editor drafts with the backup. It cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Replace", style: "destructive", onPress: () => void performRestore(backup) }
+      ]
+    );
+  }
+
+  async function performRestore(backup: ProgressBackup): Promise<void> {
+    setIsRestoring(true);
+    try {
+      const draftResult = await editorDraftStore.importAll(backup.drafts);
+      if (!draftResult.ok) {
+        setBackupStatus(`Backup validated, but editor drafts could not be restored: ${draftResult.error}`);
+        return;
+      }
+
+      const restored = restoreProgressBackup(contentPack, backup, new Date().toISOString());
+      const result = await restoreProgress(restored);
+      setBackupStatus(result.ok
+        ? "Progress and editor drafts restored from the backup."
+        : `Backup validated, but progress could not be saved: ${result.error ?? "unknown error"}`);
+      if (result.ok) {
+        setBackupText("");
+      }
+    } catch (caughtError) {
+      setBackupStatus(caughtError instanceof Error ? caughtError.message : "Unable to restore the backup.");
+    } finally {
+      setIsRestoring(false);
+    }
+  }
 
   function confirmReset(): void {
     Alert.alert(
@@ -72,6 +165,57 @@ export default function SettingsScreen(): ReactElement {
         </View>
       </Panel>
 
+      <Panel accessibilityLabel="Backup and restore">
+        <Row>
+          <Badge tone="blue">portable</Badge>
+          <Badge tone="teal">version 1</Badge>
+        </Row>
+        <SectionTitle>Back up or restore progress</SectionTitle>
+        <BodyText>This is a complete local backup: profile, achievements, placement, attempts, evidence, reviews, weekly reports, and editor drafts. It is not the reviewer portfolio packet.</BodyText>
+        <Row>
+          <ButtonShell
+            accessibilityHint="Copies a complete, versioned progress backup as JSON, including editor drafts."
+            disabled={isSaving}
+            onPress={() => void handleCopyBackup()}
+            tone="blue"
+            variant="secondary"
+          >
+            Copy backup JSON
+          </ButtonShell>
+          {Platform.OS === "web" ? (
+            <ButtonShell
+              accessibilityHint="Downloads a complete progress backup JSON file."
+              disabled={isSaving}
+              onPress={() => void handleDownloadBackup()}
+              tone="teal"
+              variant="secondary"
+            >
+              Download backup
+            </ButtonShell>
+          ) : null}
+        </Row>
+        <MutedText>To restore, paste a backup JSON below. Restoring replaces local progress only after you confirm.</MutedText>
+        <TextInput
+          accessibilityHint="Paste a ProofPath progress backup JSON document."
+          accessibilityLabel="Progress backup JSON"
+          multiline
+          onChangeText={setBackupText}
+          placeholder='{"format":"proofpath-progress-backup",...}'
+          placeholderTextColor={colors.muted}
+          style={[styles.backupInput, styles.backupText]}
+          value={backupText}
+        />
+        <ButtonShell
+          accessibilityHint="Validates the pasted backup and asks for confirmation before replacing local progress."
+          disabled={isSaving || isRestoring || backupText.trim().length === 0}
+          onPress={handleRestore}
+          tone="rose"
+        >
+          {isRestoring ? "Restoring backup" : "Restore from backup"}
+        </ButtonShell>
+        {backupStatus ? <MutedText accessibilityLiveRegion="polite">{backupStatus}</MutedText> : null}
+      </Panel>
+
       <Panel accessibilityLabel="Danger zone">
         <Row>
           <Badge tone="rose">danger zone</Badge>
@@ -133,5 +277,19 @@ const styles = StyleSheet.create({
   pathOptionSelected: {
     backgroundColor: colors.surface,
     borderColor: colors.ink
+  },
+  backupInput: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    color: colors.text,
+    minHeight: 120,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm
+  },
+  backupText: {
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+    textAlignVertical: "top"
   }
 });

@@ -1,6 +1,8 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   clearEditorDraft,
+  editorDraftStore,
   getEditorDraft,
   resetDraftStoreForTests,
   resetEditorDraft,
@@ -21,7 +23,7 @@ describe("editor draft store (web / localStorage mirror)", () => {
   });
 
   it("persists and retrieves unrun editor edits", async () => {
-    await saveEditorDraft("lesson-python-test", "x = 42\nprint(x)");
+    await expect(saveEditorDraft("lesson-python-test", "x = 42\nprint(x)")).resolves.toBe("saved");
     expect(await getEditorDraft("lesson-python-test")).toEqual({ status: "draft", code: "x = 42\nprint(x)" });
   });
 
@@ -71,9 +73,26 @@ describe("editor draft store (web / localStorage mirror)", () => {
       expect(window.localStorage.getItem("proofpath.progress.v1")).toBe("{\"keep\":true}");
     }
   });
+
+  it("round-trips every draft, including reset tombstones, through export/import", async () => {
+    await saveEditorDraft("lesson-a", "code for a");
+    await resetEditorDraft("lesson-b");
+    const snapshot = await editorDraftStore.exportAll();
+    expect(snapshot["lesson-a"]).toEqual({ status: "draft", code: "code for a" });
+    expect(snapshot["lesson-b"]).toEqual({ status: "reset" });
+
+    // Simulate a later state that a restore must replace, not merge with.
+    await saveEditorDraft("lesson-a", "newer local edit");
+    await saveEditorDraft("lesson-c", "stale extra draft");
+
+    await expect(editorDraftStore.importAll(snapshot)).resolves.toEqual({ ok: true });
+    expect(await getEditorDraft("lesson-a")).toEqual({ status: "draft", code: "code for a" });
+    expect(await getEditorDraft("lesson-b")).toEqual({ status: "reset" });
+    expect(await getEditorDraft("lesson-c")).toEqual({ status: "none" });
+  });
 });
 
-describe("editor draft store ordering and failure (shared factory)", () => {
+describe("editor draft store ordering, reset fencing, and failure (shared factory)", () => {
   function createFakePersistence(options: { failWrites?: boolean; delayFor?: (call: number) => number } = {}) {
     const stored = new Map<string, string>();
     const writes: Array<{ key: string; value: string }> = [];
@@ -89,22 +108,90 @@ describe("editor draft store ordering and failure (shared factory)", () => {
         if (delay > 0) {
           await new Promise((resolve) => setTimeout(resolve, delay));
         }
+        stored.set(key, value);
         if (options.failWrites) {
-          stored.set(key, value);
           throw new Error("quota exceeded");
         }
-        stored.set(key, value);
         writes.push({ key, value });
+        return "durable";
       },
       async remove(key) {
         stored.delete(key);
       },
       async clearAll() {
         stored.clear();
+      },
+      async entries() {
+        return Array.from(stored.entries()).map(([key, value]) => ({ key, value }));
       }
     };
 
     return { persistence, writes, stored };
+  }
+
+  interface ControlledPersistence {
+    persistence: DraftPersistence;
+    stored: Map<string, string>;
+    requestedWrites: Array<{ key: string; value: string }>;
+    pending: Array<{ key: string; value: string; release: () => void; fail: () => void }>;
+    clearCalls: () => number;
+    failClear: (error: Error) => void;
+  }
+
+  function createControlledPersistence(): ControlledPersistence {
+    const stored = new Map<string, string>();
+    const requestedWrites: Array<{ key: string; value: string }> = [];
+    const pending: ControlledPersistence["pending"] = [];
+    let clearCalls = 0;
+    let clearFailure: Error | null = null;
+
+    const persistence: DraftPersistence = {
+      async read(key) {
+        return stored.get(key) ?? null;
+      },
+      write(key, value) {
+        requestedWrites.push({ key, value });
+        return new Promise<"durable">((resolve, reject) => {
+          pending.push({
+            key,
+            value,
+            release: () => {
+              stored.set(key, value);
+              resolve("durable");
+            },
+            fail: () => reject(new Error("write failed"))
+          });
+        });
+      },
+      async remove(key) {
+        stored.delete(key);
+      },
+      async clearAll() {
+        clearCalls += 1;
+        if (clearFailure) {
+          throw clearFailure;
+        }
+        stored.clear();
+      },
+      async entries() {
+        return Array.from(stored.entries()).map(([key, value]) => ({ key, value }));
+      }
+    };
+
+    return {
+      persistence,
+      stored,
+      requestedWrites,
+      pending,
+      clearCalls: () => clearCalls,
+      failClear: (error) => {
+        clearFailure = error;
+      }
+    };
+  }
+
+  async function flush(): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
   it("serializes writes per lesson so an older save cannot overwrite a newer one", async () => {
@@ -131,13 +218,112 @@ describe("editor draft store ordering and failure (shared factory)", () => {
     await expect(Promise.all([slow, fast])).resolves.toEqual(["saved", "saved"]);
   });
 
-  it("returns a recoverable failure result when the durable write fails", async () => {
+  it("returns a recoverable failure result when the durable write throws", async () => {
     const { persistence } = createFakePersistence({ failWrites: true });
     const store = createEditorDraftStore(persistence);
 
     await expect(store.save("lesson-fail", "typed code")).resolves.toBe("failed");
-    // The session mirror still holds the text so the learner does not lose it.
+    // The fake retained the text, mirroring a session fallback.
     expect(await store.load("lesson-fail")).toEqual({ status: "draft", code: "typed code" });
+  });
+
+  it("reports session-only retention separately from durable success", async () => {
+    const stored = new Map<string, string>();
+    const persistence: DraftPersistence = {
+      async read(key) {
+        return stored.get(key) ?? null;
+      },
+      async write(key, value) {
+        stored.set(key, value);
+        return "session";
+      },
+      async remove(key) {
+        stored.delete(key);
+      },
+      async clearAll() {
+        stored.clear();
+      },
+      async entries() {
+        return Array.from(stored.entries()).map(([key, value]) => ({ key, value }));
+      }
+    };
+    const store = createEditorDraftStore(persistence);
+
+    await expect(store.save("lesson-session", "kept this session")).resolves.toBe("session_only");
+    expect(await store.load("lesson-session")).toEqual({ status: "draft", code: "kept this session" });
+  });
+
+  it("drops a save queued before clearAll and removes the in-flight write", async () => {
+    const fake = createControlledPersistence();
+    const store = createEditorDraftStore(fake.persistence);
+
+    const inFlight = store.save("lesson-a", "old code");
+    const queued = store.save("lesson-a", "queued before reset");
+    await flush();
+    expect(fake.pending).toHaveLength(1);
+
+    const clearing = store.clearAll();
+    fake.pending[0]!.release();
+
+    await expect(queued).resolves.toBe("failed");
+    await expect(inFlight).resolves.toBe("saved");
+    await clearing;
+
+    expect(fake.stored.size).toBe(0);
+    expect(await store.load("lesson-a")).toEqual({ status: "none" });
+  });
+
+  it("retains a new edit made after clearAll begins", async () => {
+    const fake = createControlledPersistence();
+    const store = createEditorDraftStore(fake.persistence);
+
+    const clearing = store.clearAll();
+    const after = store.save("lesson-a", "new code after reset");
+    await flush();
+
+    expect(fake.clearCalls()).toBe(1);
+    expect(fake.pending).toHaveLength(1);
+    fake.pending[0]!.release();
+
+    await expect(after).resolves.toBe("saved");
+    await clearing;
+    expect(await store.load("lesson-a")).toEqual({ status: "draft", code: "new code after reset" });
+  });
+
+  it("clears multiple lessons even with pending writes in several queues", async () => {
+    const fake = createControlledPersistence();
+    const store = createEditorDraftStore(fake.persistence);
+
+    const a = store.save("lesson-a", "a");
+    const b = store.save("lesson-b", "b");
+    await flush();
+    expect(fake.pending).toHaveLength(2);
+
+    const clearing = store.clearAll();
+    for (const write of fake.pending) {
+      write.release();
+    }
+
+    await Promise.all([a, b]);
+    await clearing;
+
+    expect(fake.stored.size).toBe(0);
+    expect(await store.load("lesson-a")).toEqual({ status: "none" });
+    expect(await store.load("lesson-b")).toEqual({ status: "none" });
+  });
+
+  it("surfaces a clearAll failure and still allows later edits", async () => {
+    const fake = createControlledPersistence();
+    fake.failClear(new Error("database locked"));
+    const store = createEditorDraftStore(fake.persistence);
+
+    await expect(store.clearAll()).rejects.toThrow("database locked");
+
+    const after = store.save("lesson-a", "still usable");
+    await flush();
+    fake.pending[0]!.release();
+    await expect(after).resolves.toBe("saved");
+    expect(await store.load("lesson-a")).toEqual({ status: "draft", code: "still usable" });
   });
 
   it("namespaces draft keys by lesson", () => {

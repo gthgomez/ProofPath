@@ -9,67 +9,95 @@ import {
 
 const memoryDrafts = new Map<string, string>();
 
-function isLocalStorageAvailable(): boolean {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+function localStorageOrNull(): Storage | null {
+  try {
+    return typeof window !== "undefined" && window.localStorage ? window.localStorage : null;
+  } catch {
+    return null;
+  }
 }
 
 const webDraftPersistence: DraftPersistence = {
   async read(key) {
-    if (isLocalStorageAvailable()) {
-      try {
-        const stored = window.localStorage.getItem(key);
-        if (stored !== null) {
-          return stored;
-        }
-      } catch {
-        // Fall through to the in-memory mirror.
-      }
+    // The in-memory mirror wins: it holds the newest value even when a durable
+    // write failed and the browser retained an older copy.
+    const mirrored = memoryDrafts.get(key);
+    if (mirrored !== undefined) {
+      return mirrored;
     }
-    return memoryDrafts.get(key) ?? null;
+    const storage = localStorageOrNull();
+    if (!storage) {
+      return null;
+    }
+    try {
+      return storage.getItem(key);
+    } catch {
+      return null;
+    }
   },
   async write(key, value) {
     memoryDrafts.set(key, value);
-    if (!isLocalStorageAvailable()) {
-      return;
+    const storage = localStorageOrNull();
+    if (!storage) {
+      return "session";
     }
     try {
-      window.localStorage.setItem(key, value);
-    } catch (error) {
-      // Keep the session copy but report the durable write as failed so the UI
-      // can tell the learner their draft will not survive a reload.
-      throw error;
+      storage.setItem(key, value);
+      return "durable";
+    } catch {
+      // The session copy above is still usable, but it will not survive a
+      // reload. Report that honestly instead of throwing away the edit.
+      return "session";
     }
   },
   async remove(key) {
     memoryDrafts.delete(key);
-    if (!isLocalStorageAvailable()) {
+    const storage = localStorageOrNull();
+    if (!storage) {
       return;
     }
-    try {
-      window.localStorage.removeItem(key);
-    } catch {
-      // Removing from the mirror above is enough for this session.
-    }
+    storage.removeItem(key);
   },
   async clearAll() {
     memoryDrafts.clear();
-    if (!isLocalStorageAvailable()) {
+    const storage = localStorageOrNull();
+    if (!storage) {
       return;
     }
-    try {
-      const keys: string[] = [];
-      for (let index = 0; index < window.localStorage.length; index += 1) {
-        const key = window.localStorage.key(index);
+    const keys: string[] = [];
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (key && key.startsWith(draftStorageKey(""))) {
+        keys.push(key);
+      }
+    }
+    for (const key of keys) {
+      storage.removeItem(key);
+    }
+  },
+  async entries() {
+    const values = new Map<string, string>();
+    const storage = localStorageOrNull();
+    if (storage) {
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
         if (key && key.startsWith(draftStorageKey(""))) {
-          keys.push(key);
+          try {
+            const value = storage.getItem(key);
+            if (value !== null) {
+              values.set(key, value);
+            }
+          } catch {
+            // Skip unreadable entries; a partial backup is safer than a crash.
+          }
         }
       }
-      for (const key of keys) {
-        window.localStorage.removeItem(key);
-      }
-    } catch {
-      // Best-effort clearing; the in-memory mirror is already cleared.
     }
+    // The session mirror holds the newest value after a failed durable write.
+    for (const [key, value] of memoryDrafts) {
+      values.set(key, value);
+    }
+    return Array.from(values.entries()).map(([key, value]) => ({ key, value }));
   }
 };
 

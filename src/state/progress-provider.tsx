@@ -57,6 +57,8 @@ interface ProgressContextValue {
   addEvidence: (input: EvidenceInput) => boolean;
   generateWeeklyCareerReport: () => void;
   resetLocalProgress: () => Promise<void>;
+  /** Replace all local progress from a validated backup. Explicit, not a merge. */
+  restoreProgress: (next: UserProgress) => Promise<{ ok: boolean; error?: string }>;
   dismissTour: () => void;
   placement: (lessonIds: string[], quizIds: string[]) => void;
   fastTrack?: (lessonIds: string[], quizIds: string[]) => void;
@@ -190,17 +192,48 @@ function SQLiteProgressProvider({ children }: PropsWithChildren): ReactElement {
         setIsSaving(true);
         try {
           await saveQueueRef.current.catch(() => undefined);
-          // Clear editor drafts with progress, but leave unrelated storage alone.
-          // A draft failure must not block the progress reset.
-          await editorDraftStore.clearAll().catch(() => undefined);
+          // Clear editor drafts with progress, but do not let a draft-storage
+          // failure block the progress reset. Surface the partial failure so a
+          // stale draft is not mistaken for a clean reset.
+          let draftError: string | null = null;
+          try {
+            await editorDraftStore.clearAll();
+          } catch (caughtDraftError) {
+            draftError = caughtDraftError instanceof Error ? caughtDraftError.message : "Unknown draft-storage error.";
+          }
           const initialProgress = await resetProgress(db);
           progressRef.current = initialProgress;
           setProgress(initialProgress);
-          setError(null);
+          setError(draftError ? `Progress reset, but editor drafts could not be cleared: ${draftError}` : null);
         } catch (caughtError) {
           setError(caughtError instanceof Error ? caughtError.message : "Unable to reset progress.");
         } finally {
           setIsSaving(false);
+        }
+      },
+      restoreProgress: async (restored) => {
+        const nextProgress = reconcileDerivedProgress(getContentForRole(contentPack, restored.profile.roleTargetId), restored);
+        progressRef.current = nextProgress;
+        setProgress(nextProgress);
+        setIsSaving(true);
+        pendingSaveCountRef.current += 1;
+        const save = saveQueueRef.current
+          .catch(() => undefined)
+          .then(() => saveProgress(db, nextProgress));
+        saveQueueRef.current = save;
+        try {
+          await save;
+          setError(null);
+          return { ok: true };
+        } catch (caughtError) {
+          const message = caughtError instanceof Error ? caughtError.message : "Unable to restore progress.";
+          setError(message);
+          return { ok: false, error: message };
+        } finally {
+          pendingSaveCountRef.current -= 1;
+          if (pendingSaveCountRef.current === 0) {
+            setIsSaving(false);
+          }
         }
       }
     };
@@ -364,11 +397,30 @@ function WebProgressProvider({ children }: PropsWithChildren): ReactElement {
         progressRef.current = initialProgress;
         setProgress(initialProgress);
         try {
-          await editorDraftStore.clearAll().catch(() => undefined);
+          let draftError: string | null = null;
+          try {
+            await editorDraftStore.clearAll();
+          } catch (caughtDraftError) {
+            draftError = caughtDraftError instanceof Error ? caughtDraftError.message : "Unknown draft-storage error.";
+          }
           saveWebProgress(initialProgress);
-          setError(null);
+          setError(draftError ? `Progress reset, but editor drafts could not be cleared: ${draftError}` : null);
         } catch (caughtError) {
           setError(caughtError instanceof Error ? caughtError.message : "Unable to reset progress.");
+        }
+      },
+      restoreProgress: async (restored) => {
+        const nextProgress = reconcileDerivedProgress(getContentForRole(contentPack, restored.profile.roleTargetId), restored);
+        progressRef.current = nextProgress;
+        setProgress(nextProgress);
+        try {
+          saveWebProgress(nextProgress);
+          setError(null);
+          return { ok: true };
+        } catch (caughtError) {
+          const message = caughtError instanceof Error ? caughtError.message : "Unable to restore progress.";
+          setError(message);
+          return { ok: false, error: message };
         }
       }
     };
