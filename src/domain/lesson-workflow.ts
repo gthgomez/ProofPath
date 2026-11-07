@@ -23,6 +23,12 @@ export interface LessonWorkflowResult {
   cta: LessonWorkflowCta;
   canNavigateForward: boolean;
   canNavigateBack: boolean;
+  /**
+   * True only when a portfolio evidence record was explicitly saved for this
+   * lesson. Lesson completion (Code Lab + checkpoint) is a separate achievement
+   * and must not be presented as portfolio evidence.
+   */
+  portfolioEvidenceSaved: boolean;
 }
 
 export const STEPS: LessonWorkflowStep[] = [
@@ -46,13 +52,19 @@ export function deriveLessonWorkflow(input: {
   /** True when the learner ran practice code at least once (the Experiment activity, not just a visit). */
   experimentAttempted?: boolean;
   /**
+   * True when the learner explicitly saved a portfolio evidence record for this
+   * lesson. Auto-captured Code Lab proofs are lesson achievement, not a separate
+   * portfolio artifact, so they are excluded by the caller.
+   */
+  portfolioEvidenceSaved?: boolean;
+  /**
    * True for a sample lesson opened before a career path is chosen. The lesson
    * is fully playable, but the terminal action routes to path setup instead of
    * a later lesson that would silently redirect there anyway.
    */
   previewMode?: boolean;
 }): LessonWorkflowResult {
-  const { currentStep, miniProjectDone, quizDone, lessonDone, hasQuiz, nextLessonId, allQuestionsAnswered = false, visitedSteps = [], experimentAttempted = false, previewMode = false } = input;
+  const { currentStep, miniProjectDone, quizDone, lessonDone, hasQuiz, nextLessonId, allQuestionsAnswered = false, visitedSteps = [], experimentAttempted = false, portfolioEvidenceSaved = false, previewMode = false } = input;
   const stepIndex = STEPS.indexOf(currentStep);
 
   // Determine unlocked steps
@@ -80,8 +92,10 @@ export function deriveLessonWorkflow(input: {
   if (quizDone || !hasQuiz) {
     completedSteps.push("checkpoint");
   }
-  // Evidence is considered completed if the lesson is fully complete/done
-  if (lessonDone) {
+  // Evidence is the portfolio extension, not the lesson achievement. Completing
+  // the lesson (Code Lab + checkpoint) does not by itself save a portfolio
+  // artifact, so the step stays incomplete until one is explicitly saved.
+  if (lessonDone && portfolioEvidenceSaved) {
     completedSteps.push("evidence");
   }
 
@@ -139,6 +153,7 @@ export function deriveLessonWorkflow(input: {
     unlockedSteps,
     cta,
     canNavigateBack,
-    canNavigateForward
+    canNavigateForward,
+    portfolioEvidenceSaved
   };
 }
