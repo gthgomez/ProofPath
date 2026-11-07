@@ -120,6 +120,19 @@ export function emptyHiddenCheckSummary(): HiddenCheckSummary {
   return { total: 0, passed: 0, failed: 0 };
 }
 
+/**
+ * Public disclosure policy for private verifier checks.
+ *
+ * ProofPath publishes NO hidden-check counts, names, messages, expected values,
+ * seeds, or internal identities. Grading still uses the complete result set
+ * internally (`redactCheckResults`), but every learner-facing or exported
+ * surface carries this zeroed aggregate. This is the single place the policy is
+ * named; callers must not hand-build a summary from private results.
+ */
+export function publicHiddenCheckSummary(): HiddenCheckSummary {
+  return emptyHiddenCheckSummary();
+}
+
 export function redactCheckResults(testResults: CodeRunTestResult[]): {
   hiddenCheckSummary: HiddenCheckSummary;
   visibleCheckResults: CodeRunTestResult[];
@@ -142,7 +155,9 @@ export function redactCheckResults(testResults: CodeRunTestResult[]): {
 export function normalizeCodeRunAttempt(attempt: Partial<CodeRunAttempt> & Pick<CodeRunAttempt, "id" | "lessonId" | "language" | "codeSnapshot" | "stdout" | "stderr" | "passed" | "score" | "runtimeMs" | "testResults" | "createdAt">): CodeRunAttempt {
   const runMode = attempt.runMode ?? "run_checks";
   const redacted = redactCheckResults(attempt.testResults ?? []);
-  const hiddenCheckSummary = emptyHiddenCheckSummary();
+  // Deliberately ignore any supplied summary: the public policy is zero counts.
+  // A sanitized aggregate passed by an older runner must not resurrect counts.
+  const hiddenCheckSummary = publicHiddenCheckSummary();
   const diagnostics = attempt.diagnostics ?? [];
   const command = attempt.command ?? codeRunCommand(attempt.language, runMode);
   const terminalTranscript = attempt.terminalTranscript ?? buildTerminalTranscript({

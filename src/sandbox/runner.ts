@@ -6,7 +6,7 @@ import {
   normalizeCodeRunAttempt,
   redactCheckResults
 } from "@/domain/code-run";
-import type { CodeRunAttempt, CodeRunMode, CodeRunTestResult, LessonRunnerSpec, LessonRunnerTest } from "@/domain/types";
+import type { CodeRunAttempt, CodeRunMode, CodeRunTestResult, LessonRunnerSpec, LessonRunnerTest, RunnerLanguage } from "@/domain/types";
 import { buildProblemDiagnostics } from "@/sandbox/diagnostics";
 import {
   classifySandboxError,
@@ -290,6 +290,30 @@ function timeoutAfter(timeoutMs: number): Promise<never> {
   });
 }
 
+/**
+ * Distinguish a real termination from a boundary that only stopped waiting.
+ *
+ * JavaScript/TypeScript run in a Worker that `terminate()` actually stops.
+ * Python/SQL run synchronously in the page realm, so the race timeout cannot
+ * preempt them; saying "stopped" there would be dishonest.
+ */
+export function formatSandboxTimeoutFeedback(language: RunnerLanguage, timeoutMs: number, terminated: boolean): string {
+  if (terminated) {
+    return [
+      "The runner stopped because the code took too long.",
+      "This lesson may not need a loop, input(), recursion, or repeated step. Remove any code that keeps waiting or repeating after the answer is already known.",
+      "If the lesson does ask for a loop, name the stopping condition in plain English, then make the code match that condition."
+    ].join("\n");
+  }
+
+  const runtime = language === "sql" ? "SQL" : "Python";
+  return [
+    `The runner stopped waiting after ${timeoutMs}ms.`,
+    `${runtime} in this browser sandbox runs synchronously, so this build cannot force it to stop.`,
+    "If the app stays busy, reload the page. Then remove loops, input(), recursion, or repeated work that never reaches an answer."
+  ].join("\n");
+}
+
 function stripTypeScript(code: string): string {
   return code
     .replace(/type\s+\w+\s*=\s*\{[\s\S]*?\};/g, "")
@@ -382,6 +406,8 @@ self.onmessage = (event) => {
   const stderr = [];
   const testResults = [];
   const MAX_OUTPUT_CHARS = 524288;
+  const MAX_ERROR_SUMMARY_CHARS = 2000;
+  const OUTPUT_TRUNCATION_MARKER = "[output truncated: exceeded 512KB limit]";
   let totalChars = 0;
   let truncated = false;
   function appendOutput(target, text) {
@@ -390,15 +416,26 @@ self.onmessage = (event) => {
     const addedLen = normalized.length + 1;
     const remaining = MAX_OUTPUT_CHARS - totalChars;
     if (addedLen >= remaining) {
-      const sliceLen = Math.max(0, remaining - 45);
+      const sliceLen = Math.max(0, remaining - OUTPUT_TRUNCATION_MARKER.length - 1);
       const prefix = sliceLen > 0 ? normalized.slice(0, sliceLen) + "\\n" : "";
-      target.push(prefix + "[output truncated: exceeded 512KB limit]");
+      target.push(prefix + OUTPUT_TRUNCATION_MARKER);
       truncated = true;
       totalChars = MAX_OUTPUT_CHARS;
     } else {
       target.push(normalized);
       totalChars += addedLen;
     }
+  }
+  function appendError(target, text) {
+    // Failure detail bypasses the output budget: a stdout flood must never be
+    // able to erase the line that explains why execution failed. The summary is
+    // bounded so it cannot itself become an unbounded allocation.
+    const normalized = normalizeOutput(text) || "Unknown error";
+    target.push(
+      normalized.length > MAX_ERROR_SUMMARY_CHARS
+        ? normalized.slice(0, MAX_ERROR_SUMMARY_CHARS) + "\\n[error summary truncated]"
+        : normalized
+    );
   }
   const sandboxConsole = {
     log: (...values) => appendOutput(stdout, values.map(normalizeOutput).join(" ")),
@@ -413,24 +450,22 @@ self.onmessage = (event) => {
   self.postMessage = function() {};
 
   if (runMode === "run_file") {
+    let executionError = null;
     try {
       const runner = new Function("console", "postMessage", "self", "window", "globalThis", "\\"use strict\\";\\n" + runtimeCode);
       runner(sandboxConsole, undefined, undefined, undefined, undefined);
-      post({
-        nonce,
-        stdout: stdout.join("\\n"),
-        stderr: stderr.join("\\n"),
-        testResults
-      });
     } catch (error) {
-      appendOutput(stderr, error instanceof Error ? error.message : String(error));
-      post({
-        nonce,
-        stdout: stdout.join("\\n"),
-        stderr: stderr.join("\\n"),
-        testResults
-      });
+      executionError = error instanceof Error ? error.message : String(error);
+      appendError(stderr, executionError);
     }
+    post({
+      nonce,
+      stdout: stdout.join("\\n"),
+      stderr: stderr.join("\\n"),
+      testResults,
+      executionError,
+      outputTruncated: truncated
+    });
     return;
   }
 
@@ -449,6 +484,9 @@ self.onmessage = (event) => {
       }
       testResults.push({ id: test.id, name: test.name, passed: true, visible, message: "Passed" });
     } catch (error) {
+      if (visible) {
+        appendError(stderr, error instanceof Error ? error.message : String(error || "Test failed"));
+      }
       testResults.push({
         id: test.id,
         name: test.name,
@@ -458,6 +496,9 @@ self.onmessage = (event) => {
       });
     } finally {
       // Hidden check output must never reach learner-visible stdout or stderr.
+      // Roll back both buffers unconditionally; no failure branch is allowed to
+      // preserve earlier private output (for example a sentinel printed before a
+      // failing expectation).
       if (!visible) {
         stdout.length = stdoutStart;
         stderr.length = stderrStart;
@@ -469,36 +510,121 @@ self.onmessage = (event) => {
     nonce,
     stdout: stdout.join("\\n"),
     stderr: stderr.join("\\n"),
-    testResults
+    testResults,
+    executionError: null,
+    outputTruncated: truncated
   });
 };
 `;
 }
 
 export const MAX_OUTPUT_CHARS = 524288;
+const MAX_ERROR_SUMMARY_CHARS = 2000;
+export const OUTPUT_TRUNCATION_MARKER = "[output truncated: exceeded 512KB limit]";
 
-export function createOutputCapper(maxChars = MAX_OUTPUT_CHARS): (target: string[], text: unknown) => void {
+/**
+ * Raw execution result. `executionError` is an explicit success/failure signal
+ * that is independent of whether any output buffer retained text: a run that
+ * prints past the output cap and then throws must still be reported as failed.
+ */
+export interface RunnerExecution {
+  stdout: string;
+  stderr: string;
+  testResults: CodeRunTestResult[];
+  executionError: string | null;
+  outputTruncated: boolean;
+}
+
+export interface OutputCapper {
+  append(target: string[], text: unknown): void;
+  /** Append bounded failure detail, bypassing the output budget. */
+  appendError(target: string[], text: unknown): void;
+  readonly truncated: boolean;
+}
+
+export function createOutputCapper(maxChars = MAX_OUTPUT_CHARS): OutputCapper {
   let totalChars = 0;
   let truncated = false;
-  return (target: string[], text: unknown) => {
-    if (truncated) return;
-    const normalized = normalizeOutput(text);
-    const addedLen = normalized.length + 1;
-    const remaining = maxChars - totalChars;
-    if (addedLen >= remaining) {
-      const sliceLen = Math.max(0, remaining - 45);
-      const prefix = sliceLen > 0 ? normalized.slice(0, sliceLen) + "\n" : "";
-      target.push(prefix + "[output truncated: exceeded 512KB limit]");
-      truncated = true;
-      totalChars = maxChars;
-    } else {
-      target.push(normalized);
-      totalChars += addedLen;
+  return {
+    get truncated() {
+      return truncated;
+    },
+    append(target: string[], text: unknown) {
+      if (truncated) return;
+      const normalized = normalizeOutput(text);
+      const addedLen = normalized.length + 1;
+      const remaining = maxChars - totalChars;
+      if (addedLen >= remaining) {
+        const sliceLen = Math.max(0, remaining - OUTPUT_TRUNCATION_MARKER.length - 1);
+        const prefix = sliceLen > 0 ? normalized.slice(0, sliceLen) + "\n" : "";
+        target.push(prefix + OUTPUT_TRUNCATION_MARKER);
+        truncated = true;
+        totalChars = maxChars;
+      } else {
+        target.push(normalized);
+        totalChars += addedLen;
+      }
+    },
+    appendError(target: string[], text: unknown) {
+      // Failure detail bypasses the output budget: a stdout flood must never be
+      // able to erase the line that explains why execution failed. The summary is
+      // bounded so it cannot itself become an unbounded allocation.
+      const normalized = normalizeOutput(text) || "Unknown error";
+      target.push(
+        normalized.length > MAX_ERROR_SUMMARY_CHARS
+          ? `${normalized.slice(0, MAX_ERROR_SUMMARY_CHARS)}\n[error summary truncated]`
+          : normalized
+      );
     }
   };
 }
 
-async function runJavaScriptInWorker(spec: LessonRunnerSpec, runtimeCode: string, runMode: CodeRunMode): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
+interface WorkerResultMessage {
+  nonce?: string;
+  stdout?: unknown;
+  stderr?: unknown;
+  testResults?: unknown;
+  executionError?: unknown;
+  outputTruncated?: unknown;
+}
+
+function parseWorkerResultMessage(data: WorkerResultMessage | null | undefined, nonce: string): RunnerExecution | null {
+  if (!data || data.nonce !== nonce) {
+    return null;
+  }
+
+  if (typeof data.stdout !== "string" || typeof data.stderr !== "string" || !Array.isArray(data.testResults)) {
+    return null;
+  }
+
+  const testResults: CodeRunTestResult[] = [];
+  for (const candidate of data.testResults) {
+    if (!candidate || typeof candidate !== "object") {
+      continue;
+    }
+    const result = candidate as Partial<CodeRunTestResult>;
+    if (typeof result.id !== "string" || typeof result.name !== "string" || typeof result.passed !== "boolean") {
+      continue;
+    }
+    testResults.push({
+      id: result.id,
+      name: result.name,
+      passed: result.passed,
+      visible: result.visible !== false,
+      message: typeof result.message === "string" ? result.message : ""
+    });
+  }
+
+  return {
+    stdout: data.stdout,
+    stderr: data.stderr,
+    testResults,
+    executionError: typeof data.executionError === "string" ? data.executionError : null,
+    outputTruncated: data.outputTruncated === true
+  };
+}
+
+async function runJavaScriptInWorker(spec: LessonRunnerSpec, runtimeCode: string, runMode: CodeRunMode): Promise<RunnerExecution> {
   if (typeof Worker === "undefined" || typeof Blob === "undefined" || typeof URL === "undefined") {
     throw new Error("JavaScript sandbox isolation is unavailable because this environment does not support Web Workers.");
   }
@@ -513,19 +639,17 @@ async function runJavaScriptInWorker(spec: LessonRunnerSpec, runtimeCode: string
       reject(new Error(`Sandbox worker timed out after ${spec.timeoutMs}ms.`));
     }, spec.timeoutMs);
 
-    worker.onmessage = (event: MessageEvent<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults"> & { nonce?: string }>) => {
-      if (!event.data || event.data.nonce !== nonce) {
-        // Discard unauthorized or forged messages emitted by learner code
+    worker.onmessage = (event: MessageEvent<WorkerResultMessage>) => {
+      const parsed = parseWorkerResultMessage(event.data, nonce);
+      if (!parsed) {
+        // Discard unauthorized, forged, or malformed messages emitted by learner
+        // code. The authentic result still arrives under the unguessable nonce.
         return;
       }
       clearTimeout(timeoutId);
       worker.terminate();
       URL.revokeObjectURL(workerUrl);
-      resolve({
-        stdout: event.data.stdout,
-        stderr: event.data.stderr,
-        testResults: event.data.testResults
-      });
+      resolve(parsed);
     };
 
     worker.onerror = (event) => {
@@ -618,9 +742,15 @@ function typeCheckFailureResult(
   spec: LessonRunnerSpec,
   runMode: CodeRunMode,
   typeCheck: TypeScriptTypeCheckResult
-): Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults"> {
+): RunnerExecution {
   if (runMode === "run_file") {
-    return { stdout: "", stderr: typeCheck.stderr, testResults: [] };
+    return {
+      stdout: "",
+      stderr: typeCheck.stderr,
+      testResults: [],
+      executionError: typeCheck.stderr || "TypeScript type check failed.",
+      outputTruncated: false
+    };
   }
 
   const tests = [...spec.visibleTests, ...spec.hiddenTests];
@@ -633,11 +763,13 @@ function typeCheckFailureResult(
       passed: false,
       visible: index < spec.visibleTests.length,
       message: typeCheck.learnerMessage
-    }))
+    })),
+    executionError: null,
+    outputTruncated: false
   };
 }
 
-async function runJavaScriptLike(spec: LessonRunnerSpec, code: string, runMode: CodeRunMode): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
+async function runJavaScriptLike(spec: LessonRunnerSpec, code: string, runMode: CodeRunMode): Promise<RunnerExecution> {
   // TypeScript lessons must fail on type errors, which stripping and running the
   // code can never detect. `stripTypeScript` is still used below, but only to
   // erase annotations before execution: it is no longer the verification step.
@@ -701,15 +833,15 @@ async function getPyodide(): Promise<any> {
 
 // Only invoked for `run_checks`; `run_file` is routed to `runPythonFile`. Checks
 // therefore always use the neutral import-style sentinel, never "__main__".
-async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
+async function runPython(spec: LessonRunnerSpec, code: string): Promise<RunnerExecution> {
   const pyodide = await getPyodide();
   const testResults: CodeRunTestResult[] = [];
   const stdout: string[] = [];
   const stderr: string[] = [];
-  const append = createOutputCapper();
+  const capper = createOutputCapper();
 
-  pyodide.setStdout({ batched: (text: string) => append(stdout, text) });
-  pyodide.setStderr({ batched: (text: string) => append(stderr, text) });
+  pyodide.setStdout({ batched: (text: string) => capper.append(stdout, text) });
+  pyodide.setStderr({ batched: (text: string) => capper.append(stderr, text) });
 
   for (const [index, test] of [...spec.visibleTests, ...spec.hiddenTests].entries()) {
     const visible = index < spec.visibleTests.length;
@@ -731,18 +863,19 @@ async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<Cod
       testResults.push(passResult(test, visible));
     } catch (error) {
       const message = error instanceof Error ? error.message : normalizeOutput(error);
-      if (visible || message === "Output missing") {
-        append(stderr, message);
+      // Only a visible check may publish failure text. A hidden check's message
+      // can contain harness detail, expected values, or a stderr sentinel.
+      if (visible) {
+        capper.appendError(stderr, message);
       }
       testResults.push(failResult(test, visible, error, spec.language));
     } finally {
-      // Hidden checks must never contribute to learner-visible stdout or stderr: their
-      // harness or assertion errors can reveal internal test details or seeds. Keep only visible output.
+      // Hidden checks must never contribute to learner-visible stdout or stderr.
+      // Roll back both buffers unconditionally so a generic "Output missing"
+      // failure path cannot preserve an earlier private sentinel.
       if (!visible) {
         stdout.length = stdoutStart;
-        if (stderr.length > stderrStart && stderr[stderr.length - 1] !== "Output missing") {
-          stderr.length = stderrStart;
-        }
+        stderr.length = stderrStart;
       }
     }
   }
@@ -750,31 +883,38 @@ async function runPython(spec: LessonRunnerSpec, code: string): Promise<Pick<Cod
   return {
     stdout: stdout.join("\n"),
     stderr: stderr.join("\n"),
-    testResults
+    testResults,
+    executionError: null,
+    outputTruncated: capper.truncated
   };
 }
 
-async function runPythonFile(code: string): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
+async function runPythonFile(code: string): Promise<RunnerExecution> {
   const pyodide = await getPyodide();
   const stdout: string[] = [];
   const stderr: string[] = [];
-  const append = createOutputCapper();
+  const capper = createOutputCapper();
+  let executionError: string | null = null;
 
-  pyodide.setStdout({ batched: (text: string) => append(stdout, text) });
-  pyodide.setStderr({ batched: (text: string) => append(stderr, text) });
+  pyodide.setStdout({ batched: (text: string) => capper.append(stdout, text) });
+  pyodide.setStderr({ batched: (text: string) => capper.append(stderr, text) });
   try {
     // Direct execution is the "run the file" scenario: `__name__` is "__main__",
     // so `if __name__ == "__main__":` blocks run, matching `python file.py`.
     pyodide.globals.set("__name__", PYTHON_DIRECT_RUN_NAME);
     await pyodide.runPythonAsync(code);
   } catch (error) {
-    append(stderr, error instanceof Error ? error.message : String(error));
+    executionError = error instanceof Error ? error.message : String(error);
+    // Bypass the output budget so a truncated stdout cannot hide the failure.
+    capper.appendError(stderr, executionError);
   }
 
   return {
     stdout: stdout.join("\n"),
     stderr: stderr.join("\n"),
-    testResults: []
+    testResults: [],
+    executionError,
+    outputTruncated: capper.truncated
   };
 }
 
@@ -826,12 +966,12 @@ async function getSqlJs(): Promise<SqlJsModule> {
   return sqlPromise;
 }
 
-async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
+async function runSql(spec: LessonRunnerSpec, code: string): Promise<RunnerExecution> {
   const SQL = await getSqlJs();
   const testResults: CodeRunTestResult[] = [];
   const stdout: string[] = [];
   const stderr: string[] = [];
-  const append = createOutputCapper();
+  const capper = createOutputCapper();
 
   for (const [index, test] of [...spec.visibleTests, ...spec.hiddenTests].entries()) {
     const visible = index < spec.visibleTests.length;
@@ -862,7 +1002,7 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
       // output reveals the anti-forgery seed inserted by the harness. Evaluate
       // the hidden expectation from `output`, but only publish visible output.
       if (visible) {
-        append(stdout, output);
+        capper.append(stdout, output);
       }
 
       if (!passesOutputCheck(output, test)) {
@@ -871,16 +1011,16 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
       testResults.push(passResult(test, visible, output || "Query ran"));
     } catch (error) {
       const message = error instanceof Error ? error.message : normalizeOutput(error);
-      if (visible || message === "Output missing") {
-        append(stderr, message);
+      // Only a visible check may publish failure text; a hidden harness error can
+      // name seeded rows or expected values.
+      if (visible) {
+        capper.appendError(stderr, message);
       }
       testResults.push(failResult(test, visible, error, spec.language));
     } finally {
       if (!visible) {
         stdout.length = stdoutStart;
-        if (stderr.length > stderrStart && stderr[stderr.length - 1] !== "Output missing") {
-          stderr.length = stderrStart;
-        }
+        stderr.length = stderrStart;
       }
       db.close();
     }
@@ -889,16 +1029,19 @@ async function runSql(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRu
   return {
     stdout: stdout.filter(Boolean).join("\n"),
     stderr: stderr.join("\n"),
-    testResults
+    testResults,
+    executionError: null,
+    outputTruncated: capper.truncated
   };
 }
 
-async function runSqlFile(spec: LessonRunnerSpec, code: string): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> {
+async function runSqlFile(spec: LessonRunnerSpec, code: string): Promise<RunnerExecution> {
   const SQL = await getSqlJs();
   const db = new SQL.Database();
   const stdout: string[] = [];
   const stderr: string[] = [];
-  const append = createOutputCapper();
+  const capper = createOutputCapper();
+  let executionError: string | null = null;
 
   try {
     try {
@@ -907,9 +1050,10 @@ async function runSqlFile(spec: LessonRunnerSpec, code: string): Promise<Pick<Co
       }
 
       const result = db.exec(code);
-      append(stdout, result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n"));
+      capper.append(stdout, result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\n"));
     } catch (error) {
-      append(stderr, error instanceof Error ? error.message : String(error));
+      executionError = error instanceof Error ? error.message : String(error);
+      capper.appendError(stderr, executionError);
     }
   } finally {
     db.close();
@@ -918,7 +1062,9 @@ async function runSqlFile(spec: LessonRunnerSpec, code: string): Promise<Pick<Co
   return {
     stdout: stdout.join("\n"),
     stderr: stderr.join("\n"),
-    testResults: []
+    testResults: [],
+    executionError,
+    outputTruncated: capper.truncated
   };
 }
 
@@ -974,7 +1120,7 @@ export async function runLessonSandbox(
     });
   }
 
-  const runner = async (): Promise<Pick<CodeRunAttempt, "stdout" | "stderr" | "testResults">> => {
+  const runner = async (): Promise<RunnerExecution> => {
     if (runMode === "run_file") {
       if (spec.language === "python") {
         return runPythonFile(code);
@@ -1009,8 +1155,11 @@ export async function runLessonSandbox(
       stderr: result.stderr,
       checkMessages: visibleCheckResults.filter((testResult) => !testResult.passed).map((testResult) => testResult.message)
     });
+    // Execution success is explicit and independent of retained output. A run
+    // that exceeds the output cap and then throws still sets executionError, so
+    // truncation can never turn a failure into a pass.
     const passed = runMode === "run_file"
-      ? diagnostics.every((diagnostic) => diagnostic.severity !== "error")
+      ? result.executionError === null && diagnostics.every((diagnostic) => diagnostic.severity !== "error")
       : rawTestResults.length > 0 && rawTestResults.every((testResult) => testResult.passed);
     const runtimeMs = Date.now() - startedAt;
     return normalizeCodeRunAttempt({
@@ -1044,11 +1193,14 @@ export async function runLessonSandbox(
     });
   } catch (error) {
     const rawError = error instanceof Error ? error.message : normalizeOutput(error);
-    const message = formatSandboxFailureFeedback({
-      kind: classifySandboxError(error),
-      language: spec.language,
-      detail: rawError
-    });
+    const errorKind = classifySandboxError(error);
+    const message = errorKind === "timeout"
+      ? formatSandboxTimeoutFeedback(spec.language, spec.timeoutMs, spec.language === "javascript" || spec.language === "typescript")
+      : formatSandboxFailureFeedback({
+        kind: errorKind,
+        language: spec.language,
+        detail: rawError
+      });
     const stderrContent = runMode === "run_file" ? rawError : message;
     const runtimeMs = Date.now() - startedAt;
     const diagnostics = buildProblemDiagnostics({

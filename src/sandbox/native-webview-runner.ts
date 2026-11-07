@@ -1,5 +1,5 @@
-import { normalizeCodeRunAttempt, redactCheckResults } from "@/domain/code-run";
-import type { CodeRunAttempt, CodeRunMode, LessonRunnerSpec, RunnerLanguage } from "@/domain/types";
+import { normalizeCodeRunAttempt } from "@/domain/code-run";
+import type { CodeRunAttempt, CodeRunMode, CodeRunTestResult, LessonRunnerSpec, RunnerLanguage } from "@/domain/types";
 import {
   PYTHON_DIRECT_RUN_NAME,
   PYTHON_IMPORT_RUN_NAME,
@@ -204,6 +204,8 @@ export function createNativeWebViewRunnerHtml(): string {
     }
 
     var MAX_OUTPUT_CHARS = 524288;
+    var MAX_ERROR_SUMMARY_CHARS = 2000;
+    var OUTPUT_TRUNCATION_MARKER = "[output truncated: exceeded 512KB limit]";
     var totalOutputChars = 0;
     var isOutputTruncated = false;
     function appendOutput(target, text) {
@@ -212,15 +214,25 @@ export function createNativeWebViewRunnerHtml(): string {
       var addedLen = normalized.length + 1;
       var remaining = MAX_OUTPUT_CHARS - totalOutputChars;
       if (addedLen >= remaining) {
-        var sliceLen = Math.max(0, remaining - 45);
+        var sliceLen = Math.max(0, remaining - OUTPUT_TRUNCATION_MARKER.length - 1);
         var prefix = sliceLen > 0 ? normalized.slice(0, sliceLen) + "\\n" : "";
-        target.push(prefix + "[output truncated: exceeded 512KB limit]");
+        target.push(prefix + OUTPUT_TRUNCATION_MARKER);
         isOutputTruncated = true;
         totalOutputChars = MAX_OUTPUT_CHARS;
       } else {
         target.push(normalized);
         totalOutputChars += addedLen;
       }
+    }
+    function appendError(target, text) {
+      // Failure detail bypasses the output budget: a stdout flood must never be
+      // able to erase the line that explains why execution failed.
+      var normalized = normalizeOutput(text) || "Unknown error";
+      target.push(
+        normalized.length > MAX_ERROR_SUMMARY_CHARS
+          ? normalized.slice(0, MAX_ERROR_SUMMARY_CHARS) + "\\n[error summary truncated]"
+          : normalized
+      );
     }
 
     function normalizeOutput(value) {
@@ -318,16 +330,19 @@ export function createNativeWebViewRunnerHtml(): string {
       ].join("\\n");
     }
 
-    function buildAttempt(request, startedAt, stdout, stderr, testResults) {
+    function buildAttempt(request, startedAt, stdout, stderr, testResults, executionError) {
       const passedTests = testResults.filter((result) => result.passed).length;
       const score = testResults.length === 0 ? 0 : Math.round((passedTests / testResults.length) * 100);
-      // Mirror the web runner: a run_file attempt is only passed when it produced
-      // no error output (a raised exception lands in stderr). Checks still require
-      // every result to pass.
+      // Mirror the web runner: a run_file attempt is only passed when execution
+      // did not throw AND no error output was produced. executionError is set by
+      // the catch path independently of the output buffer, so truncation cannot
+      // turn a failed run into a pass. Checks still require every result to pass.
       const passed = request.runMode === "run_file"
-        ? stderr.join("\\n").trim().length === 0
+        ? !executionError && stderr.join("\\n").trim().length === 0
         : testResults.length > 0 && testResults.every((result) => result.passed);
       const redacted = redactCheckResults(testResults);
+      // Public policy: no hidden-check counts are exposed. The aggregate below is
+      // deliberately zeroed so names, counts, seeds, and messages stay private.
       const learnerSafeHiddenSummary = { total: 0, passed: 0, failed: 0 };
 
       return {
@@ -399,6 +414,7 @@ export function createNativeWebViewRunnerHtml(): string {
       const stderr = [];
       const testResults = [];
       const tests = spec.visibleTests.concat(spec.hiddenTests || []);
+      let executionError = null;
       const sandboxConsole = {
         log: (...values) => appendOutput(stdout, values.map(normalizeOutput).join(" ")),
         error: (...values) => appendOutput(stderr, values.map(normalizeOutput).join(" "))
@@ -416,9 +432,9 @@ export function createNativeWebViewRunnerHtml(): string {
         }
         const typeCheck = await runTypeScriptTypeCheck(request.code);
         if (typeCheck.diagnostics.length > 0) {
-          stderr.push(typeCheck.stderr);
+          appendError(stderr, typeCheck.stderr);
           if (request.runMode === "run_file") {
-            return buildAttempt(request, startedAt, stdout, stderr, testResults);
+            return buildAttempt(request, startedAt, stdout, stderr, testResults, typeCheck.stderr || "TypeScript type check failed.");
           }
           for (let index = 0; index < tests.length; index += 1) {
             testResults.push({
@@ -429,7 +445,7 @@ export function createNativeWebViewRunnerHtml(): string {
               message: typeCheck.learnerMessage
             });
           }
-          return buildAttempt(request, startedAt, stdout, stderr, testResults);
+          return buildAttempt(request, startedAt, stdout, stderr, testResults, null);
         }
       }
 
@@ -440,9 +456,11 @@ export function createNativeWebViewRunnerHtml(): string {
           const runner = new Function("console", "ReactNativeWebView", "window", "postMessage", "ProofPathSandbox", "\\"use strict\\";\\n" + runtimeCode);
           runner(sandboxConsole, undefined, undefined, undefined, undefined);
         } catch (error) {
-          appendOutput(stderr, error instanceof Error ? error.message : String(error));
+          executionError = error instanceof Error ? error.message : String(error);
+          // Bypass the output budget so truncation cannot hide the failure.
+          appendError(stderr, executionError);
         }
-        return buildAttempt(request, startedAt, stdout, stderr, testResults);
+        return buildAttempt(request, startedAt, stdout, stderr, testResults, executionError);
       }
 
       for (let index = 0; index < tests.length; index += 1) {
@@ -460,6 +478,9 @@ export function createNativeWebViewRunnerHtml(): string {
           }
           testResults.push({ id: test.id, name: test.name, passed: true, visible, message: "Passed" });
         } catch (error) {
+          if (visible) {
+            appendError(stderr, error instanceof Error ? error.message : String(error || "Test failed"));
+          }
           testResults.push({
             id: test.id,
             name: test.name,
@@ -469,6 +490,8 @@ export function createNativeWebViewRunnerHtml(): string {
           });
         } finally {
           // Hidden check output must never reach learner-visible stdout or stderr.
+          // Roll back both buffers unconditionally; a generic "Output missing"
+          // failure must not preserve an earlier private sentinel.
           if (!visible) {
             stdout.length = stdoutStart;
             stderr.length = stderrStart;
@@ -476,7 +499,7 @@ export function createNativeWebViewRunnerHtml(): string {
         }
       }
 
-      return buildAttempt(request, startedAt, stdout, stderr, testResults);
+      return buildAttempt(request, startedAt, stdout, stderr, testResults, null);
     }
 
     const scriptPromises = {};
@@ -559,12 +582,15 @@ export function createNativeWebViewRunnerHtml(): string {
       pyodide.globals.set("__name__", moduleName);
 
       if (request.runMode === "run_file") {
+        let executionError = null;
         try {
           await pyodide.runPythonAsync(request.code);
         } catch (error) {
-          appendOutput(stderr, error instanceof Error ? error.message : String(error));
+          executionError = error instanceof Error ? error.message : String(error);
+          // Bypass the output budget so truncation cannot hide the failure.
+          appendError(stderr, executionError);
         }
-        return buildAttempt(request, startedAt, stdout, stderr, testResults);
+        return buildAttempt(request, startedAt, stdout, stderr, testResults, executionError);
       }
 
       for (let index = 0; index < tests.length; index += 1) {
@@ -588,7 +614,7 @@ export function createNativeWebViewRunnerHtml(): string {
           testResults.push({ id: test.id, name: test.name, passed: true, visible, message: "Passed" });
         } catch (error) {
           if (visible) {
-            appendOutput(stderr, error instanceof Error ? error.message : String(error || "Test failed"));
+            appendError(stderr, error instanceof Error ? error.message : String(error || "Test failed"));
           }
           testResults.push({
             id: test.id,
@@ -599,7 +625,8 @@ export function createNativeWebViewRunnerHtml(): string {
           });
         } finally {
           // Hidden checks must never contribute to learner-visible stdout or stderr: their
-          // harness can reveal the anti-forgery seed. Keep only visible output.
+          // harness can reveal the anti-forgery seed. Roll back both buffers
+          // unconditionally so a generic failure cannot preserve earlier output.
           if (!visible) {
             stdout.length = stdoutStart;
             stderr.length = stderrStart;
@@ -607,7 +634,7 @@ export function createNativeWebViewRunnerHtml(): string {
         }
       }
 
-      return buildAttempt(request, startedAt, stdout, stderr, testResults);
+      return buildAttempt(request, startedAt, stdout, stderr, testResults, null);
     }
 
     let sqlRuntime = null;
@@ -652,6 +679,7 @@ export function createNativeWebViewRunnerHtml(): string {
 
       if (request.runMode === "run_file") {
         const fileDb = new SQL.Database();
+        let executionError = null;
         try {
           if (spec.setupCode) {
             fileDb.run(spec.setupCode);
@@ -661,11 +689,12 @@ export function createNativeWebViewRunnerHtml(): string {
           const output = result.flatMap((table) => table.values.map((row) => row.join(" | "))).join("\\n");
           appendOutput(stdout, output);
         } catch (error) {
-          appendOutput(stderr, error instanceof Error ? error.message : String(error));
+          executionError = error instanceof Error ? error.message : String(error);
+          appendError(stderr, executionError);
         } finally {
           fileDb.close();
         }
-        return buildAttempt(request, startedAt, stdout.filter(Boolean), stderr, testResults);
+        return buildAttempt(request, startedAt, stdout.filter(Boolean), stderr, testResults, executionError);
       }
 
       for (let index = 0; index < tests.length; index += 1) {
@@ -704,8 +733,10 @@ export function createNativeWebViewRunnerHtml(): string {
           testResults.push({ id: test.id, name: test.name, passed: true, visible, message: output || "Query ran" });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error || "Test failed");
-          if (visible || message === "Output missing") {
-            appendOutput(stderr, message);
+          // Only a visible check may publish failure text; a hidden harness error
+          // can name seeded rows or expected values.
+          if (visible) {
+            appendError(stderr, message);
           }
           testResults.push({
             id: test.id,
@@ -717,15 +748,13 @@ export function createNativeWebViewRunnerHtml(): string {
         } finally {
           if (!visible) {
             stdout.length = stdoutStart;
-            if (stderr.length > stderrStart && stderr[stderr.length - 1] !== "Output missing") {
-              stderr.length = stderrStart;
-            }
+            stderr.length = stderrStart;
           }
           db.close();
         }
       }
 
-      return buildAttempt(request, startedAt, stdout.filter(Boolean), stderr, testResults);
+      return buildAttempt(request, startedAt, stdout.filter(Boolean), stderr, testResults, null);
     }
 
     function runnerErrorAttempt(request, error) {
@@ -820,13 +849,100 @@ export function createNativeWebViewRunnerHtml(): string {
 </html>`;
 }
 
+const RUNNER_LANGUAGES: readonly RunnerLanguage[] = ["python", "sql", "javascript", "typescript"];
+
+function isRunnerLanguage(value: unknown): value is RunnerLanguage {
+  return typeof value === "string" && (RUNNER_LANGUAGES as readonly string[]).includes(value);
+}
+
+/**
+ * Reconstruct a result message from known fields only.
+ *
+ * This is a shape validator, not an authentication mechanism: the webview is
+ * the trust boundary for `passed`/`score` because hidden check results are
+ * stripped before the message leaves the webview. The request correlation ID
+ * (checked by the Code Lab host) prevents a timed-out or stale run from being
+ * crossed with a newer one; it does not make a forged same-run message
+ * impossible. See docs/sandbox-runtime-limits.md.
+ */
+function sanitizeNativeAttempt(raw: unknown): CodeRunAttempt | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const attempt = raw as Record<string, unknown>;
+  if (
+    typeof attempt.id !== "string"
+    || typeof attempt.lessonId !== "string"
+    || !isRunnerLanguage(attempt.language)
+    || typeof attempt.codeSnapshot !== "string"
+    || typeof attempt.stdout !== "string"
+    || typeof attempt.stderr !== "string"
+    || typeof attempt.passed !== "boolean"
+    || typeof attempt.score !== "number"
+    || typeof attempt.runtimeMs !== "number"
+    || typeof attempt.createdAt !== "string"
+    || !Array.isArray(attempt.testResults)
+  ) {
+    return null;
+  }
+
+  const testResults: CodeRunTestResult[] = [];
+  for (const candidate of attempt.testResults) {
+    if (!candidate || typeof candidate !== "object") {
+      return null;
+    }
+    const result = candidate as Record<string, unknown>;
+    if (
+      typeof result.id !== "string"
+      || typeof result.name !== "string"
+      || typeof result.passed !== "boolean"
+      || typeof result.visible !== "boolean"
+    ) {
+      return null;
+    }
+    testResults.push({
+      id: result.id,
+      name: result.name,
+      passed: result.passed,
+      visible: result.visible,
+      message: typeof result.message === "string" ? result.message : ""
+    });
+  }
+
+  const runMode: CodeRunMode = attempt.runMode === "run_file" ? "run_file" : "run_checks";
+  // A check run cannot be a pass if a visible check in the same message failed.
+  // Hidden results are absent here by design; their pass/fail is reflected in the
+  // webview-computed `passed` flag, which is trusted only within this boundary.
+  const passed = attempt.passed === true
+    && !(runMode === "run_checks" && testResults.some((result) => result.visible && !result.passed));
+  const score = Math.max(0, Math.min(100, Math.round(attempt.score)));
+
+  return normalizeCodeRunAttempt({
+    id: attempt.id,
+    lessonId: attempt.lessonId,
+    language: attempt.language,
+    runMode,
+    ...(typeof attempt.command === "string" ? { command: attempt.command } : {}),
+    codeSnapshot: attempt.codeSnapshot,
+    stdout: attempt.stdout,
+    stderr: attempt.stderr,
+    passed,
+    score,
+    runtimeMs: attempt.runtimeMs,
+    testResults,
+    diagnostics: [],
+    createdAt: attempt.createdAt
+  });
+}
+
 export function parseNativeWebViewRunnerMessage(payload: string): NativeWebViewRunnerMessage | null {
   try {
     const parsed = JSON.parse(payload) as {
       type?: string;
       assets?: typeof SANDBOX_ASSET_PATHS;
       requestId?: string;
-      attempt?: CodeRunAttempt;
+      attempt?: unknown;
       language?: RunnerLanguage;
     };
 
@@ -838,16 +954,15 @@ export function parseNativeWebViewRunnerMessage(payload: string): NativeWebViewR
       return { type: "sandbox-warm", language: parsed.language };
     }
 
-    if (parsed.type === "sandbox-result" && parsed.attempt) {
-      const redacted = redactCheckResults(parsed.attempt.testResults ?? []);
+    if (parsed.type === "sandbox-result") {
+      const attempt = sanitizeNativeAttempt(parsed.attempt);
+      if (!attempt) {
+        return null;
+      }
       return {
         type: "sandbox-result",
         requestId: typeof parsed.requestId === "string" ? parsed.requestId : undefined,
-        attempt: normalizeCodeRunAttempt({
-          ...parsed.attempt,
-          testResults: redacted.visibleCheckResults,
-          hiddenCheckSummary: redacted.hiddenCheckSummary
-        })
+        attempt
       };
     }
 

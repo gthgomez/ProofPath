@@ -8,6 +8,7 @@ import {
   PYTHON_IMPORT_RUN_NAME,
   SQL_HARNESS_PATTERN,
   createJavaScriptWorkerSource,
+  formatSandboxTimeoutFeedback,
   isTrustedSqlHarness,
   preloadSandbox,
   runLessonSandbox
@@ -305,12 +306,13 @@ describe("lesson sandbox runner", () => {
         "2026-05-07T20:40:00.000Z"
       );
 
-      // The visible check passes (score 50 = 1 of 2 checks), so the "Output
-      // missing" failure comes from the hidden check that inserted the unseen sql
-      // topic. Only a harness-seeded hidden check can distinguish the forgery.
+      // The visible check passes (score 50 = 1 of 2 checks), so the failure comes
+      // from the hidden check that inserted the unseen sql topic. Only a
+      // harness-seeded hidden check can distinguish the forgery. The hidden
+      // check's failure text must not leak to the learner's stderr.
       expect(forged.passed).toBe(false);
       expect(forged.score).toBe(50);
-      expect(forged.stderr).toContain("Output missing");
+      expect(forged.stderr).not.toContain("Output missing");
 
       // Revert sensitivity (#9): the hidden check only discriminates because the
       // runner actually executes the trusted harness INSERT. The honest aggregate
@@ -691,5 +693,146 @@ describe("sandbox hidden check isolation and output limits", () => {
     const result = await runLessonSandbox(spec, "lesson-sql-big", spec.starterCode, new Date().toISOString(), "run_file");
     expect(result.stdout).toContain("[output truncated: exceeded 512KB limit]");
     expect(result.stdout.length).toBeLessThanOrEqual(530000);
+  });
+});
+
+describe("sandbox privacy and truncation truth (A01/A02)", () => {
+  it("never publishes a hidden Python stderr sentinel, even when the hidden expectation fails", async () => {
+    const spec: LessonRunnerSpec = {
+      language: "python",
+      instructions: "Print the visible answer.",
+      starterCode: 'print("DONE")',
+      visibleTests: [
+        { id: "visible", name: "Visible check", code: "# comment-only checker", expectedOutputIncludes: ["DONE"] }
+      ],
+      hiddenTests: [
+        {
+          id: "hidden",
+          name: "Hidden check",
+          // Emits a private sentinel to stderr, then fails its output expectation.
+          code: [
+            "import sys",
+            "sys.stderr.write('HIDDEN_ONLY_SENTINEL_2026\\n')",
+            "print('not the expected row')"
+          ].join("\n"),
+          expectedOutputIncludes: ["SECRET_EXPECTED_ROW_2026"]
+        }
+      ],
+      expectedOutput: ["DONE"],
+      timeoutMs: 30000,
+      allowNetwork: false
+    };
+
+    const result = await runLessonSandbox(
+      spec,
+      "lesson-python-hidden-sentinel",
+      spec.starterCode,
+      "2026-11-07T21:00:00.000Z",
+      "run_checks"
+    );
+
+    // Grading still reflects the hidden failure (1 of 2 checks passed).
+    expect(result.passed).toBe(false);
+    expect(result.score).toBe(50);
+    expect(result.testResults.map((testResult) => testResult.id)).toEqual(["visible"]);
+
+    // The sentinel and hidden expectation never reach any learner-visible field.
+    const serialized = JSON.stringify(result);
+    for (const secret of ["HIDDEN_ONLY_SENTINEL_2026", "SECRET_EXPECTED_ROW_2026", "Output missing"]) {
+      expect(serialized).not.toContain(secret);
+      expect(result.stdout).not.toContain(secret);
+      expect(result.stderr).not.toContain(secret);
+    }
+    expect(result.terminalTranscript.some((event) => JSON.stringify(event).includes("HIDDEN_ONLY_SENTINEL_2026"))).toBe(false);
+  }, 60000);
+
+  it("reports a Python run_file as failed when stdout is truncated before it raises", async () => {
+    const spec: LessonRunnerSpec = {
+      language: "python",
+      instructions: "Produce output, then fail.",
+      starterCode: "",
+      visibleTests: [],
+      hiddenTests: [],
+      expectedOutput: [],
+      timeoutMs: 30000,
+      allowNetwork: false
+    };
+    const code = [
+      "for i in range(20000):",
+      "    print('filler ' + str(i) + ' ' + 'x' * 60)",
+      "raise RuntimeError('boom-after-truncation')"
+    ].join("\n");
+
+    const result = await runLessonSandbox(spec, "lesson-python-truncation-throw", code, "2026-11-07T21:01:00.000Z", "run_file");
+
+    expect(result.passed).toBe(false);
+    expect(result.stdout).toContain("[output truncated: exceeded 512KB limit]");
+    // The bounded error summary survives the truncation.
+    expect(result.stderr).toContain("boom-after-truncation");
+    expect(result.terminalTranscript.some((event) => event.type === "result" && event.status === "failed")).toBe(true);
+  }, 60000);
+
+  it("reports a JavaScript run_file as failed when output truncates before a throw", async () => {
+    const spec: LessonRunnerSpec = {
+      language: "javascript",
+      instructions: "Produce output, then fail.",
+      starterCode: "",
+      visibleTests: [],
+      hiddenTests: [],
+      expectedOutput: [],
+      timeoutMs: 10000,
+      allowNetwork: false
+    };
+    const code = [
+      "for (let i = 0; i < 20000; i += 1) { console.log('padding ' + i + ' ' + 'x'.repeat(60)); }",
+      "throw new Error('boom-after-truncation');"
+    ].join("\n");
+
+    const result = await runLessonSandbox(spec, "lesson-js-truncation-throw", code, "2026-11-07T21:02:00.000Z", "run_file");
+
+    expect(result.passed).toBe(false);
+    expect(result.stdout).toContain("[output truncated: exceeded 512KB limit]");
+    expect(result.stderr).toContain("boom-after-truncation");
+  });
+
+  it("reports a SQL run_file as failed when the statement errors", async () => {
+    const spec: LessonRunnerSpec = {
+      language: "sql",
+      instructions: "Query the seeded table.",
+      starterCode: "SELECT topic FROM sessions;",
+      setupCode: "CREATE TABLE sessions (topic TEXT); INSERT INTO sessions (topic) VALUES ('python');",
+      visibleTests: [],
+      hiddenTests: [],
+      expectedOutput: [],
+      timeoutMs: 30000,
+      allowNetwork: false
+    };
+
+    const result = await runLessonSandbox(
+      spec,
+      "lesson-sql-run-file-error",
+      "SELECT topic FROM sessions; SELECT missing_column FROM sessions;",
+      "2026-11-07T21:03:00.000Z",
+      "run_file"
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.stderr.toLowerCase()).toContain("no such column");
+  });
+});
+
+describe("timeout feedback honesty (A03)", () => {
+  it("distinguishes a terminated run from a boundary that only stopped waiting", () => {
+    const terminated = formatSandboxTimeoutFeedback("javascript", 4000, true);
+    expect(terminated).toContain("stopped because the code took too long");
+    expect(terminated).not.toContain("cannot force it to stop");
+
+    const waiting = formatSandboxTimeoutFeedback("python", 4000, false);
+    expect(waiting).toContain("stopped waiting after 4000ms");
+    expect(waiting).toContain("cannot force it to stop");
+    expect(waiting).not.toContain("stopped because");
+
+    const sql = formatSandboxTimeoutFeedback("sql", 5000, false);
+    expect(sql).toContain("SQL in this browser sandbox runs synchronously");
   });
 });
