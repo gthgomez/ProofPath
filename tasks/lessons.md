@@ -1,5 +1,40 @@
 # Lessons
 
+## 2026-11-15 — Native offline hidden prints need the same stdout rollback
+
+- **What went wrong:** Web/Pyodide and native WebView rolled hidden stdout/stderr
+  back per check, but `runNativePythonProof` left hidden `print(...)` lines in the
+  shared stdout buffer. A printing hidden check could publish a sentinel into
+  learner-visible stdout, transcript, and exports even though summaries stayed zeroed.
+- **Why:** The offline regex runner graded from the shared buffer and never restored
+  `stdoutStart` for `!visible` checks; sibling runners already did.
+- **How to prevent:** Roll hidden stdout back in `runTest`'s `finally`. Cover with a
+  native-only hidden-print fixture (pass and fail). Do not rely on web-only privacy
+  tests to protect the offline beginner path.
+
+## 2026-11-15 — Last-run diagnostics must survive an unverified edit
+
+- **What went wrong:** Terminal and Problems were bound to `verifiedRun` only, so any
+  keystroke after a failure cleared the clue the learner needed while editing.
+- **Why:** Draft-match gating correctly withheld “Check passed,” but was reused for
+  all feedback surfaces.
+- **How to prevent:** Keep `latestRun` terminal/diagnostics while unverified; reserve
+  draft-match gating for verified badges and completion copy.
+
+## 2026-11-15 — Hidden-only failure still needs learner-safe feedback
+
+- **What went wrong:** Rolling back hidden stdout/stderr and zeroing public hidden
+  counts left a graded failure with every visible check green, empty `diagnostics`,
+  and Code Lab copy that said "Read the failing test" when no failing visible test
+  existed. Privacy was preserved; beginners got no actionable explanation.
+- **Why:** Disclosure treated "do not publish private detail" as "publish nothing,"
+  and status copy assumed every failure had a visible failing check.
+- **How to prevent:** When `run_checks` fails while every published check passed,
+  append one count-free `private-verification-failed` diagnostic at the disclosure
+  boundary (`normalizeCodeRunAttempt`). Keep names/counts/expected values out.
+  Update Code Lab status copy for that diagnostic. Cover with synthetic fixtures
+  and keep privacy describes self-sufficient for the runtime import hook.
+
 ## 2026-09-23 — Typecheck before vitest on new modules
 
 - **What went wrong:** New domain module's sort helper had a callback-contract mismatch (arrows expected `ScoredHit<T>`, function passed bare `T`). Went straight to `vitest run`; esbuild strips types without checking, so the mismatch surfaced as `Cannot read properties of undefined (reading 'concept')` inside `Array.sort` — only on score ties — costing a long misdirected debugging session (stack lines also drifted due to repeated edits between runs).

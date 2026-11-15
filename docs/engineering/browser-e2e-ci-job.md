@@ -1,8 +1,15 @@
-# Browser E2E CI Job (pending `workflow` scope)
+# Browser E2E CI Job
 
-The browser gates are implemented and pass locally, but the available OAuth
-token cannot modify `.github/workflows/ci.yml` because it lacks GitHub's
-`workflow` scope. Apply this job with a token/app that has that scope.
+The browser gates are implemented and live in `.github/workflows/ci.yml` as the
+`e2e-web` job (pinned checkout/setup-node, Playwright Chromium, `npm run build:web`,
+the browser scripts including private-verification feedback, failure-artifact
+upload). Keep this document as the human-readable copy of that job for local
+reproduction and review.
+
+Historical note: an earlier campaign recorded the job here because the available
+OAuth token lacked GitHub's `workflow` scope and could not modify
+`.github/workflows/ci.yml`. That gate is no longer the blocker once a token with
+`workflow` scope applies the job below.
 
 ```yaml
   # Real-browser gate: the unit suite cannot prove that the web build actually
@@ -47,6 +54,9 @@ token cannot modify `.github/workflows/ci.yml` because it lacks GitHub's
       - name: Offline update safety and offline runtime assets
         run: node scripts/e2e-offline-update.mjs
 
+      - name: Private-verification feedback (hidden-only fail, no leaks)
+        run: node scripts/e2e-private-verification.mjs
+
       - name: Upload browser artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -64,6 +74,7 @@ npx playwright install chromium
 npm run build:web
 node scripts/e2e-web-journey.mjs
 node scripts/e2e-runtime-matrix.mjs
+node scripts/e2e-private-verification.mjs
 ```
 
 The scripts start their own static server for `dist/`, so no hosted deployment

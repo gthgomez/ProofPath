@@ -712,6 +712,17 @@ describe("sandbox hidden check isolation and output limits", () => {
 });
 
 describe("sandbox privacy and truncation truth (A01/A02)", () => {
+  beforeAll(() => {
+    // This describe is a sibling of "lesson sandbox runner", so it does not
+    // inherit that suite's import hook. Without it, filtered runs fail closed
+    // with a runner error (score 0) and can hide real privacy regressions.
+    globalThis.__proofpathImportRuntimeModuleForTests = (specifier: string) => import(specifier);
+  });
+
+  afterAll(() => {
+    globalThis.__proofpathImportRuntimeModuleForTests = undefined;
+  });
+
   it("never publishes a hidden Python stderr sentinel, even when the hidden expectation fails", async () => {
     const spec: LessonRunnerSpec = {
       language: "python",
@@ -750,6 +761,12 @@ describe("sandbox privacy and truncation truth (A01/A02)", () => {
     expect(result.passed).toBe(false);
     expect(result.score).toBe(50);
     expect(result.testResults.map((testResult) => testResult.id)).toEqual(["visible"]);
+    expect(result.testResults[0]?.passed).toBe(true);
+
+    // Beginners get honest, count-free feedback instead of an empty Problems panel.
+    expect(result.diagnostics.some((diagnostic) => diagnostic.id === "private-verification-failed")).toBe(true);
+    expect(result.diagnostics.some((diagnostic) => /private verification/i.test(diagnostic.message))).toBe(true);
+    expect(result.diagnostics.some((diagnostic) => /1 of 2|hidden check|SECRET_/i.test(JSON.stringify(diagnostic)))).toBe(false);
 
     // The sentinel and hidden expectation never reach any learner-visible field.
     const serialized = JSON.stringify(result);
