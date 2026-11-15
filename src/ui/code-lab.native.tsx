@@ -162,7 +162,13 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
     }
   };
 
-  const buildFailedAttempt = (message: string, now = new Date().toISOString(), runtimeMs = 0, runMode: CodeRunMode = activeRunMode): CodeRunAttempt => {
+  const buildFailedAttempt = (
+    message: string,
+    now = new Date().toISOString(),
+    runtimeMs = 0,
+    runMode: CodeRunMode = activeRunMode,
+    codeSnapshot = code
+  ): CodeRunAttempt => {
     const command = codeRunCommand(runnerSpec.language, runMode);
     const diagnostics = buildProblemDiagnostics({ language: runnerSpec.language, stderr: message, errorMessage: message });
     const testResults = runMode === "run_checks" ? [
@@ -182,7 +188,9 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
       runMode,
       sandboxDisclosureVersion: CURRENT_SANDBOX_DISCLOSURE_VERSION,
       command,
-      codeSnapshot: code,
+      // Bind the snapshot that was actually submitted for this request, not the
+      // live editor value (which the learner may have changed during a long boot).
+      codeSnapshot,
       stdout: "",
       stderr: message,
       passed: false,
@@ -307,6 +315,7 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
       }, 420);
     }, 160);
     timeoutRef.current = setTimeout(() => {
+      const timedOutRequest = activeRequestRef.current;
       activeRequestIdRef.current = null;
       clearRunnerTimeout();
       clearPhaseTimeout();
@@ -321,7 +330,8 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
           formatNativeTimeoutFeedback(runnerSpec.language, nativeTimeoutMs),
           now,
           nativeTimeoutMs,
-          runMode
+          runMode,
+          timedOutRequest?.code ?? code
         )
       );
     }, nativeTimeoutMs);
@@ -424,11 +434,13 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
   const proofCaptured = verifiedRun?.runMode === "run_checks" && verifiedRun.passed;
   const fileRan = verifiedRun?.runMode === "run_file" && verifiedRun.passed;
   const runtimeCapabilities = runtimeCapabilitiesFor(runnerSpec.language);
+  // Keep the last executed terminal/diagnostics visible after the learner edits.
+  // Only verified badges require a byte-matched draft; failure clues must survive.
   const terminalEvents: TerminalEvent[] = isRunning
     ? buildRunningTerminalEvents(runnerSpec.language, activeRunMode, activePhaseIndex)
-    : verifiedRun?.terminalTranscript ?? buildRunningTerminalEvents(runnerSpec.language, "run_checks", -1);
-  const diagnostics = verifiedRun?.diagnostics ?? [];
-  const privateVerificationFailed = diagnostics.some(
+    : latestRun?.terminalTranscript ?? buildRunningTerminalEvents(runnerSpec.language, "run_checks", -1);
+  const diagnostics = latestRun?.diagnostics ?? [];
+  const privateVerificationFailed = Boolean(verifiedRun) && diagnostics.some(
     (diagnostic) => diagnostic.id === PRIVATE_VERIFICATION_DIAGNOSTIC_ID
   );
   const scaffoldNotice = isScaffoldStarter(runnerSpec.starterCode) ? scaffoldStarterNotice() : null;

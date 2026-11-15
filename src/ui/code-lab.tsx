@@ -199,11 +199,14 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
   const fileRan = verifiedRun?.runMode === "run_file" && verifiedRun.passed;
   const runtimeCapabilities = runtimeCapabilitiesFor(runnerSpec.language);
   const capability = getSandboxCapabilityLabel(runnerSpec.language);
+  // Keep the last executed terminal/diagnostics visible after the learner edits.
+  // Only the green "Check passed" / verified badges require a byte-matched draft;
+  // hiding the failure clue mid-edit made beginners lose the next fix.
   const terminalEvents: TerminalEvent[] = isRunning
     ? buildRunningTerminalEvents(runnerSpec.language, activeRunMode, activePhaseIndex)
-    : verifiedRun?.terminalTranscript ?? buildRunningTerminalEvents(runnerSpec.language, "run_checks", -1);
-  const diagnostics = verifiedRun?.diagnostics ?? [];
-  const privateVerificationFailed = diagnostics.some(
+    : learnerLatestRun?.terminalTranscript ?? buildRunningTerminalEvents(runnerSpec.language, "run_checks", -1);
+  const diagnostics = learnerLatestRun?.diagnostics ?? [];
+  const privateVerificationFailed = Boolean(verifiedRun) && diagnostics.some(
     (diagnostic) => diagnostic.id === PRIVATE_VERIFICATION_DIAGNOSTIC_ID
   );
   const scaffoldNotice = isScaffoldStarter(runnerSpec.starterCode) ? scaffoldStarterNotice() : null;
