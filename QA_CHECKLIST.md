@@ -207,7 +207,7 @@ Merged-tree verification: `npm run verify` 66 files / 613 tests, `tsc` clean, `n
 - [x] Offline update: content-hashed versions, all-or-nothing install, failed B preserves working A, repaired B activates, offline Python works on both A and B, old caches removed only after completion
 - [x] First-time browser journey from empty storage completes onboarding, path selection, checks, checkpoint, evidence, backup/reset/import, and offline reload
 - [x] Workspace browser journey runs the real verifier (fail → repair → pass), saves coherent self-reported evidence, awards the mission after placement, and preserves manifest provenance in the reviewer packet
-- [x] Browser E2E job is in `.github/workflows/ci.yml` (`e2e-web`; applied 2026-11-15 — hosted confirmation awaits branch CI)
+- [x] Browser E2E job is hosted CI (`e2e-web` green on PR #54; private-verification script added 2026-11-15)
 - [x] Native restore with transaction identity and reset execution verified on the offline emulator; SQL WebView cold start exceeded 24 s under software rendering and is recorded as a limitation
 
 ---

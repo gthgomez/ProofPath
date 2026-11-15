@@ -83,6 +83,9 @@ jobs:
       - name: Offline update safety and offline runtime assets
         run: node scripts/e2e-offline-update.mjs
 
+      - name: Private-verification feedback (hidden-only fail, no leaks)
+        run: node scripts/e2e-private-verification.mjs
+
       - name: Upload browser artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4

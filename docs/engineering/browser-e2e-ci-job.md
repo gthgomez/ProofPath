@@ -2,8 +2,9 @@
 
 The browser gates are implemented and live in `.github/workflows/ci.yml` as the
 `e2e-web` job (pinned checkout/setup-node, Playwright Chromium, `npm run build:web`,
-all five browser scripts, failure-artifact upload). Keep this document as the
-human-readable copy of that job for local reproduction and review.
+the browser scripts including private-verification feedback, failure-artifact
+upload). Keep this document as the human-readable copy of that job for local
+reproduction and review.
 
 Historical note: an earlier campaign recorded the job here because the available
 OAuth token lacked GitHub's `workflow` scope and could not modify
@@ -53,6 +54,9 @@ OAuth token lacked GitHub's `workflow` scope and could not modify
       - name: Offline update safety and offline runtime assets
         run: node scripts/e2e-offline-update.mjs
 
+      - name: Private-verification feedback (hidden-only fail, no leaks)
+        run: node scripts/e2e-private-verification.mjs
+
       - name: Upload browser artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -70,6 +74,7 @@ npx playwright install chromium
 npm run build:web
 node scripts/e2e-web-journey.mjs
 node scripts/e2e-runtime-matrix.mjs
+node scripts/e2e-private-verification.mjs
 ```
 
 The scripts start their own static server for `dist/`, so no hosted deployment
