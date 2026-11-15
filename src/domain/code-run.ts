@@ -12,6 +12,62 @@ import type {
   TerminalResultReason
 } from "@/domain/types";
 
+/** Stable id for the learner-safe private-verification diagnostic. */
+export const PRIVATE_VERIFICATION_DIAGNOSTIC_ID = "private-verification-failed";
+
+/**
+ * Visible checks can all pass while private checks still fail the grade.
+ * Publish one honest, count-free diagnostic so beginners are not left with a
+ * green visible PASS and an empty Problems panel. Never include names, counts,
+ * expected values, seeds, or harness detail.
+ */
+export function privateVerificationFailedDiagnostic(): ProblemDiagnostic {
+  return {
+    id: PRIVATE_VERIFICATION_DIAGNOSTIC_ID,
+    severity: "error",
+    source: "check",
+    message: "Visible checks passed, but additional private verification did not.",
+    beginnerExplanation:
+      "Your printed output matched the visible checks, yet the lesson still has private checks that stay hidden on purpose. Re-read the lesson goal, compare your output with the visible expectations, and make the smallest change that would make the solution more complete — then run checks again.",
+    confidence: "unknown"
+  };
+}
+
+/**
+ * When every published check passed but the graded attempt failed, the failure
+ * must have come from private verification. Append the learner-safe diagnostic
+ * unless one is already present.
+ */
+export function withPrivateVerificationFeedback(
+  diagnostics: ProblemDiagnostic[],
+  options: {
+    passed: boolean;
+    runMode: CodeRunMode;
+    visibleCheckResults: CodeRunTestResult[];
+  }
+): ProblemDiagnostic[] {
+  if (options.runMode !== "run_checks" || options.passed) {
+    return diagnostics;
+  }
+
+  const visibleResults = options.visibleCheckResults.filter((result) => result.visible);
+  if (visibleResults.length === 0 || visibleResults.some((result) => !result.passed)) {
+    return diagnostics;
+  }
+
+  // Legacy quarantine already replaces ambiguous buffers with an explanatory
+  // notice. Do not stack a second synthetic diagnostic on re-normalization once
+  // the disclosure version stamp makes the record look trusted.
+  if (diagnostics.some((diagnostic) => (
+    diagnostic.id === PRIVATE_VERIFICATION_DIAGNOSTIC_ID
+    || diagnostic.id === "legacy-output-quarantine"
+  ))) {
+    return diagnostics;
+  }
+
+  return [...diagnostics, privateVerificationFailedDiagnostic()];
+}
+
 const MAX_PROOF_CODE_SNAPSHOT_LENGTH = 12000;
 
 /**
@@ -220,12 +276,22 @@ export function normalizeCodeRunAttempt(attempt: Partial<CodeRunAttempt> & Pick<
   // legacy transcript that embedded hidden stdout/stderr. Even with a trusted
   // attempt, rebuilding from the already-sanitized buffers keeps one source of
   // truth and makes repeated normalization idempotent.
-  const diagnostics = trustedDisclosure ? (attempt.diagnostics ?? []) : [legacyQuarantineDiagnostic()];
   const stdout = trustedDisclosure ? attempt.stdout : "";
   const stderr = trustedDisclosure ? attempt.stderr : "";
   const visibleCheckResults = trustedDisclosure
     ? redacted.visibleCheckResults
     : sanitizeLegacyVisibleResults(attempt.testResults ?? []);
+  // When every published check passed but the grade failed, private verification
+  // is the cause. Add one count-free diagnostic so beginners are not left with a
+  // green visible PASS and an empty Problems panel. Legacy quarantine still
+  // replaces raw buffers entirely.
+  const diagnostics = trustedDisclosure
+    ? withPrivateVerificationFeedback(attempt.diagnostics ?? [], {
+      passed: attempt.passed,
+      runMode,
+      visibleCheckResults
+    })
+    : [legacyQuarantineDiagnostic()];
   const command = attempt.command ?? codeRunCommand(attempt.language, runMode);
   const terminalTranscript = buildTerminalTranscript({
     command,

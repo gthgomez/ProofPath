@@ -1,8 +1,14 @@
-# Browser E2E CI Job (pending `workflow` scope)
+# Browser E2E CI Job
 
-The browser gates are implemented and pass locally, but the available OAuth
-token cannot modify `.github/workflows/ci.yml` because it lacks GitHub's
-`workflow` scope. Apply this job with a token/app that has that scope.
+The browser gates are implemented and live in `.github/workflows/ci.yml` as the
+`e2e-web` job (pinned checkout/setup-node, Playwright Chromium, `npm run build:web`,
+all five browser scripts, failure-artifact upload). Keep this document as the
+human-readable copy of that job for local reproduction and review.
+
+Historical note: an earlier campaign recorded the job here because the available
+OAuth token lacked GitHub's `workflow` scope and could not modify
+`.github/workflows/ci.yml`. That gate is no longer the blocker once a token with
+`workflow` scope applies the job below.
 
 ```yaml
   # Real-browser gate: the unit suite cannot prove that the web build actually

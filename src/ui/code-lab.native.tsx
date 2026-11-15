@@ -2,7 +2,17 @@ import type { ReactElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
-import { buildRunningTerminalEvents, buildTerminalTranscript, codeRunCommand, CURRENT_SANDBOX_DISCLOSURE_VERSION, emptyHiddenCheckSummary, formatTerminalTranscript, normalizeCodeRunAttempt, runtimeCapabilitiesFor } from "@/domain/code-run";
+import {
+  buildRunningTerminalEvents,
+  buildTerminalTranscript,
+  codeRunCommand,
+  CURRENT_SANDBOX_DISCLOSURE_VERSION,
+  emptyHiddenCheckSummary,
+  formatTerminalTranscript,
+  normalizeCodeRunAttempt,
+  PRIVATE_VERIFICATION_DIAGNOSTIC_ID,
+  runtimeCapabilitiesFor
+} from "@/domain/code-run";
 import { isScaffoldStarter, scaffoldStarterNotice, type ScaffoldStarterNotice } from "@/domain/starter-expectation";
 import type { CodeRunAttempt, CodeRunMode, TerminalEvent } from "@/domain/types";
 import { buildProblemDiagnostics } from "@/sandbox/diagnostics";
@@ -418,6 +428,9 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
     ? buildRunningTerminalEvents(runnerSpec.language, activeRunMode, activePhaseIndex)
     : verifiedRun?.terminalTranscript ?? buildRunningTerminalEvents(runnerSpec.language, "run_checks", -1);
   const diagnostics = verifiedRun?.diagnostics ?? [];
+  const privateVerificationFailed = diagnostics.some(
+    (diagnostic) => diagnostic.id === PRIVATE_VERIFICATION_DIAGNOSTIC_ID
+  );
   const scaffoldNotice = isScaffoldStarter(runnerSpec.starterCode) ? scaffoldStarterNotice() : null;
   const failedGradedRun = verifiedRun?.runMode === "run_checks" && !verifiedRun.passed;
   const runState = isRunning
@@ -431,7 +444,9 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
         : fileRan
           ? "File ran"
           : verifiedRun
-            ? "Needs attention"
+            ? privateVerificationFailed
+              ? "Private checks need work"
+              : "Needs attention"
             : historicalPass
               ? "Passed previously"
               : isBridgeReady
@@ -489,7 +504,9 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
               : fileRan
                 ? "The file ran. Run checks when you are ready to validate the answer."
                 : verifiedRun
-                  ? "Read the failing test, change the smallest thing, then run again."
+                  ? privateVerificationFailed
+                    ? "Visible checks passed, but private verification did not. Re-read the lesson goal and refine the solution without expecting a checklist of hidden cases."
+                    : "Read the failing test, change the smallest thing, then run again."
                   : historicalPass
                     ? "You passed this lesson previously. Run checks to verify the code currently in the editor."
                     : "Run file to inspect output. Run checks when you are ready to validate the answer."}

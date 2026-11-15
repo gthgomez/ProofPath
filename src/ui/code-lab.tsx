@@ -1,7 +1,13 @@
 import type { ReactElement } from "react";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { buildRunningTerminalEvents, emptyHiddenCheckSummary, formatTerminalTranscript, runtimeCapabilitiesFor } from "@/domain/code-run";
+import {
+  buildRunningTerminalEvents,
+  emptyHiddenCheckSummary,
+  formatTerminalTranscript,
+  PRIVATE_VERIFICATION_DIAGNOSTIC_ID,
+  runtimeCapabilitiesFor
+} from "@/domain/code-run";
 import { isScaffoldStarter, scaffoldStarterNotice, type ScaffoldStarterNotice } from "@/domain/starter-expectation";
 import type { CodeRunAttempt, CodeRunMode, HiddenCheckSummary, TerminalEvent } from "@/domain/types";
 import { runLessonSandbox, getSandboxCapabilityLabel } from "@/sandbox/runner";
@@ -41,6 +47,9 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
   const [focusedLine, setFocusedLine] = useState<number | null>(null);
   const [draftStatus, setDraftStatus] = useState<string | null>(null);
   const editedRef = useRef(false);
+  // Generation fence: a delayed older run must not overwrite a newer attempt or
+  // land after unmount. Native Code Lab uses request IDs; web uses this counter.
+  const runGenerationRef = useRef(0);
   const latestRunRef = useRef(latestRun);
   latestRunRef.current = latestRun;
 
@@ -74,6 +83,8 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
 
     return () => {
       cancelled = true;
+      // Invalidate any in-flight sandbox so a late result cannot update unmounted UI.
+      runGenerationRef.current += 1;
     };
   }, [runnerSpec.starterCode, lessonId]);
 
@@ -103,6 +114,8 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
   };
 
   const runCode = async (runMode: CodeRunMode): Promise<void> => {
+    const runGeneration = ++runGenerationRef.current;
+    const codeSnapshot = code;
     setIsRunning(true);
     setActiveRunMode(runMode);
     setActivePhaseIndex(0);
@@ -110,15 +123,29 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
 
     try {
       await waitForRunPhase();
+      if (runGeneration !== runGenerationRef.current) {
+        return;
+      }
       setActivePhaseIndex(1);
-      const attempt = await runLessonSandbox(runnerSpec, lessonId, code, new Date().toISOString(), runMode);
+      const attempt = await runLessonSandbox(runnerSpec, lessonId, codeSnapshot, new Date().toISOString(), runMode);
+      if (runGeneration !== runGenerationRef.current) {
+        return;
+      }
       setActivePhaseIndex(runMode === "run_checks" ? 2 : 1);
       await waitForRunPhase(180);
+      if (runGeneration !== runGenerationRef.current) {
+        return;
+      }
       onRunPassed(redactLearnerAttempt(attempt));
     } catch (caughtError) {
+      if (runGeneration !== runGenerationRef.current) {
+        return;
+      }
       setRunError(caughtError instanceof Error ? caughtError.message : "Unable to run sandbox.");
     } finally {
-      setIsRunning(false);
+      if (runGeneration === runGenerationRef.current) {
+        setIsRunning(false);
+      }
     }
   };
 
@@ -176,6 +203,9 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
     ? buildRunningTerminalEvents(runnerSpec.language, activeRunMode, activePhaseIndex)
     : verifiedRun?.terminalTranscript ?? buildRunningTerminalEvents(runnerSpec.language, "run_checks", -1);
   const diagnostics = verifiedRun?.diagnostics ?? [];
+  const privateVerificationFailed = diagnostics.some(
+    (diagnostic) => diagnostic.id === PRIVATE_VERIFICATION_DIAGNOSTIC_ID
+  );
   const scaffoldNotice = isScaffoldStarter(runnerSpec.starterCode) ? scaffoldStarterNotice() : null;
   const failedGradedRun = verifiedRun?.runMode === "run_checks" && !verifiedRun.passed;
   const runState = isRunning
@@ -189,7 +219,9 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
         : fileRan
           ? "File ran"
           : verifiedRun
-            ? "Needs attention"
+            ? privateVerificationFailed
+              ? "Private checks need work"
+              : "Needs attention"
             : historicalPass
               ? "Passed previously"
               : "Ready to run";
@@ -222,7 +254,9 @@ export function CodeLab({ attemptHistory = [], handoff, historicalAchievement = 
               : fileRan
                 ? "The file ran. Run checks when you are ready to validate the answer."
                 : verifiedRun
-                  ? "Read the failing test, change the smallest thing, then run again."
+                  ? privateVerificationFailed
+                    ? "Visible checks passed, but private verification did not. Re-read the lesson goal and refine the solution without expecting a checklist of hidden cases."
+                    : "Read the failing test, change the smallest thing, then run again."
                   : historicalPass
                     ? "You passed this lesson previously. Run checks to verify the code currently in the editor."
                     : "Run file to inspect output. Run checks when you are ready to validate the answer."}
