@@ -11,7 +11,7 @@ gates.
 
 ## Model, trust, and tools
 
-- Use the active harness and shell. This repository supports multiple models and vendor APIs. Act on
+- Use the active harness and shell. Follow the current task's model choice. Act on
   clear tasks and pause only a genuinely risky action. This is React Native/Expo,
   not Kotlin/Android. Use Gradle only for an existing `android/` tree when
   native packaging is in scope; do not import parent Kotlin or Play Billing
