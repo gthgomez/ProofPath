@@ -387,6 +387,12 @@ function runTest(test: LessonRunnerTest, visible: boolean, scope: PythonScope, s
         "Change the smallest thing, then run again."
       ].join("\n")
     };
+  } finally {
+    // Mirror the web/WebView runners: hidden checks may print while grading, but
+    // that private output must never remain in learner-visible stdout.
+    if (!visible) {
+      stdout.length = stdoutStart;
+    }
   }
 }
 

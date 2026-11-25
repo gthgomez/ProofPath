@@ -1,8 +1,8 @@
 # ProofPath Status
 
-**Last verified:** 2026-11-07
-**Final verified main commit:** `d9cabc04ef13be70194cb50b23269c1df914db8d` (squash-merge of PR #52; runtime lifecycle, coherent restore, safe offline updates, browser/native verification)
-**Campaign branch:** `campaign/runtime-truth-and-continuity` (PR #52) is merged; PR #51 is closed as superseded. Zero open PRs at the post-merge check.
+**Last verified:** 2026-11-15
+**Final verified main commit:** `05df59e1a94a95eef4f1a688bc089095e0451783` (PR #53 docs on top of PR #52 squash-merge `d9cabc04`)
+**Active branch:** `feat/beginner-journey-feedback-guard` — private-verification learner feedback, web run-generation fence, hosted Browser E2E job. PR #51 remains superseded (not revived).
 **Status:** active development
 **Confidence:** high
 
@@ -30,6 +30,8 @@ Expo SDK 55 / React Native 0.83 / TypeScript 5.9 application with Expo SQLite lo
 - Concepts reference + global search (`/concepts`, `/concepts/[conceptId]`, `/search`).
 
 ## Recent Evidence
+
+- **2026-11-15 (beginner feedback guard, branch `feat/beginner-journey-feedback-guard`):** Reproduced on `main` `05df59e` that a hidden-only failure left every visible check green, empty `diagnostics`, and Code Lab copy saying “Read the failing test” with nothing to read — while secrets stayed redacted. Fix: `normalizeCodeRunAttempt` appends a count-free `private-verification-failed` diagnostic; Code Lab status copy names private verification without counts/names/expected values; web Code Lab gains a run-generation fence so a delayed result cannot land after unmount; privacy describe is self-sufficient for the runtime import hook; Browser E2E job applied to `.github/workflows/ci.yml` (token now has `workflow` scope). Follow-up from remaining-defect audit: native offline Python now rolls back hidden `print` stdout (parity with web/WebView); Code Lab keeps last-run terminal/diagnostics while the draft is unverified; native timeout attempts bind the submitted request code, not a live editor edit. Browser gate `e2e-private-verification.mjs` forges a SQL CTE constant that passes the visible row and fails the seeded hidden check — asserts “Private checks need work”, edit-time survival, then a real pass, with no hidden INSERT/expectation leaks. Verification: baseline `npm run verify` **66/613** on `05df59e`; after follow-up **71 files / 624 tests**; hosted CI on PR #54 green (Verify, Verify Windows, Browser E2E); local `e2e-private-verification` `ok: true`. Android TalkBack / font-scaling / touch not run (no adb device attached). Evidence under `/home/ubuntu/work/proofpath-evidence/`.
 
 - **2026-11-07 (post-merge verification, `main` `d9cabc04`):** PR #52 was squash-merged into `main` as `d9cabc04ef13be70194cb50b23269c1df914db8d`. PR #51 was closed as **superseded, not merged**: every file it touches is present in #52's merged diff, and its two commits were cherry-picked and repaired. Zero open PRs remain. On the merged tree: `npm run verify` green with **66 files / 613 tests** (content validation SUCCESS, redaction scan, `tsc --noEmit` clean); `npm run build:web` exit 0 with a content-hashed service worker (35 precached paths); hosted post-merge CI Ubuntu + Windows both pass at `d9cabc04`: https://github.com/gthgomez/ProofPath/actions/runs/42415899235. Remaining blocker: the browser E2E job is still not hosted CI because the available OAuth token lacks GitHub's `workflow` scope; the ready job is in `docs/engineering/browser-e2e-ci-job.md`.
 
@@ -111,7 +113,7 @@ The CareerForge -> ProofPath rename is complete. Package `proofpath`, `app.json`
 
 ## Blockers
 
-- **The browser E2E job is not yet hosted CI.** The ready job definition (pinned checkout/setup-node, Playwright install, `npm run build:web`, both browser scripts, failure-artifact upload) could not be pushed because the available OAuth token lacks the `workflow` scope required to modify `.github/workflows/ci.yml`. The scripts run successfully locally against the exported build. A maintainer with `workflow` scope must apply the job definition.
+- **Physical Android/iOS hardware** (TalkBack, font scaling, touch timing) remains unverified on this host — no adb device attached.
 - **Android runtime testing on this host works only through the emulator, and its WebView WASM boots are too slow for the current startup allowance.** The earlier "no virtualization / AVD cannot boot" blocker no longer holds here: WHPX acceleration is usable, the API 36 x86_64 AVD boots, and offline app navigation was exercised. What remains blocked on this host is measuring real cold-boot timings for Pyodide/sql.js/TypeScript inside the WebView (every measured boot exceeded the 20 s allowance under software rendering), so tuning `NATIVE_RUNTIME_STARTUP_ALLOWANCE_MS` and the full TypeScript/SQL pass matrix still need real hardware. They are not substituted with mocked React tests.
 - Native Gradle builds require a short checkout path on Windows: CMake object filenames embed the absolute source path, and long worktree names trip the 260-character limit (see [docs/engineering/windows-native-build-path-limit.md](./docs/engineering/windows-native-build-path-limit.md); keep ProofPath worktrees ≤ ~40 characters).
 
